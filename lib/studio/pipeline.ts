@@ -63,7 +63,7 @@ export async function pruneAssets(store: EditorStore, puppetId: string) {
   const p = puppetOf(store, puppetId);
   if (!p) return;
   const setViews = Object.values(p.poseSets ?? {}).flatMap((x) => x?.frames ?? []);
-  const used = new Set<string>([p.source?.assetId, ...[...Object.values(p.views), ...setViews].flatMap((v) => [v?.cutoutAssetId, v?.sourceAssetId, v?.manikin?.atlasAssetId])].filter(Boolean) as string[]);
+  const used = new Set<string>([p.source?.assetId, ...(p.attachments ?? []).map((a) => a.assetId), ...[...Object.values(p.views), ...setViews].flatMap((v) => [v?.cutoutAssetId, v?.sourceAssetId, v?.manikin?.atlasAssetId])].filter(Boolean) as string[]);
   const stale = p.assets.filter((a) => !used.has(a.id));
   if (!stale.length) return;
   for (const a of stale) { await deleteAsset(store.project.id, a.id).catch(() => {}); forgetAsset(store.project.id, a.id); }

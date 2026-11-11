@@ -11,10 +11,14 @@ import paperMeasuresMod from '@/docs/guida-di-prova/guida-burattino.png';
 import paperPrompt from '@/docs/guida-di-prova/prompt-burattino.txt';
 import paper34Mod from '@/docs/guida-di-prova/guida-burattino-34-pulita.png';
 import paper34Prompt from '@/docs/guida-di-prova/prompt-burattino-34.txt';
+import paperFrontMod from '@/docs/guida-di-prova/guida-burattino-fronte-pulita.png';
+import paperFrontPrompt from '@/docs/guida-di-prova/prompt-burattino-fronte.txt';
+import paperBackMod from '@/docs/guida-di-prova/guida-burattino-retro-pulita.png';
+import paperBackPrompt from '@/docs/guida-di-prova/prompt-burattino-retro.txt';
 import { readImageFile, ACCEPTED_IMAGE_TYPES } from '@/lib/import-export/image';
 import { putAsset } from '@/lib/persistence/db';
 import { updatePuppet, pruneAssets } from '@/lib/studio/pipeline';
-import { importPaperSheet } from '@/lib/studio/paper';
+import { importPaperSheet, PAPER_LABEL, setupOf, type PaperKind } from '@/lib/studio/paper';
 import { ZoomCanvas } from './ZoomCanvas';
 import { ed, st, useAssetImage, type StepProps } from './shared';
 
@@ -29,6 +33,7 @@ export function ImportStep({ store, puppet, projectId, go }: StepProps) {
   const paperFile = useRef<HTMLInputElement>(null);
   const [paperMsg, setPaperMsg] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [pKind, setPKind] = useState<PaperKind>('side');
   const src = useAssetImage(projectId, puppet.source?.assetId);
   const hasViews = Object.keys(puppet.views).length > 0;
   const legacy = !puppet.paper && !!puppet.source;      // made with the older turnaround-sheet pipeline
@@ -45,8 +50,8 @@ export function ImportStep({ store, puppet, projectId, go }: StepProps) {
   const loadPaper = async (f: File) => {
     setErr(null); setPaperMsg(null); setBusy(true);
     try {
-      const r = await importPaperSheet(store, puppet, f);
-      setPaperMsg(`Burattino montato: ${r.parts} pezzi.${r.warnings.length ? ' ' + r.warnings.join(' ') : ''} Ritocca il montaggio qui, poi passa alle animazioni.`);
+      const r = await importPaperSheet(store, puppet, f, pKind);
+      setPaperMsg(`Burattino (${PAPER_LABEL[pKind].toLowerCase()}) montato: ${r.parts} pezzi.${r.warnings.length ? ' ' + r.warnings.join(' ') : ''} Ritocca il montaggio qui, poi passa alle animazioni.`);
       go(2);
     } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
     setBusy(false);
@@ -58,7 +63,8 @@ export function ImportStep({ store, puppet, projectId, go }: StepProps) {
       <div className={st.stage}>
         <div className={st.toolbar}>
           {legacy && <button className={ed.btn} onClick={() => file.current?.click()} data-testid="sheet-import">Sostituisci foglio di rotazione…</button>}
-          <button className={`${ed.btn} ${ed.btnPrimary}`} disabled={busy} onClick={() => paperFile.current?.click()} data-testid="paper-import">{puppet.paper ? 'Sostituisci il foglio dei pezzi…' : 'Importa foglio dei pezzi (burattino)…'}</button>
+          <select className={ed.select} style={{ width: 120 }} value={pKind} onChange={(e) => setPKind(e.target.value as PaperKind)} aria-label="Vista del foglio" data-testid="paper-kind">{(['side', 'front', 'back'] as PaperKind[]).map((k) => <option key={k} value={k}>{PAPER_LABEL[k]}</option>)}</select>
+          <button className={`${ed.btn} ${ed.btnPrimary}`} disabled={busy || (pKind !== 'side' && !puppet.paper)} title={pKind !== 'side' && !puppet.paper ? 'Importa prima il profilo' : undefined} onClick={() => paperFile.current?.click()} data-testid="paper-import">{setupOf(puppet, pKind) ? `Sostituisci ${PAPER_LABEL[pKind].toLowerCase()}…` : `Importa foglio dei pezzi (${PAPER_LABEL[pKind].toLowerCase()})…`}</button>
           {legacy && <button className={ed.btn} onClick={() => go(1)} data-testid="next-step">Avanti: rimuovi lo sfondo →</button>}
           {puppet.paper && <button className={ed.btn} onClick={() => go(2)} data-testid="next-step">Avanti: montaggio →</button>}
           {puppet.source && <span className={ed.help}>{puppet.source.width} × {puppet.source.height}px</span>}
@@ -85,6 +91,11 @@ export function ImportStep({ store, puppet, projectId, go }: StepProps) {
           <a className={ed.btn} href={url(paperMeasuresMod)} download="guida-burattino.png">Scarica la guida con le misure</a>
           <div className={st.promptBox} data-testid="prompt-paper">{paperPrompt}</div>
           <button className={ed.btn} onClick={async () => { try { await navigator.clipboard.writeText(paperPrompt); } catch { setErr('Copia non riuscita: seleziona il testo a mano.'); } }}>Copia il prompt del burattino</button>
+          <span className={ed.help}>Vista di fronte e di schiena (un solo braccio e una sola gamba: l’altro lato è lo specchio):</span>
+          <a className={ed.btn} href={url(paperFrontMod)} download="guida-burattino-fronte-pulita.png">Guida di fronte (per l’AI)</a>
+          <button className={ed.btn} onClick={async () => { try { await navigator.clipboard.writeText(paperFrontPrompt); } catch { setErr('Copia non riuscita: seleziona il testo a mano.'); } }}>Copia il prompt di fronte</button>
+          <a className={ed.btn} href={url(paperBackMod)} download="guida-burattino-retro-pulita.png">Guida di schiena (per l’AI)</a>
+          <button className={ed.btn} onClick={async () => { try { await navigator.clipboard.writeText(paperBackPrompt); } catch { setErr('Copia non riuscita: seleziona il testo a mano.'); } }}>Copia il prompt di schiena</button>
           <span className={ed.help}>Variante 3/4 (busto e bacino più larghi, testa in 3/4):</span>
           <a className={ed.btn} href={url(paper34Mod)} download="guida-burattino-34-pulita.png">Scarica la guida 3/4 (per l’AI)</a>
           <button className={ed.btn} onClick={async () => { try { await navigator.clipboard.writeText(paper34Prompt); } catch { setErr('Copia non riuscita: seleziona il testo a mano.'); } }}>Copia il prompt 3/4</button>

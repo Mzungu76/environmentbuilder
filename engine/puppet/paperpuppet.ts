@@ -105,7 +105,7 @@ function opaqueBox(img: Img) {
 
 interface Joints { prox: Vec2; dist: Vec2; extra?: Vec2; top?: Vec2 }
 /** Joint points in the piece's own pixel coordinates. */
-export function jointsOf(id: PieceId, img: Img): Joints {
+export function jointsOf(id: PieceId, img: Img, frontal = false): Joints {
   const b = opaqueBox(img), top = b.y0, H = b.h, bot = b.y1;
   const at = (f: number) => top + f * H;
   switch (id) {
@@ -114,6 +114,7 @@ export function jointsOf(id: PieceId, img: Img): Joints {
     case 'pelvis': return { prox: { x: rowsCx(img, at(0), at(0.2)), y: at(0.2) }, dist: { x: rowsCx(img, at(0.5), at(0.85)), y: at(0.68) } };
     case 'hand': return { prox: { x: rowsCx(img, at(0), at(0.18)), y: at(0.16) }, dist: { x: rowsCx(img, at(0.82), bot), y: at(0.94) } };
     case 'foot': {
+      if (frontal) return { prox: { x: rowsCx(img, at(0), at(0.2)), y: at(0.22) }, dist: { x: rowsCx(img, at(0.8), bot), y: at(0.88) } };
       const x0 = b.x0, W = b.w;
       return { prox: { x: x0 + W * 0.3, y: at(0.28) }, dist: { x: x0 + W * 0.94, y: colsCy(img, x0 + W * 0.88, x0 + W) } };
     }
@@ -248,4 +249,101 @@ export function buildPaperMesh(asm: PaperAssembly, rows = 3, cols = 2): PaperBui
     for (let ry = 0; ry < rows; ry++) for (let cx = 0; cx < cols; cx++) { const a = base + ry * (cols + 1) + cx, b = a + 1, d = a + cols + 1, e = d + 1; indices.push(a, b, d, b, e, d); }
   });
   return { atlas, mesh: { cell: 1, vertices, uvs, indices }, skin: { idx: sIdx, w: sW }, parts: order.map((p) => ({ id: p.id, bone: p.bone, far: p.far })) };
+}
+
+
+// ---- frontal views (front / back) ---------------------------------------------------------------------------------------------
+function flipX(img: Img): Img {
+  const o = newImg(img.width, img.height);
+  for (let y = 0; y < img.height; y++) for (let x = 0; x < img.width; x++) { const s = (y * img.width + x) * 4, t = (y * img.width + (img.width - 1 - x)) * 4; for (let c = 0; c < 4; c++) o.data[t + c] = img.data[s + c]; }
+  return o;
+}
+/** Leftmost / rightmost opaque x on rows [y0, y1). */
+function rowExtent(img: Img, y0: number, y1: number): { x0: number; x1: number } {
+  let x0 = img.width, x1 = -1;
+  for (let y = Math.max(0, Math.floor(y0)); y < Math.min(img.height, Math.ceil(y1)); y++) for (let x = 0; x < img.width; x++) if (alphaOf(img, x, y) > 40) { if (x < x0) x0 = x; if (x > x1) x1 = x; }
+  return x1 < 0 ? { x0: 0, x1: img.width - 1 } : { x0, x1 };
+}
+
+/**
+ * Front / back assembly. Limbs are drawn once and mirrored for the other side; image-RIGHT limbs are the drawn ones (bones …R),
+ * image-LEFT limbs the mirrored copies (bones …L), as the rig expects for frontal views. From the back the backpack is drawn over the torso.
+ */
+export function assembleFrontal(pieces: Pieces, opt: PaperOptions, kind: 'front' | 'back'): PaperAssembly {
+  for (const id of PART_IDS) if (!pieces[id]) throw new Error(`Manca il pezzo «${PIECE_LABEL[id]}».`);
+  const off = (id: PieceId): Vec2 => { const a = opt.adjust?.[id]; return a ? { x: a.dx, y: a.dy } : { x: 0, y: 0 }; };
+  const sub = (a: Vec2, b: Vec2) => ({ x: a.x - b.x, y: a.y - b.y }), add = (a: Vec2, b: Vec2) => ({ x: a.x + b.x, y: a.y + b.y });
+  const base = Object.fromEntries((PART_IDS as readonly PieceId[]).map((id) => [id, { ...jointsOf(id, pieces[id]!, true), ...(opt.joints?.[id] ?? {}) }])) as Record<PartId, Joints>;
+  const imgs: Record<'R' | 'L', Record<string, Img>> = { R: {}, L: {} }, jt: Record<'R' | 'L', Record<string, Joints>> = { R: {}, L: {} };
+  for (const id of ['uarm', 'farm', 'hand', 'thigh', 'shin', 'foot'] as const) {
+    const im = pieces[id]!, fl = flipX(im), w = im.width - 1, j = base[id];
+    imgs.R[id] = im; jt.R[id] = j;
+    imgs.L[id] = fl; jt.L[id] = { prox: { x: w - j.prox.x, y: j.prox.y }, dist: { x: w - j.dist.x, y: j.dist.y } };
+  }
+  const pos: Record<string, Vec2> = {};
+  const pel = pieces.pelvis!, pb = opaqueBox(pel);
+  pos.pelvis = { x: 0, y: 0 };
+  const waist = add(pos.pelvis, base.pelvis.prox);
+  const pe = rowExtent(pel, pb.y0 + pb.h * 0.6, pb.y0 + pb.h * 0.75), hipY = pb.y0 + pb.h * 0.68, pw = pe.x1 - pe.x0;
+  const hip = { R: { x: pe.x1 - pw * 0.26, y: hipY }, L: { x: pe.x0 + pw * 0.26, y: hipY } };
+  pos.torso = add(sub(waist, base.torso.prox), off('torso'));
+  const tor = pieces.torso!, tb = opaqueBox(tor), shY = tb.y0 + tb.h * 0.2, te = rowExtent(tor, shY - 4, shY + 4), tw = te.x1 - te.x0;
+  const neck = add(pos.torso, base.torso.dist);
+  const shoulder = { R: add(pos.torso, { x: te.x1 - tw * 0.14, y: shY }), L: add(pos.torso, { x: te.x0 + tw * 0.14, y: shY }) };
+  pos.head = add(sub(neck, base.head.prox), off('head'));
+  const headTop = add(pos.head, base.head.top ?? base.head.dist);
+  const lm: Partial<Record<LandmarkId, Vec2>> = { headTop, neck, pelvis: waist };
+  const placed: Placed[] = [];
+  const joint: Record<string, Vec2> = {};
+  const sides = ['R', 'L'] as const;
+  for (const s of sides) {
+    const J = jt[s];
+    pos[`uarm${s}`] = add(sub(shoulder[s], J.uarm.prox), off('uarm')); const elbow = add(pos[`uarm${s}`], J.uarm.dist);
+    pos[`farm${s}`] = add(sub(elbow, J.farm.prox), off('farm')); const wrist = add(pos[`farm${s}`], J.farm.dist);
+    pos[`hand${s}`] = add(sub(wrist, J.hand.prox), off('hand')); const tip = add(pos[`hand${s}`], J.hand.dist);
+    pos[`thigh${s}`] = add(sub(add(pos.pelvis, hip[s]), J.thigh.prox), off('thigh')); const knee = add(pos[`thigh${s}`], J.thigh.dist);
+    pos[`shin${s}`] = add(sub(knee, J.shin.prox), off('shin')); const ankle = add(pos[`shin${s}`], J.shin.dist);
+    pos[`foot${s}`] = add(sub(ankle, J.foot.prox), off('foot')); const toe = add(pos[`foot${s}`], J.foot.dist);
+    Object.assign(lm, { [`shoulder${s}`]: shoulder[s], [`elbow${s}`]: elbow, [`wrist${s}`]: wrist, [`hand${s}`]: tip, [`hip${s}`]: add(pos.pelvis, hip[s]), [`knee${s}`]: knee, [`ankle${s}`]: ankle, [`toe${s}`]: toe });
+    joint[`ankle${s}`] = ankle;
+  }
+  const footBottom = Math.max(...sides.map((s) => pos[`foot${s}`].y + opaqueBox(imgs[s].foot).y1));
+  const H = Math.max(10, footBottom - headTop.y);
+  const tcx = pos.torso.x + (tb.x0 + tb.x1) / 2;
+  if (pieces.accA) { const ab = opaqueBox(pieces.accA), o = off('accA'); pos.accA = { x: tcx - (ab.x0 + ab.w / 2) + o.x, y: pos.torso.y + tb.y0 + tb.h * 0.42 - (ab.y0 + ab.h / 2) + o.y }; }
+  if (pieces.accB) { const ab = opaqueBox(pieces.accB), o = off('accB'); pos.accB = { x: tcx - (ab.x0 + ab.w / 2) + o.x, y: pos.torso.y + tb.y0 + tb.h * 0.04 - ab.y0 + o.y }; }
+  const order: { id: PieceId; side?: 'R' | 'L'; key: string }[] = [
+    ...(kind === 'front' ? [{ id: 'accA' as PieceId, key: 'accA' }] : []),
+    ...sides.flatMap((s) => (['thigh', 'shin', 'foot'] as const).map((id) => ({ id: id as PieceId, side: s, key: `${id}${s}` }))),
+    { id: 'pelvis', key: 'pelvis' }, { id: 'torso', key: 'torso' },
+    ...(kind === 'back' ? [{ id: 'accA' as PieceId, key: 'accA' }] : []),
+    { id: 'accB', key: 'accB' },
+    ...sides.flatMap((s) => (['uarm', 'farm', 'hand'] as const).map((id) => ({ id: id as PieceId, side: s, key: `${id}${s}` }))),
+    { id: 'head', key: 'head' },
+  ];
+  const zs = order.map((o, i) => ({ o, k: i + (opt.adjust?.[o.id]?.z ?? 0) * 1.5 })).sort((a, b) => a.k - b.k).map((e) => e.o);
+  for (const o of zs) {
+    const img = o.side ? imgs[o.side][o.id] : pieces[o.id];
+    if (!img || !pos[o.key]) continue;
+    placed.push({ id: o.id, far: false, bone: (o.side ? `${o.id}${o.side}` : o.id === 'accA' || o.id === 'accB' ? 'torso' : o.id) as BoneId, img, x: pos[o.key].x, y: pos[o.key].y });
+  }
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for (const p of placed) { x0 = Math.min(x0, p.x); y0 = Math.min(y0, p.y); x1 = Math.max(x1, p.x + p.img.width); y1 = Math.max(y1, p.y + p.img.height); }
+  const ox = Math.floor(-x0) + 4, oy = Math.floor(-y0) + 4, cw = Math.ceil(x1 - x0) + 8, ch = Math.ceil(y1 - y0) + 8, cut = newImg(cw, ch);
+  for (const p of placed) compositeOver(cut, p.img, Math.round(p.x + ox), Math.round(p.y + oy));
+  const W = (p: Vec2): Vec2 => ({ x: p.x + ox, y: p.y + oy });
+  for (const k of Object.keys(lm) as LandmarkId[]) lm[k] = W(lm[k]!);
+  const cx = W(pos.pelvis).x + pe.x0 + pw / 2;
+  return { placed: placed.map((p) => ({ ...p, x: p.x + ox, y: p.y + oy })), landmarks: lm, cutout: cut, figureHeight: H, pivot: { x: cx, y: footBottom + oy } };
+}
+
+/** Alpha-composites `src` onto `dst` at (px, py). */
+function compositeOver(dst: Img, src: Img, px: number, py: number) {
+  for (let y = 0; y < src.height; y++) for (let x = 0; x < src.width; x++) {
+    const s = (y * src.width + x) * 4, a = src.data[s + 3] / 255; if (!a) continue;
+    const X = px + x, Y = py + y; if (X < 0 || Y < 0 || X >= dst.width || Y >= dst.height) continue;
+    const t = (Y * dst.width + X) * 4, ba = dst.data[t + 3] / 255, oa = a + ba * (1 - a);
+    for (let c = 0; c < 3; c++) dst.data[t + c] = (src.data[s + c] * a + dst.data[t + c] * ba * (1 - a)) / (oa || 1);
+    dst.data[t + 3] = oa * 255;
+  }
 }

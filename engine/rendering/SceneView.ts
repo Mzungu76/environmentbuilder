@@ -61,7 +61,9 @@ export interface PuppetDraw {
   flip: boolean;
   viewKey: string;
   /** Key-pose playback: the neighbouring key drawn on top, cross-faded. */
-  over?: Omit<PuppetDraw, 'over' | 'flip'> & { alpha: number };
+  over?: Omit<PuppetDraw, 'over' | 'flip' | 'attachments'> & { alpha: number };
+  /** Tools / objects held by the character. */
+  attachments?: { id: string; assetId: string; positions: Float32Array; uvs: number[]; indices: number[]; front: boolean }[];
 }
 
 /** A procedural "omino" frame: posed shapes in doll units (feet at the origin, 1000 tall). */
@@ -525,7 +527,7 @@ export class SceneView {
       const cx = c.x * W, cy = c.y * H;
       const lift = c.lift;
       // --- rigged puppet (skinned mesh) when available
-      if (c.puppet && this.drawPuppetMesh(g, c, cx, cy, h, w, lift)) { seenMesh.add(c.id); if (c.puppet.over) seenMesh.add(c.id + '#over'); if (c.look && c.look.halo > 0.01) seenMesh.add(c.id + '#halo'); continue; }
+      if (c.puppet && this.drawPuppetMesh(g, c, cx, cy, h, w, lift)) { seenMesh.add(c.id); if (c.puppet.over) seenMesh.add(c.id + '#over'); if (c.look && c.look.halo > 0.01) seenMesh.add(c.id + '#halo'); (c.puppet.attachments ?? []).forEach((_, i) => seenMesh.add(`${c.id}#att${i}`)); continue; }
       // --- sprite (image / sprite sheet) when available; procedural placeholder otherwise
       if (c.sprite) {
         const base = this.textures.get(c.sprite.assetId);
@@ -583,6 +585,14 @@ export class SceneView {
         this.applyLook(m, look);
       }
     }
+    // tools / objects: in front of the body or behind it
+    (pd.attachments ?? []).forEach((a, i) => {
+      const slot = `${c.id}#att${i}`;
+      if (!this.placeMesh(slot, { assetId: a.assetId, positions: a.positions, uvs: a.uvs, indices: a.indices, pivot: pd.pivot, figureHeight: pd.figureHeight, viewKey: `att:${a.assetId}:${i}` }, pd.flip, 1, cx, cy - lift, h)) return;
+      const m = this.puppetMeshes.get(slot)!.mesh;
+      if (a.front) this.charRoot.addChild(m);
+      else { const mi = this.charRoot.getChildIndex(main); if (this.charRoot.getChildIndex(m) > mi) this.charRoot.setChildIndex(m, mi); }
+    });
     // soft light halo behind the figure (separates it from busy backgrounds)
     if (look && look.halo > 0.01 && this.placeMesh(c.id + '#halo', pd, pd.flip, Math.min(1, look.halo), cx, cy - lift, h)) {
       const hm = this.puppetMeshes.get(c.id + '#halo')!.mesh;
@@ -614,7 +624,7 @@ export class SceneView {
     mesh.filters = [f]; holder.__lookKey = key;
   }
 
-  private placeMesh(slot: string, pd: Omit<PuppetDraw, 'over' | 'flip'>, flip: boolean, alpha: number, x: number, y: number, h: number): boolean {
+  private placeMesh(slot: string, pd: Omit<PuppetDraw, 'over' | 'flip' | 'attachments'>, flip: boolean, alpha: number, x: number, y: number, h: number): boolean {
     const base = this.textures.get(pd.assetId);
     if (!base) { void this.texture(pd.assetId, () => this.assetLoader(pd.assetId)); return false; }
     const cached = (arr: number[], Ctor: typeof Float32Array | typeof Uint32Array) => { let t = this.typed.get(arr); if (!t) { t = Ctor.from(arr); this.typed.set(arr, t); } return t; };

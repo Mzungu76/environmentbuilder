@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { assemble, buildPaperMesh, extractPieces, jointsOf } from '@/engine/puppet/paperpuppet';
+import { assemble, assembleFrontal, buildPaperMesh, extractPieces, jointsOf } from '@/engine/puppet/paperpuppet';
 import { newImg, type Img } from '@/engine/puppet/imageProc';
 import { BONE_IDS } from '@/types';
 
@@ -67,5 +67,17 @@ describe('paper puppet', () => {
     const a = assemble(extractPieces(sheet()).pieces), tor = a.placed.find((p) => p.id === 'torso')!, pack = a.placed.find((p) => p.id === 'accA')!;
     expect(pack.x).toBeLessThan(tor.x);                                                   // starts behind (left of) the torso
     expect(pack.x + pack.img.width).toBeLessThan(tor.x + tor.img.width * 0.6);            // and only overlaps it a little
+  });
+  it('frontal assembly: mirrored limbs, shoulders and hips left/right of the body, backpack over the torso only from the back', () => {
+    const pieces = extractPieces(sheet()).pieces, f = assembleFrontal(pieces, { farShade: 0.3 }, 'front'), b = assembleFrontal(pieces, { farShade: 0.3 }, 'back'), L = f.landmarks;
+    expect(L.shoulderL!.x).toBeLessThan(L.neck!.x); expect(L.shoulderR!.x).toBeGreaterThan(L.neck!.x);
+    expect(L.hipL!.x).toBeLessThan(L.hipR!.x); expect(L.kneeL!.y).toBeGreaterThan(L.hipL!.y); expect(L.ankleR!.y).toBeGreaterThan(L.kneeR!.y);
+    expect(Math.abs((L.shoulderL!.x + L.shoulderR!.x) / 2 - L.neck!.x)).toBeLessThan(30);       // symmetric about the neck
+    expect(Object.keys(L)).toHaveLength(19);
+    const bones = new Set(f.placed.map((p) => p.bone)); expect(bones.size).toBe(15);
+    expect(f.placed.every((p) => !p.far)).toBe(true);                                         // no darkened copies: both sides are drawn
+    const idx = (a: typeof f, id: string) => a.placed.findIndex((p) => p.id === id);
+    expect(idx(f, 'accA')).toBeLessThan(idx(f, 'torso')); expect(idx(b, 'accA')).toBeGreaterThan(idx(b, 'torso'));
+    const m = buildPaperMesh(f), n = m.mesh.vertices.length / 2; expect(m.skin.idx.length).toBe(n * 4);
   });
 });

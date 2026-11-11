@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import type { PuppetView } from '@/types';
 import { plantFeet, reachArm, twoBoneIK } from '@/engine/puppet/ik';
 import { apply, boneMatrices, buildRig, templateLandmarks } from '@/engine/puppet/skeleton';
-import { makePreset } from '@/engine/puppet/animation';
+import { makePreset, kindsForView } from '@/engine/puppet/animation';
+import { chooseViewForState } from '@/engine/puppet/runtime';
 import { blendPoses, samplePose } from '@/engine/puppet/animation';
 import { buildSequence, concatClips, SEQUENCES } from '@/engine/puppet/sequences';
 import { EXTRA_KINDS } from '@/engine/puppet/presets';
@@ -77,5 +78,46 @@ describe('presets, sequences and blending', () => {
     expect((pl as unknown as { blend: unknown }).blend).not.toBeNull();
     for (let i = 0; i < 20; i++) pl.frame(puppet, 'WALK', 0.016, 0);
     expect((pl as unknown as { blend: unknown }).blend).toBeNull();
+  });
+  it('frontal presets mirror the image-left arm; side-only presets are not offered for front/back; CLIMB falls back to the back view', () => {
+    const side = makePreset('wave', 'side', 1, view), front = makePreset('celebrate', 'front', 1, view);
+    const k = front.keys[0].pose.rot; expect(Math.sign(k.uarmL!)).toBe(-Math.sign(k.uarmR!));
+    expect(side.keys[0].pose.rot.uarmR).toBeLessThan(0);
+    expect(kindsForView('front')).not.toContain('crouch'); expect(kindsForView('side')).toContain('crouch');
+    const mk = (id: 'side' | 'back') => ({ ...view, id, mesh: { cell: 1, vertices: [0, 0, 1, 0, 0, 1], uvs: [0, 0, 1, 0, 0, 1], indices: [0, 1, 2] }, skin: { idx: new Array(12).fill(0), w: [1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0] } });
+    expect(chooseViewForState({ side: mk('side'), back: mk('back') }, 'CLIMB', 'side')).toBe('back');
+    expect(chooseViewForState({ side: mk('side') }, 'CLIMB', 'side')).toBe('side');
+  });
+});
+
+import { activeAttachments, attachmentQuad } from '@/engine/puppet/attachments';
+import type { Attachment } from '@/types';
+describe('attachments (tools and objects)', () => {
+  const att: Attachment = { id: 'pick', name: 'Piccone', assetId: 'img', width: 100, height: 300, bone: 'handR', grip: { x: 50, y: 250 }, offset: { x: 0, y: 0 }, rot: 0, scale: 0.4, front: true, always: false };
+  it('the grip sits on the bone anchor and the tool is scaled by the figure height', () => {
+    const q = attachmentQuad(view, { rot: {}, dx: 0, dy: 0 }, att)!, rig = buildRig(view)!, hand = rig.bones.find((b) => b.id === 'handR')!;
+    const anchor = { x: (hand.head.x + hand.tail.x) / 2, y: (hand.head.y + hand.tail.y) / 2 }, s = (0.4 * view.figureHeight) / 300;
+    // grip (50,250) → anchor: the top-left corner is at (-50, -250) × s from it
+    expect(q.positions[0]).toBeCloseTo(anchor.x - 50 * s, 3); expect(q.positions[1]).toBeCloseTo(anchor.y - 250 * s, 3);
+    expect(Math.hypot(q.positions[6] - q.positions[0], q.positions[7] - q.positions[1])).toBeCloseTo(300 * s, 3);   // image height
+  });
+  it('follows the bone: the tool moves with the hand when the arm turns', () => {
+    const rest = attachmentQuad(view, { rot: {}, dx: 0, dy: 0 }, att)!, up = attachmentQuad(view, { rot: { uarmR: -150 }, dx: 0, dy: 0 }, att)!;
+    expect(Math.hypot(up.positions[0] - rest.positions[0], up.positions[1] - rest.positions[1])).toBeGreaterThan(100);
+    const a = attachmentQuad(view, { rot: {}, dx: 0, dy: 0 }, { ...att, rot: 90 })!;                                // extra rotation about the grip
+    expect(Math.abs(a.positions[0] - rest.positions[0]) + Math.abs(a.positions[1] - rest.positions[1])).toBeGreaterThan(10);
+  });
+  it('shown always, or only in the clips that list it, and only in the views it is made for', () => {
+    const clip = { ...makePreset('dig', 'side', 1, view), attach: ['pick'] }, other = makePreset('walk', 'side', 1);
+    expect(activeAttachments([att], clip, 'side')).toHaveLength(1); expect(activeAttachments([att], other, 'side')).toHaveLength(0);
+    expect(activeAttachments([{ ...att, always: true }], other, 'side')).toHaveLength(1);
+    expect(activeAttachments([att], clip, 'front')).toHaveLength(0); expect(activeAttachments([{ ...att, views: ['front'] }], clip, 'front')).toHaveLength(1);
+  });
+  it('the player returns the quads of the attachments of the current clip', () => {
+    const v = { ...view, mesh: { cell: 1, vertices: [0, 0, 10, 0, 0, 10], uvs: [0, 0, 1, 0, 0, 1], indices: [0, 1, 2] }, skin: { idx: new Array(12).fill(0), w: [1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0] } };
+    const dig = { ...makePreset('dig', 'side', 1, view), attach: ['pick'] };
+    const puppet = { ...createPuppet('p'), views: { side: { ...v, clips: [...v.clips, dig], stateClips: { ...v.stateClips, INTERACT: dig.id } } }, idleView: 'side' as const, attachments: [att] };
+    expect(new PuppetPlayer().frame(puppet, 'INTERACT', 0.02, 0)!.attachments).toHaveLength(1);
+    expect(new PuppetPlayer().frame(puppet, 'WALK', 0.02, 0)!.attachments).toBeUndefined();
   });
 });

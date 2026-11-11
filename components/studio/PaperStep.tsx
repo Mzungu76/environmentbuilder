@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { PaperSetup } from '@/types';
 import { PIECE_LABEL, type PieceId, type Pieces } from '@/engine/puppet/paperpuppet';
-import { assembleSetup, commitPaper, loadPieces } from '@/lib/studio/paper';
+import { assembleSetup, commitPaper, loadPieces, PAPER_LABEL, setupOf, type PaperKind } from '@/lib/studio/paper';
 import { imgToCanvas } from '@/lib/studio/pipeline';
 import { ZoomCanvas } from './ZoomCanvas';
 import { ed, st, type StepProps } from './shared';
@@ -16,7 +16,9 @@ const LABEL: Record<string, string> = { ...PIECE_LABEL, accA: 'Zaino (dietro)', 
  * joint it hangs on (children follow), and move it in front of / behind its neighbours. Changes are saved automatically.
  */
 export function PaperStep({ store, puppet, projectId, go }: StepProps) {
-  const setup = puppet.paper!;
+  const kinds = (['side', 'front', 'back'] as PaperKind[]).filter((k) => setupOf(puppet, k));
+  const [kind, setKind] = useState<PaperKind>('side');
+  const setup = setupOf(puppet, kind) ?? puppet.paper!;
   const [pieces, setPieces] = useState<Pieces | null>(null);
   const [warn, setWarn] = useState<string | null>(null);
   const [local, setLocal] = useState<PaperSetup>(setup);
@@ -25,24 +27,25 @@ export function PaperStep({ store, puppet, projectId, go }: StepProps) {
   const [saving, setSaving] = useState(false);
   const [ver, setVer] = useState(0);
   const seq = useRef(0);
+  const first = useRef(true);
 
   useEffect(() => {
     let alive = true;
-    loadPieces(projectId, puppet).then((r) => { if (alive) { if (r) setPieces(r.pieces); else setWarn('Foglio dei pezzi non trovato: importalo di nuovo.'); } }).catch((e) => alive && setWarn(e instanceof Error ? e.message : String(e)));
+    setPieces(null); setLocal(setupOf(puppet, kind) ?? puppet.paper!); first.current = true;
+    loadPieces(projectId, puppet, kind).then((r) => { if (alive) { if (r) setPieces(r.pieces); else setWarn('Foglio dei pezzi non trovato: importalo di nuovo.'); } }).catch((e) => alive && setWarn(e instanceof Error ? e.message : String(e)));
     return () => { alive = false; };
-  }, [projectId, puppet.paper?.sheetAssetId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [projectId, kind, setupOf(puppet, kind)?.sheetAssetId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const asm = useMemo(() => (pieces ? assembleSetup(pieces, local) : null), [pieces, local]);
+  const asm = useMemo(() => (pieces ? assembleSetup(pieces, local, kind) : null), [pieces, local, kind]);
   const canvas = useMemo(() => (asm ? imgToCanvas(asm.cutout) : null), [asm]);
   useEffect(() => setVer((n) => n + 1), [asm, sel]);
 
   // auto-save (debounced): the assembled images are rebuilt as new assets
-  const first = useRef(true);
   useEffect(() => {
     if (!pieces) return;
     if (first.current) { first.current = false; return; }
     const my = ++seq.current;
-    const t = setTimeout(async () => { setSaving(true); try { await commitPaper(store, puppet.id, pieces, local); } finally { if (seq.current === my) setSaving(false); } }, 900);
+    const t = setTimeout(async () => { setSaving(true); try { await commitPaper(store, puppet.id, pieces, local, kind); } finally { if (seq.current === my) setSaving(false); } }, 900);
     return () => clearTimeout(t);
   }, [local]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -63,6 +66,7 @@ export function PaperStep({ store, puppet, projectId, go }: StepProps) {
     <div className={st.main}>
       <div className={st.stage}>
         <div className={st.toolbar}>
+          {kinds.length > 1 && <div className={ed.checkGrid} data-testid="paper-views">{kinds.map((k) => <button key={k} className={ed.chip} aria-pressed={kind === k} onClick={() => setKind(k)} data-testid={`paper-view-${k}`}>{PAPER_LABEL[k]}</button>)}</div>}
           <button className={`${ed.btn} ${ed.btnPrimary}`} onClick={() => go(6)} data-testid="next-step">Avanti: animazioni →</button>
           <span className={ed.help}>{saving ? 'Salvataggio…' : 'Clicca un pezzo per selezionarlo: lo sposti con le frecce.'}</span>
         </div>

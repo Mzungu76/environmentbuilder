@@ -47,7 +47,19 @@ export const PRESET_LABEL: Record<PresetKind, string> = { idle: 'Riposo', walk: 
 const pose = (rot: Partial<Record<BoneId, number>>, dx = 0, dy = 0): Pose => ({ rot, dx, dy });
 
 /** Parametric starting clips (sampled into keyframes the user can edit). `amount` scales the motion (0.2 … 2). */
+/** Presets that make sense for frontal (front / back) views: no leg bending in the image plane. */
+export const FRONTAL_KINDS: PresetKind[] = ['idle', 'walk', 'climb', 'jump', 'fall', 'interact', 'collect', 'wave', 'lookAround', 'celebrate', 'scared', 'surprised', 'hit', 'showObject'];
+export const kindsForView = (view: ViewId): PresetKind[] => (view === 'front' || view === 'back' ? FRONTAL_KINDS : (Object.keys(PRESET_LABEL) as PresetKind[]));
+/** Presets written for the side view raise both arms with the same sign; in a frontal view the image-left arm turns the other way. */
+const MIRROR_ARMS: PresetKind[] = ['climb', 'jump', 'fall', 'interact', 'collect', 'wave', 'celebrate', 'scared', 'surprised', 'hit', 'showObject'];
 export function makePreset(kind: PresetKind, view: ViewId, amount = 1, pv?: PuppetView): Clip {
+  const c = makePresetRaw(kind, view, amount, pv);
+  if ((view === 'front' || view === 'back') && MIRROR_ARMS.includes(kind)) {
+    for (const k of c.keys) { const rot = { ...k.pose.rot }; for (const b of ['uarmL', 'farmL', 'handL'] as BoneId[]) if (rot[b] !== undefined) rot[b] = -rot[b]!; k.pose = { ...k.pose, rot }; }
+  }
+  return c;
+}
+function makePresetRaw(kind: PresetKind, view: ViewId, amount = 1, pv?: PuppetView): Clip {
   if (view === 'climb' || view === 'jump') return makePosePreset(kind, view, amount);
   if (isExtra(kind)) return makeExtraPreset(kind, pv, amount);
   const keys: { t: number; pose: Pose }[] = [];

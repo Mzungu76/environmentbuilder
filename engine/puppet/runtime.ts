@@ -79,6 +79,7 @@ export function chooseViewForState(views: Partial<Record<ViewId, PuppetView>>, s
   const has = (v: ViewId) => !!views[v] && !!resolveView(views[v]!).mesh;
   if (!hint) {
     if (state === 'CLIMB' && has('climb')) return 'climb';
+    if (state === 'CLIMB' && has('back')) return 'back';           // climbing away from the camera
     if ((state === 'JUMP' || state === 'FALL') && has('jump')) return 'jump';
   }
   const moving = state === 'WALK' || state === 'CLIMB' || state === 'JUMP' || state === 'FALL';

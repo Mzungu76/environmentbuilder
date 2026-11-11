@@ -2,12 +2,16 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { BONE_IDS, type BoneId, type CharacterState, type Clip, type Pose, type PuppetView } from '@/types';
-import { makePreset, PRESET_LABEL, PRESET_STATE, samplePose, type PresetKind } from '@/engine/puppet/animation';
+import { kindsForView, makePreset, PRESET_LABEL, PRESET_STATE, samplePose, type PresetKind } from '@/engine/puppet/animation';
 import { apply, boneMatrices, parentRotation, restAngle, buildRig } from '@/engine/puppet/skeleton';
 import { updatePuppet } from '@/lib/studio/pipeline';
 import { uid } from '@/lib/ids';
 import { plantFeet } from '@/engine/puppet/ik';
 import { buildSequence, SEQUENCES } from '@/engine/puppet/sequences';
+import { activeAttachments, attachmentQuad, QUAD_INDICES, QUAD_UVS } from '@/engine/puppet/attachments';
+import { drawPuppet } from '@/engine/puppet/canvasRenderer';
+import { imgToCanvas, loadAssetImg } from '@/lib/studio/pipeline';
+import { AttachmentsPanel } from './AttachmentsPanel';
 import { resolveView } from '@/engine/puppet/runtime';
 import { ZoomCanvas } from './ZoomCanvas';
 import { renderPuppet } from './draw';
@@ -31,12 +35,20 @@ export function AnimateStep({ store, puppet, projectId, go }: StepProps) {
   const [ver, setVer] = useState(0);
   const [ground, setGround] = useState(true);
   const [plant, setPlant] = useState(true);
+  const [selAtt, setSelAtt] = useState<string | null>(null);
+  const attCanvas = useRef(new Map<string, HTMLCanvasElement>());
+  useEffect(() => {
+    let alive = true;
+    for (const a of puppet.attachments ?? []) if (!attCanvas.current.has(a.assetId)) { void loadAssetImg(projectId, a.assetId).then((img) => { if (alive && img) { attCanvas.current.set(a.assetId, imgToCanvas(img)); setVer((n) => n + 1); } }); }
+    return () => { alive = false; };
+  }, [puppet.attachments, projectId]);
   const drag = useRef<{ bone: BoneId; moved: boolean } | null>(null);
   const clip = view?.clips.find((c) => c.id === clipId) ?? view?.clips[0];
   const rig = useMemo(() => (view ? buildRig(view) : null), [view]);
 
   useEffect(() => { if (view && !view.clips.some((c) => c.id === clipId)) setClipId(view.clips[0]?.id ?? null); }, [view, clipId]);
   useEffect(() => setVer((n) => n + 1), [view, phase, selKey, clip]);
+  useEffect(() => { if (!kindsForView(vid).includes(kind)) setKind('walk'); }, [vid]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // playback
   useEffect(() => {
@@ -96,7 +108,11 @@ export function AnimateStep({ store, puppet, projectId, go }: StepProps) {
                 const gy = view.pivot.y, x0 = -v.ox / v.zoom - 50, x1 = x0 + 4000;
                 ctx.save(); ctx.strokeStyle = 'rgba(120,200,120,.9)'; ctx.lineWidth = 2 / v.zoom; ctx.setLineDash([10 / v.zoom, 6 / v.zoom]); ctx.beginPath(); ctx.moveTo(x0, gy); ctx.lineTo(x1, gy); ctx.stroke(); ctx.restore();
               }
+              const shown = [...activeAttachments(puppet.attachments, clip, vid), ...((puppet.attachments ?? []).filter((a) => a.id === selAtt && (a.views ?? ['side']).includes(vid)))].filter((a, i, arr) => arr.findIndex((b) => b.id === a.id) === i);
+              const drawAtt = (front: boolean) => { for (const a of shown) { if (a.front !== front) continue; const q = attachmentQuad(rv, pose, a), im = attCanvas.current.get(a.assetId); if (q && im) { drawPuppet(ctx, im, q.positions, QUAD_UVS, QUAD_INDICES, { x: rv.pivot.x, y: rv.pivot.y, scale: 1, flip: false, pivot: rv.pivot }); if (a.id === selAtt) { const u = a.grip.x / a.width, w2 = a.grip.y / a.height, P = q.positions, gx = P[0] + (P[2] - P[0]) * u + (P[6] - P[0]) * w2, gy = P[1] + (P[3] - P[1]) * u + (P[7] - P[1]) * w2; ctx.beginPath(); ctx.arc(gx, gy, 5 / v.zoom, 0, Math.PI * 2); ctx.fillStyle = '#22c55e'; ctx.fill(); ctx.lineWidth = 1.5 / v.zoom; ctx.strokeStyle = '#052e16'; ctx.stroke(); } } } };
+              drawAtt(false);
               renderPuppet(ctx, cut.canvas, rv, pose);
+              drawAtt(true);
               const mats = boneMatrices(rig, pose);
               for (const b of rig.bones) {
                 const t = apply(mats[b.index], b.tail);
@@ -146,7 +162,7 @@ export function AnimateStep({ store, puppet, projectId, go }: StepProps) {
             {view.clips.map((c) => <button key={c.id} className={st.item} aria-current={clip?.id === c.id} onClick={() => { setClipId(c.id); setSelKey(null); setPhase(0); }}><span>{c.name}</span><span className={st.tag}>{c.keys.length} chiavi · {c.duration}s</span></button>)}
           </div>
           <div className={ed.row2} style={{ gridTemplateColumns: '1fr auto' }}>
-            <select className={ed.select} value={kind} onChange={(e) => setKind(e.target.value as PresetKind)} aria-label="Preset">{KINDS.map((k) => <option key={k} value={k}>{PRESET_LABEL[k]}</option>)}</select>
+            <select className={ed.select} value={kind} onChange={(e) => setKind(e.target.value as PresetKind)} aria-label="Preset">{kindsForView(vid).map((k) => <option key={k} value={k}>{PRESET_LABEL[k]}</option>)}</select>
             <button className={ed.btn} onClick={() => { const c = makePreset(kind, vid, amount, view); setClips((cs, sc) => ({ clips: [...cs, c], stateClips: { ...sc, [PRESET_STATE[kind]]: sc[PRESET_STATE[kind]] ?? c.id } })); setClipId(c.id); }} data-testid="add-preset">Aggiungi</button>
           </div>
           <Slider id="amt" label="Ampiezza del preset" value={amount} min={0.2} max={2} step={0.1} onChange={setAmount} fmt={(v) => `×${v.toFixed(1)}`} />
@@ -179,10 +195,11 @@ export function AnimateStep({ store, puppet, projectId, go }: StepProps) {
             <span className={ed.help}>Posizionati sull’istante voluto e muovi lo slider: viene creata o aggiornata una chiave con le gambe già risolte.</span>
           </div>
         )}
+        <AttachmentsPanel store={store} puppet={puppet} projectId={projectId} clip={clip} vid={vid} selected={selAtt} onSelect={setSelAtt} setClip={setClip} />
         <div className={ed.section} data-testid="sequences">
           <h4>Sequenze predefinite</h4>
           <span className={ed.help}>Catene di movimenti già pronte (usano le animazioni esistenti, creando quelle che mancano). Il risultato è una normale animazione che puoi assegnare a uno stato o modificare.</span>
-          {SEQUENCES.map((d) => <div key={d.id} className={ed.row2} style={{ gridTemplateColumns: '1fr auto', alignItems: 'center' }}><span><strong>{d.label}</strong><br /><span className={ed.help}>{d.help}</span></span><button className={ed.btn} onClick={() => addSequence(d.id)} data-testid={`seq-${d.id}`}>Aggiungi</button></div>)}
+          {SEQUENCES.filter((d) => d.steps.every((x) => kindsForView(vid).includes(x.kind))).map((d) => <div key={d.id} className={ed.row2} style={{ gridTemplateColumns: '1fr auto', alignItems: 'center' }}><span><strong>{d.label}</strong><br /><span className={ed.help}>{d.help}</span></span><button className={ed.btn} onClick={() => addSequence(d.id)} data-testid={`seq-${d.id}`}>Aggiungi</button></div>)}
         </div>
         <div className={ed.section}>
           <h4>Quale animazione per quale stato</h4>

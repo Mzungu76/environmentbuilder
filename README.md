@@ -31,6 +31,9 @@ Pipeline guidata in 7 passi per trasformare un **foglio di rotazione** (fronte, 
 ### Burattino di carta — Studio personaggi → passo *Importa*
 Foglio di pezzi separati disegnati dall'AI → ritrovamento dei pezzi, snodi dai pixel, montaggio di profilo, atlante e mesh rigida sullo scheletro esistente (`engine/puppet/paperpuppet.ts`, `lib/studio/paper.ts`). Guide e prompt in `docs/guida-di-prova/` (`tools/make-puppet-guide.py` rigenera le guide e il layout).
 
+### Fronte/retro, attrezzi e animazioni del burattino
+Viste frontali con arti specchiati (`assembleFrontal`), attrezzi agganciati alle ossa (`engine/puppet/attachments.ts`), IK per i piedi a terra (`ik.ts`), preset (`presets.ts`) e sequenze (`sequences.ts`).
+
 ### Sequenze di pose (arrampicata) — passo *Viste*
 Foglio con N pose → ritaglio, scheletro automatico per adattamento della sagoma (`engine/puppet/fit.ts`), scala uniforme, riproduzione chiave→chiave con deformazione e dissolvenza (`engine/puppet/keyposes.ts`). Esportato nel pacchetto (`puppet.json → poseSets`) con `sampleSet` nel runtime.
 

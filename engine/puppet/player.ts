@@ -1,5 +1,6 @@
 import type { CharacterState, Puppet, PuppetView, ViewId } from '@/types';
-import { advancePhase, chooseViewForState, poseAt, resolveView, skinVertices } from './runtime';
+import { advancePhase, chooseViewForState, clipFor, poseAt, resolveView, skinVertices } from './runtime';
+import { activeAttachments, attachmentQuad, type AttachQuad } from './attachments';
 import { sampleSet } from './keyposes';
 import { blendPoses } from './animation';
 import type { Pose } from '@/types';
@@ -9,6 +10,8 @@ export interface PuppetFrame {
   viewId: ViewId; view: PuppetView; positions: Float32Array;
   /** Key-pose playback only: the neighbouring key, drawn on top of the main layer with this alpha. */
   over?: PuppetLayer;
+  /** Tools / objects held in this frame (view pixel space). */
+  attachments?: AttachQuad[];
 }
 
 const setKeyOf = (state: CharacterState): 'climb' | 'jump' | null => (state === 'CLIMB' ? 'climb' : state === 'JUMP' || state === 'FALL' ? 'jump' : null);
@@ -55,7 +58,8 @@ export class PuppetPlayer {
     const positions = skinVertices(view, pz, this.buf.get(view));
     if (!positions) return null;
     this.buf.set(view, positions);
-    return { viewId, view, positions };
+    const att = activeAttachments(puppet.attachments, clipFor(view, state), viewId).map((a) => attachmentQuad(view, pz, a)).filter((q): q is AttachQuad => !!q);
+    return { viewId, view, positions, attachments: att.length ? att : undefined };
   }
 
   private layer(view: PuppetView, pose: import('@/types').Pose): Float32Array | null {

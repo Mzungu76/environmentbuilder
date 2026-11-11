@@ -59,7 +59,8 @@ export function puppetJson(p: Puppet) {
     if (!set || set.frames.length < 2) continue;
     poseSets[key] = { duration: set.duration, loop: set.loop, frames: set.frames.map((f, i) => { const { cutoutAssetId, crop: _c, sourceAssetId, manikin, ...rest } = f; void cutoutAssetId; void _c; void sourceAssetId; void manikin; return { ...rest, texture: `textures/${key}-${i}.png` }; }) };
   }
-  return { format: PUPPET_FORMAT, schemaVersion: SCHEMA_VERSION, name: p.name, idleView: p.idleView, views, poseSets };
+  const attachments = (p.attachments ?? []).map((a) => { const { assetId, ...rest } = a; void assetId; return { ...rest, texture: `attachments/${a.id}.png` }; });
+  return { format: PUPPET_FORMAT, schemaVersion: SCHEMA_VERSION, name: p.name, idleView: p.idleView, views, poseSets, attachments };
 }
 
 const blobToDataUrl = (b: Blob) => new Promise<string>((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result)); r.onerror = () => rej(r.error); r.readAsDataURL(b); });
@@ -83,6 +84,11 @@ export async function buildPuppetPackage(project: Project, puppet: Puppet): Prom
       if (!blob) throw new Error(`Immagine mancante per la posa ${i + 1} della sequenza «${key}»`);
       const path = `textures/${key}-${i}.png`; zip.file(path, blob); urls[path] = await blobToDataUrl(blob);
     }
+  }
+  for (const a of puppet.attachments ?? []) {
+    const blob = await getAsset(project.id, a.assetId);
+    if (!blob) throw new Error(`Immagine mancante per l’attrezzo «${a.name}»`);
+    zip.file(`attachments/${a.id}.png`, blob); urls[`attachments/${a.id}.png`] = await blobToDataUrl(blob);
   }
   zip.file('puppet.json', JSON.stringify(json, null, 2));
   zip.file('environment-runtime.mjs', RUNTIME_SOURCE);
@@ -122,6 +128,7 @@ Note
 - Stati supportati: IDLE, WALK, CLIMB, INTERACT, COLLECT, JUMP, FALL, CUSTOM (quelli senza animazione usano IDLE).
 - speedInFigureHeights = velocità in altezze del personaggio al secondo: sincronizza il passo (clip.cycleLength) ed evita i piedi che scivolano.
 - Il profilo guarda a destra: per andare a sinistra usa flip: true.
+- Attrezzi e oggetti: puppet.json → attachments (immagine, osso, impugnatura, scala…) e clip.attach (id mostrati in quella animazione). Per ogni frame R.activeAttachments(attachments, clip, viewId) + R.attachmentQuad(view, pose, a) danno i 4 angoli (stesso spazio dei vertici): disegnali con R.drawPuppet e QUAD uv [0,0,1,0,1,1,0,1], indici [0,1,2,0,2,3] davanti o dietro al corpo (a.front).
 - Sequenze di pose (arrampicata/salto): puppet.json → poseSets.climb = { frames, duration, loop }; a ogni frame R.sampleSet(set, phase) restituisce { under, over } (view + pose + alpha): disegna under opaco e over sopra con globalAlpha = alpha; la fase avanza di dt/duration. Vedi demo.html.
 - Vista fronte/retro: scegli con l'indicazione "view" dei collegamenti (props.view) o per le soste (idleView).
 `;

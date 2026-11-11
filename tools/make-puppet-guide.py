@@ -8,6 +8,8 @@ from PIL import Image, ImageDraw, ImageFont
 OUT = os.path.join(os.path.dirname(__file__), '..', 'docs', 'guida-di-prova')
 W, H = 2048, 1536
 THREE_Q = '--34' in sys.argv      # 3/4 variant: deeper head, torso and pelvis (the body is turned a little toward the viewer)
+FRONT, BACK = '--front' in sys.argv, '--back' in sys.argv      # frontal variants: the camera sees the character from the front / the back
+FRONTAL = FRONT or BACK
 S = 1.3                      # canvas px per unit; a standing figure is 1000 units = 1300 px tall
 PADX, PADY = 30, 64          # slot margin around the silhouette (px); the top/bottom margins hold the label and the measures
 
@@ -25,6 +27,22 @@ PARTS = [
   ('accA',   'ZAINO (dietro al busto)',      None,     200, 260, 'free',  None, None),
   ('accB',   'BRETELLA (sul busto)',         None,     110, 300, 'free',  None, None),
 ]
+
+if FRONTAL:
+    # front/back view: wide torso/pelvis, limbs drawn ONCE (the app mirrors them for the other side); the foot is seen from the front
+    PARTS = [
+      ('head',   'TESTA (con cappello o capelli)' + (', di fronte' if FRONT else ', di nuca'), 'head', 195, 240, 'head', (97, 205), (97, 8)),
+      ('torso',  'BUSTO (senza braccia)', 'torso', 250, 350, 'torso', (125, 305), (125, 40)),
+      ('pelvis', 'BACINO', 'pelvis', 240, 140, 'torso', (120, 55), (120, 105)),
+      ('uarm',   'BRACCIO', 'uarmR', 80, 210, 'limb', (40, 40), (40, 175)),
+      ('farm',   'AVAMBRACCIO', 'farmR', 70, 200, 'limb', (35, 35), (35, 165)),
+      ('hand',   'MANO', 'handR', 80, 100, 'limb', (40, 25), (40, 92)),
+      ('thigh',  'COSCIA', 'thighR', 112, 270, 'limb', (56, 52), (56, 220)),
+      ('shin',   'GAMBA (stinco)', 'shinR', 92, 270, 'limb', (46, 44), (46, 230)),
+      ('foot',   'PIEDE (visto da %s)' % ('davanti' if FRONT else 'dietro'), 'footR', 100, 130, 'limb', (50, 30), (50, 115)),
+      ('accA',   'ZAINO (visibile da dietro)' if BACK else 'ZAINO (nascosto, facoltativo)', None, 230, 260, 'free', None, None),
+      ('accB',   'BRETELLE (sul busto)' if FRONT else 'ACCESSORIO (facoltativo)', None, 150, 300, 'free', None, None),
+    ]
 
 def font(sz, bold=False):
     for p in ['/usr/share/fonts/truetype/dejavu/DejaVuSans%s.ttf' % ('-Bold' if bold else '')]:
@@ -84,13 +102,13 @@ def render(annotated):
                 d.line([q['x'] - 14, q['y'], q['x'] + 14, q['y']], fill=col, width=3); d.line([q['x'], q['y'] - 14, q['x'], q['y'] + 14], fill=col, width=3)
                 d.ellipse([q['x'] - 6, q['y'] - 6, q['x'] + 6, q['y'] + 6], outline=col, width=3)
     if annotated:
-        d.text((50, 30), ('GUIDA BURATTINO 3/4' if THREE_Q else 'GUIDA BURATTINO') + ' — vista laterale (destra), pezzi dritti e non ruotati. 1 unità = 1/1000 dell\'altezza in piedi (1000 u = %d px)' % layout['standingHeightPx'], fill=(0, 0, 0), font=font(26, True))
+        d.text((50, 30), ('GUIDA BURATTINO DI FRONTE' if FRONT else 'GUIDA BURATTINO DI SCHIENA' if BACK else 'GUIDA BURATTINO 3/4' if THREE_Q else 'GUIDA BURATTINO') + (' — vista frontale, un solo braccio e una sola gamba (l\'altro lato è lo specchio), pezzi dritti.' if FRONTAL else ' — vista laterale (destra), pezzi dritti e non ruotati.'), fill=(0, 0, 0), font=font(26, True))
         d.text((50, 64), 'Croce ROSSA = snodo con il pezzo precedente (prossimale).  Croce BLU = snodo con il pezzo successivo (distale).  Il disegno deve proseguire oltre lo snodo (estremità arrotondata).', fill=(60, 60, 60), font=font(21))
-        d.text((50, H - 60), 'Le sagome grigie indicano posizione e proporzioni: i pezzi devono stare DENTRO la propria casella, senza toccare i bordi.', fill=(60, 60, 60), font=font(22))
+        d.text((50, H - 60), 'Le sagome grigie indicano posizione e proporzioni: i pezzi devono stare DENTRO la propria casella, senza toccare i bordi.  1 unità = 1/1000 dell\'altezza in piedi (1000 u = %d px).' % layout['standingHeightPx'], fill=(60, 60, 60), font=font(22))
     return im
 
 os.makedirs(OUT, exist_ok=True)
-sfx = '-34' if THREE_Q else ''
+sfx = '-fronte' if FRONT else '-retro' if BACK else '-34' if THREE_Q else ''
 render(True).save(os.path.join(OUT, f'guida-burattino{sfx}.png'))
 render(False).save(os.path.join(OUT, f'guida-burattino{sfx}-pulita.png'))
 json.dump(layout, open(os.path.join(OUT, f'guida-burattino{sfx}-layout.json'), 'w'), indent=1, ensure_ascii=False)

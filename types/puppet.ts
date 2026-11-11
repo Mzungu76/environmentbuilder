@@ -50,6 +50,8 @@ export interface Clip {
   keys: Keyframe[];
   /** Distance covered per cycle, in figure heights: lets the runtime sync the speed and avoid foot sliding. */
   cycleLength?: number;
+  /** Ids of the attachments (tools / objects) shown while this clip plays. */
+  attach?: string[];
 }
 
 export interface WeightParams {
@@ -144,6 +146,33 @@ export interface PoseSet {
 }
 export type PoseSetKey = 'climb' | 'jump';
 
+/**
+ * A tool or object carried by the character (pickaxe, torch, a collected item…): an image fixed to a bone. The `grip` point of the
+ * image sits on the bone's anchor (the middle of the bone, e.g. the centre of the hand), then `offset`, `rot` and `scale` fine-tune it.
+ */
+export interface Attachment {
+  id: string;
+  name: string;
+  assetId: string;
+  width: number;
+  height: number;
+  bone: BoneId;
+  /** Point of the image (pixels) that is held. */
+  grip: Vec2;
+  /** From the bone anchor, in figure heights. */
+  offset: Vec2;
+  /** Degrees, relative to the bone's rest orientation. */
+  rot: number;
+  /** Height of the image as a fraction of the figure height. */
+  scale: number;
+  /** Drawn in front of the body (true) or behind it. */
+  front: boolean;
+  /** Always visible (e.g. a carried object); otherwise only in the clips that list it in `attach`. */
+  always: boolean;
+  /** Views that show it (default: the profile only). */
+  views?: ViewId[];
+}
+
 /** Paper puppet: hand corrections of the automatic assembly. Keys are piece ids (head, torso, pelvis, uarm, farm, hand, thigh, shin, foot, accA, accB). */
 export interface PaperAdjust { dx: number; dy: number; /** > 0 draws the piece in front of its default place, < 0 behind */ z: number }
 export interface PaperSetup { sheetAssetId: string; adjust: Record<string, PaperAdjust>; farShade: number }
@@ -158,6 +187,10 @@ export interface Puppet {
   poseSets?: Partial<Record<PoseSetKey, PoseSet>>;
   /** Present when the character was assembled from a sheet of separate parts (paper puppet). */
   paper?: PaperSetup;
+  /** Front / back views assembled from their own sheets of parts (the profile view is `paper`). */
+  /** Tools and objects the character can hold. */
+  attachments?: Attachment[];
+  paperViews?: Partial<Record<'front' | 'back', PaperSetup>>;
   /** View used when standing still. */
   idleView: ViewId;
   /** Asset metadata for every image of this puppet (source + cut-outs), exported with the project. */
