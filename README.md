@@ -33,6 +33,7 @@ npm run dev        # http://localhost:3000
 npm test           # test unitari (vitest)
 npm run typecheck
 npm run build      # export statico in ./out, pubblicabile su qualsiasi hosting statico
+npm run build:standalone   # genera dist/environment-builder.html, un singolo file apribile con doppio click
 ```
 
 ## Uso rapido
