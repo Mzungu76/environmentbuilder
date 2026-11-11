@@ -6,9 +6,13 @@ import mapMod from '@/docs/guida-di-prova/guida-mappa-parti.png';
 import promptText from '@/docs/guida-di-prova/prompt-guida.txt';
 import posesMod from '@/docs/guida-di-prova/guida-pose-extra.png';
 import posesPrompt from '@/docs/guida-di-prova/prompt-pose-extra.txt';
+import paperCleanMod from '@/docs/guida-di-prova/guida-burattino-pulita.png';
+import paperMeasuresMod from '@/docs/guida-di-prova/guida-burattino.png';
+import paperPrompt from '@/docs/guida-di-prova/prompt-burattino.txt';
 import { readImageFile, ACCEPTED_IMAGE_TYPES } from '@/lib/import-export/image';
 import { putAsset } from '@/lib/persistence/db';
 import { updatePuppet, pruneAssets } from '@/lib/studio/pipeline';
+import { importPaperSheet } from '@/lib/studio/paper';
 import { ZoomCanvas } from './ZoomCanvas';
 import { ed, st, useAssetImage, type StepProps } from './shared';
 
@@ -20,6 +24,9 @@ export function ImportStep({ store, puppet, projectId, go }: StepProps) {
   const [err, setErr] = useState<string | null>(null);
   const [confirm, setConfirm] = useState<File | null>(null);
   const [copied, setCopied] = useState(false);
+  const paperFile = useRef<HTMLInputElement>(null);
+  const [paperMsg, setPaperMsg] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
   const src = useAssetImage(projectId, puppet.source?.assetId);
   const hasViews = Object.keys(puppet.views).length > 0;
 
@@ -32,6 +39,15 @@ export function ImportStep({ store, puppet, projectId, go }: StepProps) {
       await pruneAssets(store, puppet.id);
     } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
   };
+  const loadPaper = async (f: File) => {
+    setErr(null); setPaperMsg(null); setBusy(true);
+    try {
+      const r = await importPaperSheet(store, puppet, f);
+      setPaperMsg(`Burattino montato: ${r.parts} pezzi.${r.warnings.length ? ' ' + r.warnings.join(' ') : ''} Controlla il risultato nel passo «Animazioni».`);
+      go(6);
+    } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
+    setBusy(false);
+  };
   const pick = (f?: File) => { if (!f) return; if (hasViews) setConfirm(f); else void load(f); };
 
   return (
@@ -39,6 +55,7 @@ export function ImportStep({ store, puppet, projectId, go }: StepProps) {
       <div className={st.stage}>
         <div className={st.toolbar}>
           <button className={`${ed.btn} ${ed.btnPrimary}`} onClick={() => file.current?.click()} data-testid="sheet-import">{puppet.source ? 'Sostituisci foglio…' : 'Importa foglio di rotazione…'}</button>
+          <button className={ed.btn} disabled={busy} onClick={() => paperFile.current?.click()} data-testid="paper-import">Importa foglio pezzi (burattino di carta)…</button>
           {puppet.source && <button className={ed.btn} onClick={() => go(1)} data-testid="next-step">Avanti: rimuovi lo sfondo →</button>}
           {puppet.source && <span className={ed.help}>{puppet.source.width} × {puppet.source.height}px</span>}
         </div>
@@ -49,7 +66,10 @@ export function ImportStep({ store, puppet, projectId, go }: StepProps) {
             : <div className={st.empty}><div><h2 style={{ margin: '0 0 6px', color: 'var(--text)' }}>Importa il foglio di rotazione</h2><p style={{ margin: 0 }}>Trascina qui un’immagine (PNG, JPG, WebP) con le tre viste del personaggio — fronte, profilo verso destra, retro — oppure usa la guida a destra per farla generare.</p></div></div>}
         </div>
         {confirm && <div className={ed.banner} style={{ position: 'static' }} role="alert">Sostituendo il foglio si perdono viste, scheletro e pesi già creati. <button onClick={() => { void load(confirm); setConfirm(null); }}>Sostituisci</button><button onClick={() => setConfirm(null)}>Annulla</button></div>}
+        {busy && <span className={ed.help}>Elaborazione dei pezzi…</span>}
+        {paperMsg && <span className={ed.help} style={{ color: 'var(--text)' }} role="status" data-testid="paper-msg">{paperMsg}</span>}
         {err && <div className={ed.banner} style={{ position: 'static' }} role="alert">{err}</div>}
+        <input ref={paperFile} type="file" accept={ACCEPTED_IMAGE_TYPES.join(',')} hidden data-testid="paper-file" onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) void loadPaper(f); }} />
         <input ref={file} type="file" accept={ACCEPTED_IMAGE_TYPES.join(',')} hidden data-testid="sheet-file" onChange={(e) => { pick(e.target.files?.[0]); e.target.value = ''; }} />
       </div>
       <aside className={st.panel} aria-label="Guida per l’AI">
@@ -68,6 +88,15 @@ export function ImportStep({ store, puppet, projectId, go }: StepProps) {
           <div className={st.promptBox} data-testid="prompt-text">{promptText}</div>
           <button className={ed.btn} onClick={async () => { try { await navigator.clipboard.writeText(promptText); setCopied(true); setTimeout(() => setCopied(false), 1500); } catch { setErr('Copia non riuscita: seleziona il testo a mano.'); } }}>{copied ? 'Copiato ✓' : 'Copia il prompt'}</button>
           <span className={ed.help}>Compila i parametri tra {'{{ }}'} (personaggio, vestiti, palette, stile, sfondo).</span>
+        </div>
+        <div className={ed.section} data-testid="paper-guide">
+          <h4>Alternativa · Burattino di carta (pezzi separati)</h4>
+          <span className={ed.help}>Il personaggio come pezzi di carta snodati: l’AI disegna testa, busto, bacino, braccio, avambraccio, mano, coscia, gamba e piede in un unico foglio e il programma li rimonta. Movimenti ampi (arrampicata, salto) senza deformare il disegno. Vista di profilo verso destra, specchiabile. Dai all’AI la guida «pulita» insieme all’immagine del personaggio.</span>
+          <img className={st.guideImg} src={url(paperCleanMod)} alt="Guida del burattino: sagome dei pezzi" />
+          <a className={ed.btn} href={url(paperCleanMod)} download="guida-burattino-pulita.png">Scarica la guida pulita (per l’AI)</a>
+          <a className={ed.btn} href={url(paperMeasuresMod)} download="guida-burattino.png">Scarica la guida con le misure</a>
+          <div className={st.promptBox} data-testid="prompt-paper">{paperPrompt}</div>
+          <button className={ed.btn} onClick={async () => { try { await navigator.clipboard.writeText(paperPrompt); } catch { setErr('Copia non riuscita: seleziona il testo a mano.'); } }}>Copia il prompt del burattino</button>
         </div>
         <div className={ed.section}>
           <h4>3 · Pose aggiuntive: arrampicata e salto (opzionale)</h4>

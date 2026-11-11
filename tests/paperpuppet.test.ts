@@ -1,0 +1,52 @@
+import { describe, expect, it } from 'vitest';
+import { assemble, buildPaperMesh, extractPieces, jointsOf } from '@/engine/puppet/paperpuppet';
+import { newImg, type Img } from '@/engine/puppet/imageProc';
+import { BONE_IDS } from '@/types';
+
+function rect(img: Img, x0: number, y0: number, w: number, h: number, c: [number, number, number]) {
+  for (let y = y0; y < y0 + h; y++) for (let x = x0; x < x0 + w; x++) { const i = (y * img.width + x) * 4; img.data[i] = c[0]; img.data[i + 1] = c[1]; img.data[i + 2] = c[2]; img.data[i + 3] = 255; }
+}
+/** Sheet like the AI's: top row head/torso/pelvis/backpack, bottom row arm/forearm/hand/thigh/shin/foot. Positions are NOT on a grid. */
+function sheet(drop?: string): Img {
+  const s = newImg(1400, 1000);
+  const top: [string, number, number, number, number][] = [['head', 40, 90, 200, 240], ['torso', 300, 70, 180, 340], ['pelvis', 560, 120, 190, 200], ['acc', 820, 100, 210, 300]];
+  const bot: [string, number, number, number, number][] = [['uarm', 50, 560, 90, 230], ['farm', 220, 580, 80, 210], ['hand', 380, 600, 80, 130], ['thigh', 520, 540, 110, 290], ['shin', 700, 545, 100, 295], ['foot', 880, 640, 180, 120]];
+  for (const [n, x, y, w, h] of [...top, ...bot]) if (n !== drop) rect(s, x, y, w, h, [(x / 6) % 255, (y / 4) % 255, 90]);
+  return s;
+}
+
+describe('paper puppet', () => {
+  it('finds the 9 parts + the accessory even when they are not on a fixed grid', () => {
+    const r = extractPieces(sheet());
+    expect(Object.keys(r.pieces).sort()).toEqual(['accA', 'farm', 'foot', 'hand', 'head', 'pelvis', 'shin', 'thigh', 'torso', 'uarm'].sort());
+    expect(r.pieces.head!.width).toBe(200 + 6); expect(r.pieces.thigh!.height).toBe(290 + 6);   // exact size + 3px margin each side
+    expect(r.pieces.foot!.width).toBeGreaterThan(r.pieces.foot!.height);
+  });
+  it('explains what is wrong when parts are missing', () => {
+    expect(() => extractPieces(sheet('shin'))).toThrow(/riga bassa|pezzi/);
+    expect(() => extractPieces(newImg(100, 100))).toThrow(/nessun pezzo/);
+  });
+  it('limb joints are the centres of the rounded ends, inside the piece', () => {
+    const p = extractPieces(sheet()).pieces, j = jointsOf('thigh', p.thigh!);
+    expect(j.prox.y).toBeLessThan(j.dist.y); expect(j.prox.y).toBeGreaterThan(3); expect(j.dist.y).toBeLessThan(p.thigh!.height);
+    expect(Math.abs(j.prox.x - p.thigh!.width / 2)).toBeLessThan(4);
+  });
+  it('assembles a standing figure: head over torso over pelvis over legs, far limbs behind, joints chained', () => {
+    const a = assemble(extractPieces(sheet()).pieces), L = a.landmarks;
+    expect(L.headTop!.y).toBeLessThan(L.neck!.y); expect(L.neck!.y).toBeLessThan(L.pelvis!.y); expect(L.pelvis!.y).toBeLessThan(L.hipR!.y);
+    expect(L.hipR!.y).toBeLessThan(L.kneeR!.y); expect(L.kneeR!.y).toBeLessThan(L.ankleR!.y); expect(L.shoulderR!.y).toBeLessThan(L.elbowR!.y); expect(L.elbowR!.y).toBeLessThan(L.wristR!.y);
+    expect(L.toeR!.x).toBeGreaterThan(L.ankleR!.x);                                     // toes point right
+    expect(a.placed.findIndex((p) => p.far && p.id === 'thigh')).toBeLessThan(a.placed.findIndex((p) => p.id === 'torso'));
+    expect(a.placed.findIndex((p) => !p.far && p.id === 'uarm')).toBeGreaterThan(a.placed.findIndex((p) => p.id === 'torso'));
+    expect(a.cutout.width).toBeGreaterThan(100); expect(a.figureHeight).toBeGreaterThan(500);
+    expect(Object.keys(L)).toHaveLength(19);
+  });
+  it('rigid-part mesh: every vertex skinned to exactly one bone, valid UVs and indices', () => {
+    const a = assemble(extractPieces(sheet()).pieces), b = buildPaperMesh(a), n = b.mesh.vertices.length / 2;
+    expect(b.mesh.uvs.length).toBe(n * 2); expect(b.skin.idx.length).toBe(n * 4); expect(Math.max(...b.mesh.indices)).toBeLessThan(n);
+    expect(b.mesh.uvs.every((u) => u >= 0 && u <= 1)).toBe(true);
+    for (let i = 0; i < n; i++) { expect(b.skin.w[i * 4]).toBe(1); expect(b.skin.idx[i * 4]).toBeLessThan(BONE_IDS.length); }
+    expect(new Set(b.parts.map((p) => p.bone)).size).toBe(15);                           // all bones have a part
+    expect(b.atlas.width).toBeLessThanOrEqual(1100);
+  });
+});

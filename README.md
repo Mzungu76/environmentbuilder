@@ -28,6 +28,9 @@ L’interfaccia è in **italiano** (stringhe ancora inline nei componenti; un li
 
 Pipeline guidata in 7 passi per trasformare un **foglio di rotazione** (fronte, profilo, retro; generato con una guida inclusa) in un personaggio animato: rimozione sfondo con tolleranze, ritaglio delle viste con rettangoli regolabili, ritocco (gomma/ripristina), scheletro di 19 giunti con posizionamento automatico e correzione manuale, mesh e **pesi automatici + pennello**, copie degli arti lontani nel profilo, animazioni a chiavi con preset, anteprima ed **esportazione ZIP** (puppet.json + texture + runtime + `demo.html`). Nel Playtest il personaggio cammina con passo sincronizzato alla velocità e vista fronte/retro per collegamento. Dati: schema **v3** (`Project.puppets`, `Character.puppetId`), migrazione da v2 automatica. Guida all'integrazione: [docs/INTEGRAZIONE-PERSONAGGI.md](docs/INTEGRAZIONE-PERSONAGGI.md). Utilizzabile anche da smartphone/tablet (area di lavoro fissa in alto, modalità «mano», bersagli touch più grandi).
 
+### Burattino di carta — Studio personaggi → passo *Importa*
+Foglio di pezzi separati disegnati dall'AI → ritrovamento dei pezzi, snodi dai pixel, montaggio di profilo, atlante e mesh rigida sullo scheletro esistente (`engine/puppet/paperpuppet.ts`, `lib/studio/paper.ts`). Guide e prompt in `docs/guida-di-prova/` (`tools/make-puppet-guide.py` rigenera le guide e il layout).
+
 ### Sequenze di pose (arrampicata) — passo *Viste*
 Foglio con N pose → ritaglio, scheletro automatico per adattamento della sagoma (`engine/puppet/fit.ts`), scala uniforme, riproduzione chiave→chiave con deformazione e dissolvenza (`engine/puppet/keyposes.ts`). Esportato nel pacchetto (`puppet.json → poseSets`) con `sampleSet` nel runtime.
 
