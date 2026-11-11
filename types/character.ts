@@ -48,6 +48,8 @@ export interface Character {
   startNodeId: string | null;
   /** Rigged character from the Studio used instead of sprite/placeholder (schema v3). */
   puppetId?: string | null;
+  /** Procedural "omino" used when no puppet is set (schema v4). */
+  dollId?: string | null;
   /** Abilities matched against edge requirements (e.g. "can-climb"). */
   abilities: string[];
   behavior: CharacterBehavior;

@@ -83,17 +83,33 @@ Nell’editor, il personaggio usa il modellino scegliendolo in *Aspetto con sche
 
 **Limiti:** l’immagine unica non contiene ciò che è nascosto (dietro un braccio, l’altra gamba): le copie degli arti lontani e il pennello dei pesi compensano, ma movimenti molto ampi mostrano deformazioni. L’aspetto non cambia con l’inventario.
 
-## 9. Playtest
+## 9. Omini (personaggi procedurali)
+
+Nello Studio personaggi, il pulsante **Omini** (accanto a *Modellini*) apre l’editor di un personaggio **senza immagini**: un omino con testa, busto, **braccia, gambe**, vestiti e accessori, disegnato dal programma e animato con lo stesso scheletro dei modellini. Ha uno stile pulito e coerente, si adatta a qualunque scena ed è leggerissimo.
+
+- **Si parte da un modello** (*Minatore*, *Esploratrice*, *Piccolo (testa grande)*, *Slanciato*) con **Nuovo**, oppure da **Casuale** (ogni clic un omino diverso). **Copia** duplica quello corrente.
+- **Aspetto:** capelli (nessuno, corti, spettinati, lunghi, coda, chignon), volto (puntini, semplice, sorriso, serio), maglia (maglietta, camicia, giacca, gilet), pantaloni (lunghi, pantaloncini, cargo), scarpe (stivali, scarpe da ginnastica, scalzo).
+- **Colori:** pelle, capelli, maglia, pantaloni, scarpe, accento, contorno.
+- **Accessori** (ognuno col suo colore): casco con lampada, berretto, cappello a tesa, zaino, piccone, fazzoletto, cintura, guanti, ginocchiere, occhiali.
+- **Proporzioni:** 11 cursori (testa, collo, busto, fianchi, braccia, gambe, mani, piedi…): dal personaggio «testa grande» a quello slanciato. *Ripristina* torna ai valori base.
+- **Stile e movimento:** spessore del contorno, ombra degli arti lontani (dà profondità), **vivacità** (ampiezza di tutti i movimenti).
+- **Anteprima animata** in tutti gli stati (IDLE, WALK, CLIMB, INTERACT, COLLECT, JUMP, FALL), con velocità, specchio e *Ferma* per osservare una posa. Il passo della camminata segue la velocità.
+- **Usalo:** nell’editor, Inspector del personaggio → *Omino (procedurale)*, oppure dallo Studio con *Crea un personaggio con questo omino* o l’elenco dei personaggi del progetto. Se un personaggio ha anche un modellino, questo ha la precedenza (ordine: modellino → omino → sprite → segnaposto).
+- **Esporta:** *Esporta pacchetto ZIP* = `doll.json` + runtime senza dipendenze + `demo.html` (lettore autonomo). Non servono immagini.
+
+Funziona bene anche da smartphone. **Limiti:** solo vista di profilo (specchiata per l’altra direzione); gli accessori sono quelli elencati; non ci sono ancora texture dipinte sulle parti né cambio d’abito in base all’inventario.
+
+## 10. Playtest
 
 Nasconde gli strumenti. **Play / Pausa / Stop / Reset** (`Spazio` = Play/Pausa). *Stop* riporta tutti alla partenza; *Reset* riparte da capo. In manuale clicca un nodo (cerchi bianchi) o usa l’elenco; destinazioni non raggiungibili vengono rifiutate con un messaggio. Pannelli: **Interazioni** (pulsanti manuali, inventario, eventi inviati al gioco), **Diagnostica** (posizione, nodo, collegamento, velocità, stato, percorso), **Parametri** (modificano davvero il personaggio). *Mostra percorsi* sovrappone i nodi di progetto. Tornando all’Editor **nulla è perso**: il Playtest non modifica il progetto (inventario e oggetti raccolti sono solo temporanei).
 
-## 10. Salvataggio ed esportazione
+## 11. Salvataggio ed esportazione
 
 - **Esporta → ZIP:** `project.json` + `manifest.json` + tutte le immagini (`assets/`). È il formato di backup e di consegna. **Importa** dalla Libreria (crea sempre un *nuovo* progetto, non sovrascrive).
 - **Esporta → JSON:** solo configurazione, senza immagini.
 - Vecchi progetti (schema v1) vengono aggiornati automaticamente; file più recenti dell’app vengono rifiutati con un avviso.
 
-## 11. Integrazione con altri giochi
+## 12. Integrazione con altri giochi
 
 1. Esporta lo ZIP: le coordinate sono **normalizzate (0–1)** rispetto alla dimensione originale dell’immagine, quindi indipendenti da schermo e risoluzione; moltiplica per larghezza/altezza dell’immagine del livello.
 2. Per riusare movimento, percorsi, uscite e interazioni senza riscriverli: `npm run build:runtime` produce `dist/environment-runtime.mjs` (~19 KB, nessuna dipendenza, niente DOM):
@@ -109,7 +125,7 @@ Nasconde gli strumenti. **Play / Pausa / Stop / Reset** (`Spazio` = Play/Pausa).
    Sono esportati anche `findRoute`, `resolveExit`, `availableInteractions`, `performInteraction`, `registerMovementType` (nuovi tipi di movimento).
 3. **Eventi in uscita dal Playtest** (per prove di integrazione): ogni evento (`arrival`, `interaction`, `transition`, con il nome evento configurato) è un `CustomEvent` sulla `window` — `window.addEventListener('environment-builder:event', e => e.detail)` — e un `postMessage` al genitore se l’app è in un iframe (`{ source: 'environment-builder', event }`).
 
-## 12. Limiti noti e consigli
+## 13. Limiti noti e consigli
 
 - Niente fisica/collisioni (scelta di progetto: movimento guidato dal grafo).
 - Immagini oltre la dimensione massima di texture della GPU (spesso 8192–16384 px) possono non comparire: verrà mostrato un avviso.

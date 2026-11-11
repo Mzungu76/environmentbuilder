@@ -31,6 +31,12 @@ export function CharacterPanel({ store, env, c }: { store: EditorStore; env: Env
             {store.project.puppets.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
         </Field>
+        <Field label="Omino (procedurale)" id="c-doll" help="Usato se non c’è un modellino. Si crea e si personalizza nello Studio personaggi → Omini.">
+          <select id="c-doll" className={styles.select} value={c.dollId ?? ''} onChange={(e) => set({ dollId: e.target.value || null })} data-testid="char-doll">
+            <option value="">— nessuno —</option>
+            {store.project.dolls.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+          </select>
+        </Field>
         <Link className={styles.btn} href={`/studio?id=${store.project.id}`} style={{ textDecoration: 'none' }}>Apri lo Studio personaggi</Link>
       </div>
       <SpriteEditor store={store} env={env} c={c} />

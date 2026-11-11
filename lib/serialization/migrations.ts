@@ -18,6 +18,12 @@ migrations[2] = (doc) => ({
   environments: (doc.environments ?? []).map((env: any) => ({ ...env, characters: (env.characters ?? []).map((c: any) => ({ ...c, puppetId: c.puppetId ?? null })) })),
 });
 
+// v3 → v4: procedural characters (dolls) and the optional link from a character to one.
+migrations[3] = (doc) => ({
+  ...doc, schemaVersion: 4, dolls: doc.dolls ?? [],
+  environments: (doc.environments ?? []).map((env: any) => ({ ...env, characters: (env.characters ?? []).map((c: any) => ({ ...c, dollId: c.dollId ?? null })) })),
+});
+
 function normalizeInteraction(i: any) {
   return {
     id: i.id, kind: i.kind ?? 'custom', label: i.label ?? i.kind ?? 'Interazione', trigger: i.trigger ?? 'manual', once: i.once ?? false,
@@ -44,7 +50,7 @@ export function migrateProject(input: unknown): Project {
   for (const env of doc.environments) {
     if (!env?.navigation || !Array.isArray(env.navigation.nodes) || !Array.isArray(env.navigation.edges))
       throw new SchemaError(`L’ambiente “${env?.name ?? '?'}” ha un grafo di navigazione non valido`);
-    doc.customProfiles ??= []; doc.puppets ??= [];
+    doc.customProfiles ??= []; doc.puppets ??= []; doc.dolls ??= [];
     env.layers ??= []; env.assets ??= []; env.objects ??= []; env.entrances ??= []; env.exits ??= []; env.characters ??= []; env.profiles ??= ['custom'];
   }
   return doc as Project;

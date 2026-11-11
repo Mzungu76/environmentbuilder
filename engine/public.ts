@@ -34,3 +34,9 @@ export { rigOf, skinVertices, clipFor, advancePhase, poseAt, chooseView, chooseV
 export { samplePose, phaseRate, makePreset, defaultClips } from '@/engine/puppet/animation';
 export { buildRig, boneMatrices, BONE_DEFS } from '@/engine/puppet/skeleton';
 export { drawPuppet, type DrawOptions } from '@/engine/puppet/canvasRenderer';
+
+// --- procedural characters ("omini") ---------------------------------------------------------------------------------
+export { buildDollShapes, dollLandmarks, DOLL_HEIGHT, type DollShape } from '@/engine/doll/shapes';
+export { DollPlayer, dollClips } from '@/engine/doll/player';
+export { drawDoll, shapesBounds, type DollDrawOptions } from '@/engine/doll/render';
+export { createDoll, randomDoll, DOLL_PRESETS, ACCESSORY_LABEL } from '@/engine/doll/defaults';

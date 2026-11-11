@@ -4,7 +4,7 @@ Editor 2D universale per trasformare illustrazioni (prodotte esternamente, es. c
 
 Tutto gira nel browser: nessun backend, nessun database remoto, nessun servizio a pagamento. I dati sono salvati in **IndexedDB**.
 
-## Stato: Milestone 1 (Editor base) ✅ · Milestone 2 (Simulazione) ✅ · Milestone 3 (Gestione ambienti) ✅ · Milestone 4 (Estensioni) ✅ · **Studio personaggi** ✅
+## Stato: Milestone 1 (Editor base) ✅ · Milestone 2 (Simulazione) ✅ · Milestone 3 (Gestione ambienti) ✅ · Milestone 4 (Estensioni) ✅ · **Studio personaggi** ✅ · **Omini** ✅
 
 📘 **Manuale operativo:** [docs/MANUALE.md](docs/MANUALE.md)
 
@@ -27,6 +27,10 @@ L’interfaccia è in **italiano** (stringhe ancora inline nei componenti; un li
 ### Studio personaggi (modellini con scheletro) — sezione `/studio`
 
 Pipeline guidata in 7 passi per trasformare un **foglio di rotazione** (fronte, profilo, retro; generato con una guida inclusa) in un personaggio animato: rimozione sfondo con tolleranze, ritaglio delle viste con rettangoli regolabili, ritocco (gomma/ripristina), scheletro di 19 giunti con posizionamento automatico e correzione manuale, mesh e **pesi automatici + pennello**, copie degli arti lontani nel profilo, animazioni a chiavi con preset, anteprima ed **esportazione ZIP** (puppet.json + texture + runtime + `demo.html`). Nel Playtest il personaggio cammina con passo sincronizzato alla velocità e vista fronte/retro per collegamento. Dati: schema **v3** (`Project.puppets`, `Character.puppetId`), migrazione da v2 automatica. Guida all'integrazione: [docs/INTEGRAZIONE-PERSONAGGI.md](docs/INTEGRAZIONE-PERSONAGGI.md). Utilizzabile anche da smartphone/tablet (area di lavoro fissa in alto, modalità «mano», bersagli touch più grandi).
+
+### Omini (personaggi procedurali) — Studio personaggi → *Omini*
+
+Evoluzione del piccolo personaggio disegnato dal programma: ora ha **braccia**, vestiti e accessori e si personalizza interamente (proporzioni, colori, capelli, volto, maglia, pantaloni, scarpe, 10 accessori tra cui casco con lampada, zaino e piccone), con modelli di partenza (Minatore, Esploratrice, Piccolo, Slanciato) e generatore **Casuale**. Lo scheletro e le animazioni sono gli stessi dei modellini (passo sincronizzato, arrampicata, salto…). Geometria pura (`engine/doll/`): una lista di poligoni disegnabile con Pixi, Canvas o qualunque motore; esportazione ZIP con `doll.json` + runtime + `demo.html`. Schema **v4** (`Project.dolls`, `Character.dollId`), migrazione automatica.
 
 ### Milestone 4 – Estensioni
 
@@ -117,6 +121,7 @@ engine/
   scene/                Operazioni sui livelli grafici
   editor/SceneController  Instrada l'input agli editor (oggetti → navigazione)
   puppet/               Studio personaggi: imageProc (sfondo/ritaglio), skeleton, mesh+pesi, animation, runtime, player, canvasRenderer
+  doll/                 Omini: proporzioni → scheletro → poligoni (shapes), player, renderer Canvas
   characters/           Factory e valori predefiniti dei personaggi
   navigation/           Navigation Editor: grafo (funzioni pure e immutabili), geometria Bézier, hit-testing,
                         NavigationEditor (controller strumenti → comandi sullo store)

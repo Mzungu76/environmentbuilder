@@ -76,3 +76,23 @@ Per percorsi, uscite, interazioni e inventario degli ambienti vedi `docs/MANUALE
 
 ## Compatibilità e versioni
 `puppet.json` riporta `format: "environment-builder-puppet"` e `schemaVersion`. File di schemi precedenti si aggiornano con `R.migrateProject` (per i progetti interi). Il runtime non ha dipendenze e gira in qualunque browser moderno e in Node (solo `drawPuppet` richiede Canvas).
+
+---
+
+# Omini (personaggi procedurali)
+
+Pacchetto: `doll.json`, `environment-runtime.mjs`, `demo.html`, `README.md`. Nessuna immagine: il runtime trasforma `doll` + stato + tempo in **poligoni** pronti da disegnare.
+
+```js
+import * as R from './environment-runtime.mjs';
+const { doll } = await (await fetch('doll.json')).json();
+const player = new R.DollPlayer();                    // uno per personaggio
+// ogni frame:
+const shapes = player.frame(doll, state, dt, speedPx / heightPx);   // 'IDLE' | 'WALK' | 'CLIMB' | 'JUMP' | …
+R.drawDoll(ctx, shapes, { x: feetX, y: feetY, scale: heightPx / R.DOLL_HEIGHT, flip: facingLeft,
+                          outline: doll.colors.outline, outlineWidth: doll.style.outline * R.DOLL_HEIGHT });
+```
+- `shapes` è una lista ordinata (dal fondo al primo piano) di `{ pts: [x0,y0,x1,y1,…], fill: '#rrggbb', kind?: 'poly'|'line', w?, closed?, bare? }`. Unità: figura alta **1000**, piedi in (0,0), y verso il basso, il personaggio guarda a **destra**. Con un altro motore (Pixi, WebGL, SVG…) disegna gli stessi poligoni: prima il riempimento, poi il contorno (`outline`, escluso se `bare`); le `line` sono polilinee con spessore `w`.
+- Il passo si aggancia alla velocità (`speedPx / heightPx` = altezze al secondo).
+- Da codice: `R.createDoll()`, `R.randomDoll(seed)`, `R.DOLL_PRESETS`; le proprietà di `doll` (proporzioni, colori, parti, accessori, stile, movimento) sono in `types/doll.ts`.
+- Nel progetto (ZIP intero, schema v4) gli omini stanno in `project.dolls` e un personaggio li usa con `dollId`.

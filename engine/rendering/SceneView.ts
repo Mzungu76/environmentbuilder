@@ -1,5 +1,6 @@
 import { Application, Container, Graphics, MeshSimple, Rectangle, Sprite, Texture } from 'pixi.js';
 import type { SpriteDraw } from '@/engine/characters/sprites';
+import type { DollShape } from '@/engine/doll/shapes';
 import type { CharacterState, InteractiveObject, NavigationGraph, SceneLayer, Vec2 } from '@/types';
 import { objectTypeInfo } from '@/engine/interaction/objects';
 import { EDGE_COLOR } from '@/engine/movement/movementTypes';
@@ -61,6 +62,9 @@ export interface PuppetDraw {
   viewKey: string;
 }
 
+/** A procedural "omino" frame: posed shapes in doll units (feet at the origin, 1000 tall). */
+export interface DollDraw { shapes: DollShape[]; outline: string; outlineWidth: number; flip: boolean }
+
 export interface CharacterRenderItem {
   id: string;
   /** Feet position, normalized. */
@@ -79,6 +83,7 @@ export interface CharacterRenderItem {
   stateTime: number;
   liveClock: boolean;
   puppet?: PuppetDraw | null;
+  doll?: DollDraw | null;
 }
 
 export interface LayerSource { layer: SceneLayer; blobLoader: () => Promise<Blob | undefined> }
@@ -536,10 +541,28 @@ export class SceneView {
           continue;
         }
       }
+      if (c.doll) { this.drawDollShapes(g, c, cx, cy - lift, h, w, lift); continue; }
       this.drawProcedural(g, c, cx, cy, w, h, lift, t);
     }
     for (const [id, sp] of this.charSprites) if (!seen.has(id)) { sp.destroy(); this.charSprites.delete(id); }
     for (const [id, m] of this.puppetMeshes) if (!seenMesh.has(id)) { m.mesh.destroy(); this.puppetMeshes.delete(id); }
+  }
+
+  /** Draws the shapes of an "omino" (polygons, then outlines) with Pixi graphics. */
+  private drawDollShapes(g: Graphics, c: CharacterRenderItem, cx: number, cy: number, h: number, w: number, lift: number) {
+    const d = c.doll!, sc = h / 1000, f = d.flip ? -1 : 1;
+    if (c.shadow) g.ellipse(cx, cy + lift, w * 0.55, Math.max(2, h * 0.05)).fill({ color: 0x000000, alpha: 0.35 });
+    const ow = d.outlineWidth * sc;
+    for (const s of d.shapes) {
+      const n = s.pts.length;
+      if (n < 4) continue;
+      const pts = new Array<number>(n);
+      for (let i = 0; i < n; i += 2) { pts[i] = cx + s.pts[i] * sc * f; pts[i + 1] = cy + s.pts[i + 1] * sc; }
+      if (s.kind === 'line') { g.poly(pts, !!s.closed).stroke({ width: (s.w ?? 8) * sc, color: s.fill, cap: 'round', join: 'round' }); continue; }
+      g.poly(pts, true).fill(s.fill);
+      if (!s.bare && ow > 0) g.poly(pts, true).stroke({ width: ow, color: d.outline, join: 'round' });
+    }
+    if (c.selected) g.ellipse(cx, cy + lift, w * 0.8, Math.max(3, h * 0.09)).stroke({ width: 2 / this.zoom, color: 0xffffff, alpha: 0.9 });
   }
 
   /** Draws a skinned puppet with a Pixi mesh; false while its texture is still loading (placeholder is used meanwhile). */

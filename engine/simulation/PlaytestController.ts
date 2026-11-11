@@ -4,6 +4,7 @@ import type { CharacterRenderItem, SceneView, ViewPointerEvent } from '@/engine/
 import type { SceneController } from '@/engine/editor/SceneController';
 import { spriteFor } from '@/engine/characters/sprites';
 import { PuppetPlayer } from '@/engine/puppet/player';
+import { DollPlayer } from '@/engine/doll/player';
 import { flipsWithFacing } from '@/engine/puppet/runtime';
 import { Agent, type AgentSnapshot } from './Agent';
 import { exitNodeIds, resolveExit } from '@/engine/interaction/objects';
@@ -59,6 +60,7 @@ export class PlaytestController {
 
   private lastSeq = new Map<string, number>();
   private players = new Map<string, PuppetPlayer>();
+  private dollPlayers = new Map<string, DollPlayer>();
   private lastRender = performance.now();
   readonly runtime: RuntimeState;
 
@@ -233,13 +235,22 @@ export class PlaytestController {
     return { assetId, positions: f.positions, uvs: f.view.mesh.uvs, indices: f.view.mesh.indices, pivot: f.view.pivot, figureHeight: f.view.figureHeight, flip: flipsWithFacing(f.view) && s.facing < 0, viewKey: `${puppet.id}:${f.viewId}:${assetId}` };
   }
 
+  private dollFor(c: Character, s: AgentSnapshot, dt: number): CharacterRenderItem['doll'] {
+    if (c.puppetId && this.store.project.puppets.some((p) => p.id === c.puppetId)) return null;
+    const doll = c.dollId ? this.store.project.dolls.find((d) => d.id === c.dollId) : undefined;
+    if (!doll) return null;
+    let pl = this.dollPlayers.get(c.id); if (!pl) { pl = new DollPlayer(); this.dollPlayers.set(c.id, pl); }
+    const figurePx = Math.max(1, c.height * this.env.height);
+    return { shapes: pl.frame(doll, s.state, dt, s.speedPx / figurePx), outline: doll.colors.outline, outlineWidth: doll.style.outline * 1000, flip: s.facing < 0 };
+  }
+
   private pushRender() {
     const now = performance.now(), dt = this.status === 'playing' ? Math.min(0.1, (now - this.lastRender) / 1000) : 0;
     this.lastRender = now;
     const items: CharacterRenderItem[] = [];
     for (const [id, a] of this.agents) {
       const c = a.config, s = a.snapshot();
-      items.push({ id, x: s.x, y: s.y, width: c.width, height: c.height, color: c.color, facing: s.facing, state: s.state, shadow: c.shadow, selected: false, lift: s.lift, sprite: spriteFor(c, s.state), stateTime: s.stateTime, liveClock: false, puppet: this.puppetFor(c, s, dt) });
+      items.push({ id, x: s.x, y: s.y, width: c.width, height: c.height, color: c.color, facing: s.facing, state: s.state, shadow: c.shadow, selected: false, lift: s.lift, sprite: spriteFor(c, s.state), stateTime: s.stateTime, liveClock: false, puppet: this.puppetFor(c, s, dt), doll: this.dollFor(c, s, dt) });
     }
     this.view.setCharacters(items);
   }

@@ -3,6 +3,7 @@ import type { CharacterRenderItem, PlaytestMarkers } from '@/engine/rendering/Sc
 import { createCharacter } from '@/engine/characters/factory';
 import { spriteFor } from '@/engine/characters/sprites';
 import { PuppetPlayer } from '@/engine/puppet/player';
+import { DollPlayer } from '@/engine/doll/player';
 import type { EditorStore } from '@/lib/store/editorStore';
 import type { SceneView, ViewPointerEvent } from '@/engine/rendering/SceneView';
 import { cleanObjectLinks } from '@/engine/interaction/objects';
@@ -27,6 +28,7 @@ export class NavigationEditor {
   private lastTool = '';
   private unsub: () => void;
   private players = new Map<string, PuppetPlayer>();
+  private dollPlayers = new Map<string, DollPlayer>();
 
   /** Set by the playtest controller (destination markers); null in the editor. */
   markers: PlaytestMarkers | null = null;
@@ -61,7 +63,7 @@ export class NavigationEditor {
       for (const c of env.characters) {
         const n = env.navigation.nodes.find((x) => x.id === c.startNodeId);
         if (!n) continue;
-        items.push({ id: c.id, x: n.x, y: n.y, width: c.width, height: c.height, color: c.color, facing: 1, state: 'IDLE', shadow: c.shadow, selected: s.selection?.kind === 'character' && s.selection.id === c.id, lift: 0, sprite: spriteFor(c, 'IDLE'), stateTime: 0, liveClock: true, puppet: this.puppetDraw(c) });
+        items.push({ id: c.id, x: n.x, y: n.y, width: c.width, height: c.height, color: c.color, facing: 1, state: 'IDLE', shadow: c.shadow, selected: s.selection?.kind === 'character' && s.selection.id === c.id, lift: 0, sprite: spriteFor(c, 'IDLE'), stateTime: 0, liveClock: true, puppet: this.puppetDraw(c), doll: this.dollDraw(c) });
       }
       this.view.setCharacters(items);
     }
@@ -76,6 +78,15 @@ export class NavigationEditor {
     const assetId = f?.view.cutoutAssetId;
     if (!f || !assetId || !f.view.mesh) return null;
     return { assetId, positions: f.positions, uvs: f.view.mesh.uvs, indices: f.view.mesh.indices, pivot: f.view.pivot, figureHeight: f.view.figureHeight, flip: false, viewKey: `${puppet.id}:${f.viewId}:${assetId}` };
+  }
+
+  /** Static idle pose of a procedural "omino" (editor mode; used when the character has no puppet). */
+  private dollDraw(c: { id: string; puppetId?: string | null; dollId?: string | null }): CharacterRenderItem['doll'] {
+    if (c.puppetId && this.store.project.puppets.some((p) => p.id === c.puppetId)) return null;
+    const doll = c.dollId ? this.store.project.dolls.find((d) => d.id === c.dollId) : undefined;
+    if (!doll) return null;
+    let pl = this.dollPlayers.get(c.id); if (!pl) { pl = new DollPlayer(); this.dollPlayers.set(c.id, pl); }
+    return { shapes: pl.frame(doll, 'IDLE', 0, 0), outline: doll.colors.outline, outlineWidth: doll.style.outline * 1000, flip: false };
   }
 
   cancelPending() { this.pendingFrom = null; this.refresh(); }

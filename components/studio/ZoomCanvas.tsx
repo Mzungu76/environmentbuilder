@@ -5,6 +5,17 @@ import { useCallback, useEffect, useRef, useState, type CSSProperties } from 're
 export interface ViewXform { zoom: number; ox: number; oy: number; dpr: number }
 export interface CanvasPointer { type: 'down' | 'move' | 'up'; x: number; y: number; button: number; shift: boolean; pointerType: string }
 
+const tiles = new Map<number, HTMLCanvasElement>();
+function checkerTile(size: number): HTMLCanvasElement {
+  let t = tiles.get(size);
+  if (!t) {
+    t = document.createElement('canvas'); t.width = t.height = size * 2;
+    const x = t.getContext('2d')!; x.fillStyle = '#2a2e37'; x.fillRect(0, 0, size * 2, size * 2); x.fillStyle = '#343946'; x.fillRect(size, 0, size, size); x.fillRect(0, size, size, size);
+    tiles.set(size, t);
+  }
+  return t;
+}
+
 interface Props {
   /** Size of the content in its own coordinates (used for fit). */
   contentWidth: number;
@@ -45,8 +56,9 @@ export function ZoomCanvas({ contentWidth, contentHeight, draw, onPointer, versi
       const ctx = c.getContext('2d')!; const v = view.current;
       ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, c.width, c.height);
       if (props.current.checker) {
-        const s = 16 * v.dpr; ctx.fillStyle = '#2a2e37'; ctx.fillRect(0, 0, c.width, c.height); ctx.fillStyle = '#343946';
-        for (let y = 0; y < c.height; y += s) for (let x = ((y / s) % 2) * s; x < c.width; x += s * 2) ctx.fillRect(x, y, s, s);
+        // one fill with a cached 2×2 tile pattern instead of ~1500 rectangles per frame
+        const tile = checkerTile(16 * v.dpr);
+        ctx.fillStyle = ctx.createPattern(tile, 'repeat')!; ctx.fillRect(0, 0, c.width, c.height);
       }
       ctx.setTransform(v.zoom * v.dpr, 0, 0, v.zoom * v.dpr, v.ox * v.dpr, v.oy * v.dpr);
       props.current.draw(ctx, v);

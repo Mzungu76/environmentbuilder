@@ -15,6 +15,7 @@ import { SkeletonStep } from './SkeletonStep';
 import { MeshStep } from './MeshStep';
 import { AnimateStep } from './AnimateStep';
 import { ExportStep } from './ExportStep';
+import { DollStudio } from './DollStudio';
 import { Icon } from '@/components/ui/icons';
 import { ed, st, type StepProps } from './shared';
 
@@ -46,6 +47,9 @@ function Studio({ store, initialPuppet }: { store: EditorStore; initialPuppet: s
   const puppets = state.project.puppets;
   const [pid, setPid] = useState<string | null>(initialPuppet && puppets.some((p) => p.id === initialPuppet) ? initialPuppet : puppets[0]?.id ?? null);
   const [step, setStep] = useState(0);
+  const [mode, setMode] = useState<'puppet' | 'doll'>('puppet');
+  const dolls = state.project.dolls;
+  const [did, setDid] = useState<string | null>(dolls[0]?.id ?? null);
   const [confirmDel, setConfirmDel] = useState(false);
   const puppet = puppets.find((p) => p.id === pid) ?? null;
   const stepsRef = useRef<HTMLElement>(null);
@@ -80,7 +84,12 @@ function Studio({ store, initialPuppet }: { store: EditorStore; initialPuppet: s
       <header className={st.top}>
         <Link href={`/editor?id=${store.project.id}`} className={ed.btn} data-testid="back-editor" aria-label="Torna all’editor">←<span className={st.hideSm}> Editor</span></Link>
         <h1 className={st.hideSm}>Studio personaggi · {state.project.name}</h1>
+        <div className={ed.seg} role="group" aria-label="Tipo di personaggio">
+          <button aria-pressed={mode === 'puppet'} onClick={() => setMode('puppet')} data-testid="mode-puppet">Modellini</button>
+          <button aria-pressed={mode === 'doll'} onClick={() => setMode('doll')} data-testid="mode-doll">Omini</button>
+        </div>
         <span className={st.spacer} />
+        {mode === 'puppet' && <>
         <select className={ed.select} style={{ width: 170, flex: '0 1 200px' }} value={pid ?? ''} onChange={(e) => { setPid(e.target.value || null); setStep(0); setConfirmDel(false); }} aria-label="Personaggio" data-testid="puppet-select">
           {puppets.length === 0 && <option value="">Nessun personaggio</option>}
           {puppets.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
@@ -89,19 +98,20 @@ function Studio({ store, initialPuppet }: { store: EditorStore; initialPuppet: s
         {puppet && (confirmDel
           ? <button className={`${ed.btn} ${ed.btnDanger}`} onClick={() => { store.commitProject((pr) => ({ ...pr, puppets: pr.puppets.filter((p) => p.id !== puppet.id), environments: pr.environments.map((e) => ({ ...e, characters: e.characters.map((c) => (c.puppetId === puppet.id ? { ...c, puppetId: null } : c)) })) })); setPid(null); setConfirmDel(false); }}>Eliminare «{puppet.name}»?</button>
           : <button className={`${ed.btn} ${ed.btnDanger} ${ed.iconBtn}`} onClick={() => setConfirmDel(true)} aria-label="Elimina personaggio" title="Elimina personaggio">{Icon.trash}</button>)}
+        </>}
         <button className={`${ed.btn} ${ed.iconBtn}`} onClick={() => store.undo()} disabled={!state.canUndo} aria-label="Annulla" title="Annulla (Ctrl+Z)">{Icon.undo}</button>
         <button className={`${ed.btn} ${ed.iconBtn}`} onClick={() => store.redo()} disabled={!state.canRedo} aria-label="Ripeti" title="Ripeti">{Icon.redo}</button>
         <span className={`${ed.status} ${st.hideSm}`} role="status"><span className={`${ed.dot} ${st2 === 'dirty' ? ed.dotDirty : st2 === 'error' ? ed.dotError : st2 === 'saving' ? ed.dotSaving : ''}`} />{st2 === 'saved' ? 'Salvato' : st2 === 'dirty' ? 'Modifiche non salvate' : st2 === 'saving' ? 'Salvataggio…' : 'Salvataggio non riuscito'}</span>
         <Link href="/manuale" target="_blank" className={`${ed.btn} ${ed.iconBtn} ${st.hideSm}`} aria-label="Manuale" title="Manuale">{Icon.help}</Link>
       </header>
-      <nav className={st.steps} aria-label="Passi" ref={stepsRef}>
+      {mode === 'doll' ? <div /> : <nav className={st.steps} aria-label="Passi" ref={stepsRef}>
         {STEPS.map((s, i) => (
           <button key={s} className={st.step} aria-current={step === i} onClick={() => setStep(i)} data-testid={`step-${i}`}>
             <span className={st.num}>{i + 1}</span>{s}{puppet && done[i] ? <span className={st.ok} /> : null}
           </button>
         ))}
-      </nav>
-      {!puppet ? (
+      </nav>}
+      {mode === 'doll' ? <DollStudio store={store} dolls={dolls} selectedId={did} onSelect={setDid} /> : !puppet ? (
         <div className={st.stage} style={{ gridTemplateRows: '1fr' }}>
           <div className={st.empty}><div><h2 style={{ color: 'var(--text)', margin: '0 0 8px' }}>Studio personaggi</h2><p style={{ margin: '0 0 14px' }}>Trasforma un foglio di rotazione (fronte, profilo, retro) in un personaggio con scheletro e animazioni, da usare negli ambienti o in un altro gioco.</p><button className={`${ed.btn} ${ed.btnPrimary}`} onClick={create} data-testid="new-puppet-big">Crea il primo personaggio</button></div></div>
         </div>
