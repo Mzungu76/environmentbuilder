@@ -76,6 +76,7 @@ export function TopBar(p: Props) {
           </div>
         )}
       </div>
+      <Link href="/manuale" target="_blank" rel="noreferrer" className={`${styles.btn} ${styles.iconBtn}`} title="Manuale (si apre in una nuova scheda)" aria-label="Manuale" data-testid="open-manual">{Icon.help}</Link>
       <button className={`${styles.btn} ${styles.iconBtn} ${styles.inspToggle}`} onClick={p.onToggleInspector} aria-label="Mostra/nascondi inspector" title="Inspector">{Icon.panel}</button>
     </header>
   );

@@ -4,6 +4,7 @@ Strumento per trasformare **un’illustrazione 2D** (prodotta altrove, es. con A
 
 ## 1. Avvio
 
+- **Questo manuale è anche nell’app:** pulsante *Manuale* nella Libreria e icona **?** nella barra superiore dell’editor (si apre in una nuova scheda, così non perdi il lavoro).
 - **File unico:** apri `environment-builder.html` con doppio click (Chrome, Edge, Firefox).
 - **Da codice:** `npm install` poi `npm run dev` e apri http://localhost:3000. Il file unico si rigenera con `npm run build:standalone`.
 - I progetti sono salvati **nel browser** (IndexedDB), legati al modo in cui apri l’app: cambiando browser o spostando il file non li vedi più. **Fai backup con Esporta → ZIP.**

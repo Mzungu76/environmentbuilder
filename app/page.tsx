@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { deleteProject, duplicateProject, getAsset, listProjects, saveProject, type ProjectSummary } from '@/lib/persistence/db';
 import { uid } from '@/lib/ids';
 import { createProject } from '@/lib/serialization/factory';
@@ -53,6 +54,7 @@ export default function LibraryPage() {
       <div className={styles.head}>
         <div><h1>Environment Builder</h1><p>Trasforma illustrazioni 2D in ambienti esplorabili e configurabili.</p></div>
         <div className={styles.actions}>
+          <Link href="/manuale" className={styles.btn} data-testid="open-manual">Manuale</Link>
           <button className={styles.btn} onClick={() => importRef.current?.click()} data-testid="import-project">{Icon.folder}Importa progetto…</button>
         </div>
       </div>
