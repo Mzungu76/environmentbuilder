@@ -15,7 +15,8 @@ export function PlaytestPanel({ store, env, ctrl, showPaths, open }: { store: Ed
   const v = useSyncExternalStore(ctrl.subscribe, ctrl.getView, ctrl.getView);
   const [diag, setDiag] = useState(true);
   const [dest, setDest] = useState('');
-  const chars = env.characters.filter((c) => v.snapshots[c.id]);
+  const chars = ctrl.listCharacters().filter((c) => v.snapshots[c.id]);
+  const visitor = !!v.activeId && ctrl.isVisitor(v.activeId);
   const c = chars.find((x) => x.id === v.activeId);
   const snap = c ? v.snapshots[c.id] : undefined;
   const nodes = env.navigation.nodes;
@@ -61,7 +62,7 @@ export function PlaytestPanel({ store, env, ctrl, showPaths, open }: { store: Ed
                 <div className={styles.seg} role="group" aria-label="Modalità di movimento" style={{ width: '100%' }}>
                   {(['manual', 'autonomous'] as const).map((m) => (
                     <button key={m} style={{ flex: 1 }} aria-pressed={c.behavior.mode === m} data-testid={`pt-mode-${m}`}
-                      onClick={() => { store.commitEnv((e) => ({ ...e, characters: e.characters.map((x) => (x.id === c.id ? { ...x, behavior: { ...x.behavior, mode: m } } : x)) })); ctrl.haltActive(); if (m === 'autonomous') ctrl.play(); }}>
+                      onClick={() => { ctrl.setMode(c.id, m); if (m === 'autonomous') ctrl.play(); }}>
                       {m === 'manual' ? 'Manuale' : 'Autonomo'}
                     </button>
                   ))}
@@ -107,7 +108,8 @@ export function PlaytestPanel({ store, env, ctrl, showPaths, open }: { store: Ed
             </div>
           )}
 
-          {c && <div className={styles.section}><h4>Parametri (modificano il personaggio)</h4><BehaviorFields store={store} c={c} idp="pt" /></div>}
+          {c && !visitor && <div className={styles.section}><h4>Parametri (modificano il personaggio)</h4><BehaviorFields store={store} c={c} idp="pt" /></div>}
+          {c && visitor && <div className={styles.section}><span className={styles.help}>{c.name} è in visita da un altro ambiente: i suoi parametri si modificano nell’ambiente d’origine.</span></div>}
         </>
       )}
     </aside>

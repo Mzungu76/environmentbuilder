@@ -15,7 +15,7 @@ export interface StoredAsset {
   blob: Blob;
 }
 
-export interface ProjectSummary { id: string; name: string; updatedAt: number; environmentCount: number; thumbAssetId: string | null }
+export interface ProjectSummary { id: string; name: string; updatedAt: number; environmentCount: number; thumbAssetId: string | null; environments: { id: string; name: string }[] }
 
 let dbPromise: Promise<IDBDatabase> | null = null;
 
@@ -66,6 +66,7 @@ export async function listProjects(): Promise<ProjectSummary[]> {
     .map((p) => ({
       id: p.id, name: p.name, updatedAt: p.updatedAt, environmentCount: p.environments.length,
       thumbAssetId: p.environments[0]?.layers.find((l) => l.role === 'background')?.assetId ?? null,
+      environments: p.environments.map((e) => ({ id: e.id, name: e.name })),
     }))
     .sort((a, b) => b.updatedAt - a.updatedAt);
 }
@@ -98,4 +99,14 @@ export async function deleteAsset(projectId: string, assetId: string): Promise<v
 
 export async function listAssets(projectId: string): Promise<StoredAsset[]> {
   return (await tx<StoredAsset[]>([ASSETS], 'readonly', (t) => t.objectStore(ASSETS).index('projectId').getAll(projectId))) ?? [];
+}
+
+/** Copies a project together with its image assets. Returns the new project. */
+export async function duplicateProject(id: string, newId: string, newName: string): Promise<Project> {
+  const src = await loadProject(id);
+  if (!src) throw new Error('Progetto non trovato');
+  const copy: Project = { ...structuredClone(src), id: newId, name: newName, createdAt: Date.now(), updatedAt: Date.now() };
+  for (const a of await listAssets(id)) await putAsset(newId, a.assetId, a.blob);
+  await saveProject(copy);
+  return copy;
 }

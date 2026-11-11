@@ -2,6 +2,8 @@ import type { EditorStore } from '@/lib/store/editorStore';
 import { putAsset } from '@/lib/persistence/db';
 import { readImageFile } from './image';
 import { uid } from '@/lib/ids';
+import { addLayer } from '@/engine/scene/layers';
+import { updateObject } from '@/engine/interaction/objects';
 
 /**
  * Imports an image as the environment's main background (replacing the previous one).
@@ -18,5 +20,24 @@ export async function importBackground(store: EditorStore, file: File): Promise<
     const usedAssets = new Set(layers.map((l) => l.assetId));
     const assets = [...env.assets.filter((a) => usedAssets.has(a.id)), meta];
     return { ...env, width: meta.width, height: meta.height, layers, assets };
+  });
+}
+
+/** Adds a mid/foreground layer (the file is stored as a normal image asset). */
+export async function importLayer(store: EditorStore, role: 'midground' | 'foreground', file: File): Promise<void> {
+  const { meta, blob } = await readImageFile(file);
+  await putAsset(store.project.id, meta.id, blob);
+  store.commitEnv((env) => addLayer(env, role, meta));
+}
+
+/** Associates an image with an interactive object; size follows the image aspect ratio. */
+export async function importObjectImage(store: EditorStore, objectId: string, file: File): Promise<void> {
+  const { meta, blob } = await readImageFile(file);
+  await putAsset(store.project.id, meta.id, blob);
+  store.commitEnv((env) => {
+    const o = env.objects.find((x) => x.id === objectId);
+    if (!o) return env;
+    const aspect = meta.width / meta.height;
+    return updateObject({ ...env, assets: [...env.assets.filter((a) => a.id !== meta.id), meta] }, objectId, { assetId: meta.id, width: Math.min(1, o.height * aspect) });
   });
 }

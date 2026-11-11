@@ -29,5 +29,10 @@ export const Icon = {
   pause: <S><path d="M8 5v14M16 5v14" /></S>,
   stop: <S><rect x="6" y="6" width="12" height="12" rx="1.5" /></S>,
   reset: <S><path d="M4 12a8 8 0 108-8H7M7 4L4 7l3 3" /></S>,
+  object: <S><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z" /><path d="M12 12l8-4.5M12 12L4 7.5M12 12v9" /></S>,
+  layers: <S><path d="M12 3l9 5-9 5-9-5z" /><path d="M3 13l9 5 9-5" /></S>,
+  copy: <S><rect x="8" y="8" width="12" height="12" rx="2" /><path d="M16 8V6a2 2 0 00-2-2H6a2 2 0 00-2 2v8a2 2 0 002 2h2" /></S>,
+  up: <S><path d="M6 15l6-6 6 6" /></S>,
+  down: <S><path d="M6 9l6 6 6-6" /></S>,
   curve: <S><circle cx="4" cy="19" r="1.5" /><circle cx="20" cy="5" r="1.5" /><path d="M5 18C5 8 15 16 19 6" /></S>,
 };

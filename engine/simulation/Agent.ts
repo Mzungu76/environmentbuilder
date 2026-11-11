@@ -46,6 +46,11 @@ export class Agent {
   private pos: Vec2 = { x: 0, y: 0 };
   private speedPx = 0;
   private time = 0;
+  /** Nodes autonomous mode never picks as destination (e.g. exits to other environments). */
+  blocked: Set<string> = new Set();
+  /** Increments every time the agent arrives at a node; `arrivalFinal` = that node ends the current route. */
+  arrivalSeq = 0;
+  arrivalFinal = false;
 
   constructor(env: Environment, config: Character) {
     this.env = env; this.config = config;
@@ -59,7 +64,7 @@ export class Agent {
     const nav = this.env.navigation;
     const start = nav.nodes.find((n) => n.id === this.config.startNodeId) ?? nav.nodes[0] ?? null;
     this.track = null; this.s = 0; this.moving = false; this.route = []; this.destination = null;
-    this.pause = 0; this.decisionTimer = 0; this.state = 'IDLE'; this.speedPx = 0; this.time = 0; this.lastNodeId = null;
+    this.pause = 0; this.decisionTimer = 0; this.state = 'IDLE'; this.speedPx = 0; this.time = 0; this.lastNodeId = null; this.arrivalSeq = 0; this.arrivalFinal = false;
     this.nodeId = start?.id ?? null;
     this.pos = start ? { x: start.x, y: start.y } : { x: 0, y: 0 };
   }
@@ -179,6 +184,7 @@ export class Agent {
 
   private arrive(tr: Track) {
     this.track = null; this.nodeId = tr.to; this.lastNodeId = tr.from; this.s = 0;
+    this.arrivalSeq++; this.arrivalFinal = this.route.length === 0;
     const node = this.env.navigation.nodes.find((n) => n.id === tr.to)!;
     this.pos = { x: node.x, y: node.y };
     const b = this.config.behavior;
@@ -205,7 +211,7 @@ export class Agent {
   private pickDestination() {
     const nav = this.env.navigation, from = this.nodeId!;
     const prof = this.profile();
-    const cands = [...reachableNodes(nav, from, prof.abilities, prof.edgeWeights, true)].filter((id) => id !== from);
+    const cands = [...reachableNodes(nav, from, prof.abilities, prof.edgeWeights, true)].filter((id) => id !== from && !this.blocked.has(id));
     if (!cands.length) { this.pause = this.randPause(); return; }
     // weight candidates by how attractive the route is (mean edge preference)
     const scored: { id: string; w: number; steps: RouteStep[] }[] = [];

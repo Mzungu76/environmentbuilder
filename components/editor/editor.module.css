@@ -107,3 +107,16 @@
 .diag dt { color: var(--text-faint); }
 .diag dd { margin: 0; color: var(--text); word-break: break-word; }
 @media (max-width: 900px) { .mainPlay { grid-template-columns: 1fr; grid-template-rows: 1fr; } .mainPlay .inspector { bottom: 0; } }
+
+/* environments + object type bar */
+.app { grid-template-rows: 48px auto 1fr; }
+.envTabs { display: flex; align-items: center; gap: 8px; padding: 4px 10px; background: var(--surface); border-bottom: 1px solid var(--border); min-height: 38px; }
+.envScroll { display: flex; gap: 4px; overflow-x: auto; flex: 1; min-width: 0; scrollbar-width: thin; }
+.envTab { height: 28px; padding: 0 12px; border-radius: 6px; border: 1px solid transparent; background: transparent; color: var(--text-dim); white-space: nowrap; }
+.envTab:hover:not(:disabled) { background: var(--surface-3); color: var(--text); }
+.envTab[aria-selected="true"] { background: var(--accent-soft); border-color: var(--accent); color: var(--text); }
+.envTab:disabled { opacity: .45; cursor: not-allowed; }
+.envActions { display: flex; gap: 4px; align-items: center; flex: none; }
+.typeBar { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); z-index: 6; display: flex; flex-wrap: wrap; gap: 4px; justify-content: center; max-width: calc(100% - 24px); background: rgba(23,26,32,.95); border: 1px solid var(--border-strong); padding: 4px; border-radius: 12px; }
+.typeBar .chip { font-size: 12px; }
+@media (max-width: 900px) { .typeBar { top: 8px; } }

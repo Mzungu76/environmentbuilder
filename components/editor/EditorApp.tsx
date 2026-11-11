@@ -14,6 +14,9 @@ import { SceneCanvas, type SceneHandle } from '@/components/scene/SceneCanvas';
 import { TopBar } from '@/components/toolbar/TopBar';
 import { TOOLS, ToolPalette } from '@/components/toolbar/ToolPalette';
 import { PlaytestPanel } from '@/components/panels/PlaytestPanel';
+import { EnvTabs } from '@/components/panels/EnvTabs';
+import { OBJECT_TYPES } from '@/engine/interaction/objects';
+import type { Character } from '@/types';
 import { PlaytestController } from '@/engine/simulation/PlaytestController';
 import { Inspector } from '@/components/inspector/Inspector';
 import { Icon } from '@/components/ui/icons';
@@ -21,7 +24,7 @@ import styles from './editor.module.css';
 
 type Load = { status: 'loading' } | { status: 'error'; message: string } | { status: 'ready'; store: EditorStore };
 
-export function EditorApp({ projectId }: { projectId: string | null }) {
+export function EditorApp({ projectId, envId }: { projectId: string | null; envId?: string | null }) {
   const [load, setLoad] = useState<Load>({ status: 'loading' });
 
   useEffect(() => {
@@ -31,13 +34,16 @@ export function EditorApp({ projectId }: { projectId: string | null }) {
       try {
         const raw = await loadProject(projectId);
         if (!raw) throw new Error('Progetto non trovato in questo browser.');
-        if (alive) setLoad({ status: 'ready', store: new EditorStore(migrateProject(raw)) });
+        if (!alive) return;
+        const project = migrateProject(raw);
+        if (envId && project.environments.some((e) => e.id === envId)) project.activeEnvironmentId = envId;
+        setLoad({ status: 'ready', store: new EditorStore(project) });
       } catch (e) {
         if (alive) setLoad({ status: 'error', message: e instanceof Error ? e.message : String(e) });
       }
     })();
     return () => { alive = false; };
-  }, [projectId]);
+  }, [projectId, envId]);
 
   if (load.status === 'loading') return <div className={styles.center}>Caricamento progetto…</div>;
   if (load.status === 'error') return <div className={styles.center}><div><p>{load.message}</p><Link href="/" className={styles.btn}>Torna alla libreria</Link></div></div>;
@@ -62,12 +68,24 @@ function Editor({ store }: { store: EditorStore }) {
   const playtest = state.mode === 'playtest';
 
   // Playtest lifecycle: the controller owns the pointer/tick while active and restores the editor on exit.
+  // Walking into an exit switches the active environment and starts a new controller there (`playKey`).
+  const entry = useRef<{ character: Character; entryNodeId: string; text: string } | null>(null);
+  const [playKey, setPlayKey] = useState(0);
+  const playEnvId = env.id;
   useEffect(() => {
     if (!playtest || !sceneReady || !handle.current) return;
-    const c = new PlaytestController(store, handle.current.view, handle.current.editor);
+    const carried = entry.current; entry.current = null;
+    const c = new PlaytestController(store, handle.current.view, handle.current.editor, {
+      carried: carried?.character, entryNodeId: carried?.entryNodeId, message: carried?.text, autoplay: !!carried,
+      onTransition: (t) => {
+        entry.current = { character: t.character, entryNodeId: t.entryNodeId, text: t.text };
+        store.setActiveEnvironment(t.targetEnvId);
+        setPlayKey((k) => k + 1);
+      },
+    });
     setCtrl(c);
     return () => { c.dispose(); setCtrl(null); };
-  }, [playtest, sceneReady, store]);
+  }, [playtest, sceneReady, store, playEnvId, playKey]);
 
   // --- missing assets check (after load) ---
   useEffect(() => {
@@ -98,6 +116,7 @@ function Editor({ store }: { store: EditorStore }) {
   }, [store]);
 
   const setTool = useCallback((t: ToolId) => store.setTool(t), [store]);
+  const openLayers = useCallback(() => { store.setSelection(null); store.setTool('select'); setInspectorOpen(true); }, [store]);
 
   // --- keyboard shortcuts ---
   useEffect(() => {
@@ -123,6 +142,7 @@ function Editor({ store }: { store: EditorStore }) {
       if (tool) { setTool(tool.id); return; }
       if (e.key === 'Delete' || e.key === 'Backspace') { handle.current?.editor.deleteSelection(); e.preventDefault(); }
       else if (e.key === 'Escape') { handle.current?.editor.cancelPending(); store.setSelection(null); if (store.getState().tool === 'path' || store.getState().tool === 'connect') store.setTool('select'); }
+      else if (k === 'l') openLayers();
       else if (k === 'f') handle.current?.view.fit();
       else if (k === 'o') store.setPreview(!store.getState().preview);
       else if (k === '+' || k === '=') handle.current?.view.zoomCenter(1.25);
@@ -131,7 +151,7 @@ function Editor({ store }: { store: EditorStore }) {
     const up = (e: KeyboardEvent) => { if (e.key === ' ') { spaceHeld = false; if (handle.current) handle.current.view.panMode = store.getState().tool === 'pan'; } };
     window.addEventListener('keydown', down); window.addEventListener('keyup', up);
     return () => { window.removeEventListener('keydown', down); window.removeEventListener('keyup', up); };
-  }, [store, setTool]);
+  }, [store, setTool, openLayers]);
 
   const onNew = async () => { const p = createProject(); await saveProject(p); router.push(`/editor?id=${p.id}`); };
   const onExportZip = async () => {
@@ -156,8 +176,9 @@ function Editor({ store }: { store: EditorStore }) {
         onExportZip={onExportZip} onExportJson={onExportJson} onToggleInspector={() => setInspectorOpen((o) => !o)}
         onMode={(m) => store.setMode(m)} canPlaytest={hasImage}
       />
+      <EnvTabs store={store} envs={state.project.environments} activeId={env.id} locked={playtest} />
       <div className={`${styles.main} ${playtest ? styles.mainPlay : ''}`}>
-        {!playtest && <ToolPalette tool={state.tool} onTool={setTool} />}
+        {!playtest && <ToolPalette tool={state.tool} onTool={setTool} onLayers={openLayers} />}
         <div className={styles.stageWrap}
           onDragOver={(e) => { e.preventDefault(); setDragOver(true); }} onDragLeave={() => setDragOver(false)}
           onDrop={(e) => { e.preventDefault(); setDragOver(false); void importFile(e.dataTransfer.files[0]); }}>
@@ -172,7 +193,12 @@ function Editor({ store }: { store: EditorStore }) {
               </div>
             </div>
           )}
-          {hasImage && !state.preview && !playtest && <div className={styles.hint}>{toolInfo.hint}</div>}
+          {hasImage && !state.preview && !playtest && state.tool === 'object' && (
+            <div className={styles.typeBar} role="group" aria-label="Tipo di oggetto">
+              {OBJECT_TYPES.map((t) => <button key={t.id} className={styles.chip} aria-pressed={state.objectType === t.id} onClick={() => store.setObjectType(t.id)} data-testid={`otype-${t.id}`}>{t.label}</button>)}
+            </div>
+          )}
+          {hasImage && !state.preview && !playtest && <div className={styles.hint} style={state.tool === 'object' ? { top: 64 } : undefined}>{toolInfo.hint}</div>}
           {notice && <div className={styles.banner} role="alert">{notice}<button onClick={() => setNotice(null)}>Chiudi</button></div>}
           <div className={styles.hud}>
             <button className={`${styles.btn} ${styles.iconBtn}`} onClick={() => handle.current?.view.zoomCenter(0.8)} aria-label="Riduci" title="Riduci (-)">{Icon.minus}</button>

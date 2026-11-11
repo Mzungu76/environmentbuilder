@@ -21,3 +21,7 @@
 .primary { background: var(--accent-strong); border-color: var(--accent-strong); color: #fff; }
 .primary:hover { background: var(--accent); }
 .danger { color: var(--danger); }
+
+.envs { display: flex; flex-wrap: wrap; gap: 4px; margin: 4px 0 2px; }
+.envChip { font-size: 11px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface-2); color: var(--text-dim); }
+.envChip:hover { border-color: var(--accent); color: var(--text); }

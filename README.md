@@ -4,7 +4,7 @@ Editor 2D universale per trasformare illustrazioni (prodotte esternamente, es. c
 
 Tutto gira nel browser: nessun backend, nessun database remoto, nessun servizio a pagamento. I dati sono salvati in **IndexedDB**.
 
-## Stato: Milestone 1 (Editor base) ✅ · Milestone 2 (Simulazione) ✅
+## Stato: Milestone 1 (Editor base) ✅ · Milestone 2 (Simulazione) ✅ · Milestone 3 (Gestione ambienti) ✅
 
 L’interfaccia è in **italiano** (stringhe ancora inline nei componenti; un livello i18n è da prevedere se servirà un’altra lingua).
 
@@ -21,7 +21,22 @@ L’interfaccia è in **italiano** (stringhe ancora inline nei componenti; un li
 | Esportazione ZIP (project.json + immagini + manifest) e JSON; importazione ZIP/JSON | ✅ |
 | Modalità anteprima senza strumenti (`O`) | ✅ |
 | Touch: selezione, trascinamento nodi, pinch-zoom e pan a due dita, layout responsive | ✅ |
-| Oggetti, ingressi/uscite, layer mid/foreground, più ambienti | ⏳ Milestone 3 (modello dati già pronto, UI non ancora presente) |
+
+### Milestone 3 – Gestione completa degli ambienti
+
+| Funzione | Stato |
+|---|---|
+| Più ambienti per progetto con schede (crea, duplica, elimina, rinomina); ogni ambiente ha immagine, grafo, oggetti, personaggi e livelli propri | ✅ |
+| Duplicazione con nuovi id e riferimenti interni rimappati (nodi, percorsi, oggetti, personaggi); le immagini restano condivise | ✅ |
+| Libreria progetti con elenco degli ambienti (apertura diretta), duplicazione e importazione di interi progetti | ✅ |
+| Oggetti (`I`): generico, raccoglibile, punto di interazione, punto di osservazione, ingresso, uscita, trigger — tipologie aperte | ✅ |
+| Oggetti: sposta, ridimensiona (maniglia gialla), elimina, nascondi, immagine associata, proprietà libere, collegamento a nodo e percorso | ✅ |
+| **Ingressi e uscite**: un’uscita punta all’ingresso di un altro (o dello stesso) ambiente; la validità è controllata | ✅ |
+| **Playtest tra ambienti**: un personaggio che termina un percorso su un’uscita compare all’ingresso collegato; uscendo dal Playtest si torna all’ambiente di partenza | ✅ |
+| Livelli grafici (`L`): sfondo obbligatorio + piani intermedi e primi piani; visibilità, ordine, spostamento, opacità. Il primo piano è disegnato sopra i personaggi | ✅ |
+| Esportazione/importazione ZIP di progetti multi-ambiente senza perdite (verificato) | ✅ |
+
+Note: le uscite non sono mai scelte come meta dal movimento autonomo (il passaggio avviene solo su comando). Raccolta e interazioni con gli oggetti non sono ancora attive nel Playtest (Milestone 4); un personaggio in visita da un altro ambiente si configura nell’ambiente d’origine.
 
 ### Milestone 2 – Simulazione
 
@@ -64,7 +79,7 @@ npm run build:standalone   # genera dist/environment-builder.html, un singolo fi
 5. **Inspector** (destra): modifica nome, tipo, coordinate, direzione, velocità, requisiti.
 6. Il progetto si salva da solo; **Export → ZIP** produce un pacchetto autonomo re-importabile dalla libreria.
 
-Scorciatoie: `K` personaggio · `Spazio` Play/Pausa (in Playtest) · `V` selezione · `H` mano · `N` nodo · `C` connetti · `P` percorso · `Del` elimina · `Esc` annulla · `F` adatta · `+`/`-` zoom · `O` anteprima · `Ctrl+Z` / `Ctrl+Shift+Z` · `Ctrl+S`.
+Scorciatoie: `I` oggetto · `L` livelli · `K` personaggio · `Spazio` Play/Pausa (in Playtest) · `V` selezione · `H` mano · `N` nodo · `C` connetti · `P` percorso · `Del` elimina · `Esc` annulla · `F` adatta · `+`/`-` zoom · `O` anteprima · `Ctrl+Z` / `Ctrl+Shift+Z` · `Ctrl+S`.
 
 ## Architettura
 
@@ -78,6 +93,9 @@ engine/
                         Non conosce store né strumenti.
   simulation/           Simulation Engine: Agent (movimento), routing (Dijkstra), track (curve a lunghezza d'arco),
                         PlaytestController (loop a passo fisso, input, diagnostica)
+  interaction/          Object & Interaction Editor: oggetti, ingressi/uscite (risoluzione dei passaggi), ObjectEditor
+  scene/                Operazioni sui livelli grafici
+  editor/SceneController  Instrada l'input agli editor (oggetti → navigazione)
   characters/           Factory e valori predefiniti dei personaggi
   navigation/           Navigation Editor: grafo (funzioni pure e immutabili), geometria Bézier, hit-testing,
                         NavigationEditor (controller strumenti → comandi sullo store)
@@ -120,5 +138,4 @@ L'import crea sempre un **nuovo** progetto (nuovo id) e non sovrascrive quelli e
 
 ## Roadmap
 
-- **M3 – Ambienti completi**: più scene, ingressi/uscite collegati, oggetti, layer mid/foreground, duplicazione ambienti.
-- **M4 – Estensioni**: nuovi profili, tipi di movimento, animazioni, interazioni configurabili.
+- **M4 – Estensioni** (raccolta/interazioni degli oggetti, sprite e animazioni, nuovi profili e tipi di movimento): nuovi profili, tipi di movimento, animazioni, interazioni configurabili.

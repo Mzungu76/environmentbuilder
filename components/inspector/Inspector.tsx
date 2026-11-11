@@ -10,6 +10,9 @@ import { Icon } from '@/components/ui/icons';
 import styles from '../editor/editor.module.css';
 import { CheckField, Field, NumberField, PropsField, TextField } from './fields';
 import { CharacterPanel } from './CharacterPanel';
+import { ObjectPanel } from './ObjectPanel';
+import { LayersPanel } from './LayersPanel';
+import { objectIssues, objectTypeInfo } from '@/engine/interaction/objects';
 import { createCharacter } from '@/engine/characters/factory';
 
 /* ---- inspector -------------------------------------------------------------------------------- */
@@ -20,16 +23,18 @@ export function Inspector({ store, env, selection, open, onFit, onReplaceImage, 
   const nav = env.navigation;
   const node = selection?.kind === 'node' ? nav.nodes.find((n) => n.id === selection.id) : undefined;
   const edge = selection?.kind === 'edge' ? nav.edges.find((e) => e.id === selection.id) : undefined;
+  const obj = selection?.kind === 'object' ? env.objects.find((o) => o.id === selection.id) : undefined;
   const chr = selection?.kind === 'character' ? env.characters.find((c) => c.id === selection.id) : undefined;
   const select = (s: Selection) => store.setSelection(s);
 
   return (
     <aside className={`${styles.inspector} ${open ? styles.inspectorOpen : ''}`} aria-label="Inspector" data-testid="inspector">
       <div className={styles.inspHead}>
-        <h3>{node ? 'Nodo' : edge ? 'Percorso' : chr ? 'Personaggio' : 'Ambiente'}</h3>
-        {(node || edge || chr) && <button className={`${styles.btn} ${styles.btnDanger}`} onClick={onDeleteSelection} title="Elimina (Canc)" data-testid="delete-selected">{Icon.trash}Elimina</button>}
+        <h3>{node ? 'Nodo' : edge ? 'Percorso' : chr ? 'Personaggio' : obj ? 'Oggetto' : 'Ambiente'}</h3>
+        {(node || edge || chr || obj) && <button className={`${styles.btn} ${styles.btnDanger}`} onClick={onDeleteSelection} title="Elimina (Canc)" data-testid="delete-selected">{Icon.trash}Elimina</button>}
       </div>
-      {chr ? <CharacterPanel store={store} env={env} c={chr} />
+      {obj ? <ObjectPanel store={store} env={env} o={obj} />
+        : chr ? <CharacterPanel store={store} env={env} c={chr} />
         : node ? <NodePanel store={store} env={env} node={node} select={select} />
         : edge ? <EdgePanel store={store} env={env} edge={edge} select={select} onToggleCurve={onToggleCurve} />
         : <EnvPanel store={store} env={env} onFit={onFit} onReplaceImage={onReplaceImage} />}
@@ -152,10 +157,22 @@ function EnvPanel({ store, env, onFit, onReplaceImage }: { store: EditorStore; e
             <div>{asset.width} × {asset.height}px · {asset.mime.replace('image/', '').toUpperCase()} · {(asset.bytes / 1024).toFixed(0)} KB</div>
           </div>
         ) : <span className={styles.help}>Nessuna immagine.</span>}
-        <div className={styles.row2}>
-          <button className={styles.btn} onClick={onReplaceImage}>{Icon.image}{asset ? 'Sostituisci' : 'Importa'}</button>
-          <button className={styles.btn} onClick={onFit}>{Icon.fit}Adatta vista</button>
+        <button className={styles.btn} onClick={onFit}>{Icon.fit}Adatta vista</button>
+        {!asset && <button className={styles.btn} onClick={onReplaceImage}>{Icon.image}Importa immagine</button>}
+      </div>
+      <LayersPanel store={store} env={env} />
+      <div className={styles.section}>
+        <h4>Oggetti ({env.objects.length})</h4>
+        <div className={styles.list}>
+          {env.objects.map((o) => (
+            <button key={o.id} className={styles.listItem} onClick={() => store.setSelection({ kind: 'object', id: o.id })}>
+              <span><i className={styles.swatchDot} style={{ background: '#' + objectTypeInfo(o.type).color.toString(16).padStart(6, '0'), marginRight: 8 }} />{o.name}</span>
+              <span className={styles.badge}>{o.visible ? objectTypeInfo(o.type).label : 'nascosto'}</span>
+            </button>
+          ))}
         </div>
+        {objectIssues(store.project, env).map((i, k) => <span key={k} className={styles.warn}>{i.message}</span>)}
+        <span className={styles.help}>Aggiungili con lo strumento Oggetto (<kbd>I</kbd>).</span>
       </div>
       <div className={styles.section}>
         <h4>Profili</h4>

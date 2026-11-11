@@ -1,8 +1,9 @@
 import type { Character, Environment } from '@/types';
 import type { EditorStore } from '@/lib/store/editorStore';
 import type { CharacterRenderItem, SceneView, ViewPointerEvent } from '@/engine/rendering/SceneView';
-import type { NavigationEditor } from '@/engine/navigation/NavigationEditor';
+import type { SceneController } from '@/engine/editor/SceneController';
 import { Agent, type AgentSnapshot } from './Agent';
+import { exitNodeIds, resolveExit } from '@/engine/interaction/objects';
 
 export type PlayStatus = 'stopped' | 'playing' | 'paused';
 
@@ -15,6 +16,17 @@ export interface PlaytestView {
 }
 
 const FIXED_DT = 1 / 60;
+
+export interface PlaytestOptions {
+  /** A character coming from another environment through an exit. */
+  carried?: Character;
+  /** Node (in this environment) where the carried character appears. */
+  entryNodeId?: string;
+  message?: string;
+  autoplay?: boolean;
+  /** Called when a character reaches an exit linked to an entrance of another (or the same) environment. */
+  onTransition?: (t: { targetEnvId: string; entryNodeId: string; character: Character; text: string }) => void;
+}
 
 /**
  * Simulation Engine host. Runs the agents on a FIXED time step (deterministic regardless of frame rate),
@@ -34,9 +46,13 @@ export class PlaytestController {
   private hoverId: string | null = null;
   private pan: { x: number; y: number } | null = null;
 
-  constructor(private store: EditorStore, private view: SceneView, private editor: NavigationEditor) {
+  private lastSeq = new Map<string, number>();
+
+  constructor(private store: EditorStore, private view: SceneView, private editor: SceneController, private opts: PlaytestOptions = {}) {
     this.env = store.env;
     this.rebuild();
+    if (opts.message) this.message = { text: opts.message, kind: 'info', at: Date.now() };
+    if (opts.autoplay && this.agents.size) this.status = 'playing';
     this.viewState = this.compute();
     view.onPointer = (e) => this.onPointer(e);
     view.onTick = (dt) => this.tick(dt);
@@ -74,14 +90,29 @@ export class PlaytestController {
   private rebuild() {
     this.env = this.store.env;
     this.agents.clear();
-    for (const c of this.env.characters) {
+    const blocked = exitNodeIds(this.env);
+    const chars = this.env.characters.filter((c) => c.id !== this.opts.carried?.id);
+    if (this.opts.carried && this.env.navigation.nodes.some((n) => n.id === this.opts.entryNodeId)) chars.push({ ...this.opts.carried, startNodeId: this.opts.entryNodeId ?? null });
+    for (const c of chars) {
       if (!this.env.navigation.nodes.length) break;
-      this.agents.set(c.id, new Agent(this.env, c));
+      const a = new Agent(this.env, c); a.blocked = blocked; this.agents.set(c.id, a);
     }
+    this.lastSeq.clear();
     if (!this.activeId || !this.agents.has(this.activeId)) this.activeId = this.agents.keys().next().value ?? null;
   }
 
   get characterCount() { return this.agents.size; }
+  /** Characters taking part in this playtest (including a visitor from another environment). */
+  listCharacters(): Character[] { return [...this.agents.values()].map((a) => a.config); }
+  isVisitor(id: string) { return !this.store.env.characters.some((c) => c.id === id); }
+
+  setMode(id: string, mode: 'manual' | 'autonomous') {
+    const a = this.agents.get(id);
+    if (!a) return;
+    if (this.isVisitor(id)) a.config = { ...a.config, behavior: { ...a.config.behavior, mode } };
+    else this.store.commitEnv((e) => ({ ...e, characters: e.characters.map((x) => (x.id === id ? { ...x, behavior: { ...x.behavior, mode } } : x)) }));
+    if (id === this.activeId) { a.halt(); this.updateMarkers(); this.publish(); }
+  }
   get active(): Agent | null { return this.activeId ? this.agents.get(this.activeId) ?? null : null; }
 
   setActive(id: string) { if (this.agents.has(id)) { this.activeId = id; this.updateMarkers(); this.publish(); } }
@@ -118,6 +149,7 @@ export class PlaytestController {
   private tick(dt: number) {
     // live config: panel edits apply immediately
     for (const c of this.store.env.characters) { const a = this.agents.get(c.id); if (a) a.config = c; }
+    if (this.status === 'playing') this.checkExits();
     if (this.status === 'playing') {
       this.acc += dt;
       while (this.acc >= FIXED_DT) { for (const a of this.agents.values()) a.step(FIXED_DT); this.acc -= FIXED_DT; }
@@ -125,6 +157,21 @@ export class PlaytestController {
       this.publish(false);
     }
     this.pushRender();
+  }
+
+  /** A character that ENDS a route on an exit node leaves for the linked entrance. */
+  private checkExits() {
+    for (const [id, a] of this.agents) {
+      if (a.arrivalSeq === (this.lastSeq.get(id) ?? 0)) continue;
+      this.lastSeq.set(id, a.arrivalSeq);
+      const node = a.snapshot().nodeId;
+      if (!a.arrivalFinal || !node) continue;
+      const r = resolveExit(this.store.project, this.env, node);
+      if (!r || !this.opts.onTransition) continue;
+      this.status = 'paused';
+      this.opts.onTransition({ targetEnvId: r.targetEnv.id, entryNodeId: r.entranceNodeId, character: a.config, text: `${a.config.name} è passato da “${this.env.name}” a “${r.targetEnv.name}”.` });
+      return;
+    }
   }
 
   private pushRender() {

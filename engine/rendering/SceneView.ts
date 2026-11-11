@@ -1,5 +1,6 @@
 import { Application, Container, Graphics, Sprite, Texture } from 'pixi.js';
-import type { CharacterState, NavigationGraph, SceneLayer, Vec2 } from '@/types';
+import type { CharacterState, InteractiveObject, NavigationGraph, SceneLayer, Vec2 } from '@/types';
+import { objectTypeInfo } from '@/engine/interaction/objects';
 import { edgePolyline } from '@/engine/navigation/geometry';
 
 /**
@@ -31,7 +32,12 @@ export interface OverlayModel {
   cursor: Vec2 | null;
   hoverNodeId: string | null;
   markers?: PlaytestMarkers | null;
+  /** Interactive objects and which one is selected (design markers are drawn only with the overlay). */
+  objects?: InteractiveObject[];
+  selectedObjectId?: string | null;
 }
+
+export interface ObjectSource { object: InteractiveObject; blobLoader: () => Promise<Blob | undefined> }
 
 /** Destination markers / route highlight used by the playtest (drawn even when the editor overlay is hidden). */
 export interface PlaytestMarkers {
@@ -68,7 +74,11 @@ const HANDLE_COLOR = 0xfde047;
 export class SceneView {
   private app!: Application;
   private world = new Container();
-  private layerRoot = new Container();
+  private bgRoot = new Container();   // background + midground
+  private objRoot = new Container();  // object images (below characters)
+  private fgRoot = new Container();   // foreground (above characters)
+  private objSprites = new Map<string, Sprite>();
+  private loading = new Map<string, Promise<Texture | null>>();
   private overlay = new Graphics();
   private host!: HTMLElement;
   private envW = 1;
@@ -79,6 +89,7 @@ export class SceneView {
   private sprites = new Map<string, Sprite>();
   private textures = new Map<string, Texture>();
   private layerVersion = 0;
+  private objVersion = 0;
   private destroyed = false;
   private resizeObs?: ResizeObserver;
   private charGfx = new Graphics();
@@ -110,7 +121,7 @@ export class SceneView {
     host.appendChild(app.canvas);
     app.canvas.style.touchAction = 'none';
     app.canvas.style.display = 'block';
-    this.world.addChild(this.layerRoot, this.overlay, this.charGfx);
+    this.world.addChild(this.bgRoot, this.objRoot, this.charGfx, this.fgRoot, this.overlay);
     app.stage.addChild(this.world);
     app.ticker.add((t) => {
       this.onTick(Math.min(0.1, t.deltaMS / 1000));
@@ -144,7 +155,30 @@ export class SceneView {
     this.dirty = true;
   }
 
-  /** Synchronizes sprites with the layer list. Textures are loaded lazily and cached per asset id. */
+  /** Texture cache keyed by asset id (shared by layers and objects); concurrent loads are de-duplicated. */
+  private texture(assetId: string, loader: () => Promise<Blob | undefined>): Promise<Texture | null> {
+    const cached = this.textures.get(assetId);
+    if (cached) return Promise.resolve(cached);
+    let p = this.loading.get(assetId);
+    if (!p) {
+      p = (async () => {
+        try {
+          const blob = await loader();
+          if (!blob) throw new Error('dati immagine mancanti nell’archivio locale');
+          const tex = Texture.from(await createImageBitmap(blob));
+          this.textures.set(assetId, tex);
+          return tex;
+        } catch (err) {
+          this.onAssetError(assetId, err instanceof Error ? err.message : String(err));
+          return null;
+        } finally { this.loading.delete(assetId); }
+      })();
+      this.loading.set(assetId, p);
+    }
+    return p;
+  }
+
+  /** Synchronizes layer sprites. Draw order: background/midground → objects → characters → foreground. */
   async setLayers(sources: LayerSource[]) {
     const version = ++this.layerVersion;
     const wanted = new Set(sources.map((s) => s.layer.id));
@@ -152,38 +186,43 @@ export class SceneView {
 
     const roleOrder = { background: 0, midground: 1, foreground: 2 } as const;
     const ordered = sources.map((s, i) => ({ s, i })).sort((a, b) => roleOrder[a.s.layer.role] - roleOrder[b.s.layer.role] || a.i - b.i);
+    const texs = await Promise.all(ordered.map(({ s }) => this.texture(s.layer.assetId, s.blobLoader)));
+    if (this.destroyed || version !== this.layerVersion) return; // superseded by a newer call
 
-    for (const { s } of ordered) {
+    const counts = { bg: 0, fg: 0 };
+    ordered.forEach(({ s }, k) => {
+      const tex = texs[k];
       const { layer } = s;
-      let tex = this.textures.get(layer.assetId);
-      if (!tex) {
-        try {
-          const blob = await s.blobLoader();
-          if (!blob) throw new Error('image data missing in local storage');
-          const bmp = await createImageBitmap(blob);
-          tex = Texture.from(bmp);
-          this.textures.set(layer.assetId, tex);
-        } catch (err) {
-          this.onAssetError(layer.assetId, err instanceof Error ? err.message : String(err));
-          continue;
-        }
-        if (this.destroyed || version !== this.layerVersion) return; // superseded by a newer call
-      }
       let sp = this.sprites.get(layer.id);
-      if (!sp) { sp = new Sprite(tex); this.sprites.set(layer.id, sp); }
-      else if (sp.texture !== tex) sp.texture = tex;
-      sp.visible = layer.visible;
-      sp.alpha = layer.opacity;
+      if (!tex) { sp?.destroy(); this.sprites.delete(layer.id); return; }
+      if (!sp) { sp = new Sprite(tex); this.sprites.set(layer.id, sp); } else if (sp.texture !== tex) sp.texture = tex;
+      sp.visible = layer.visible; sp.alpha = layer.opacity;
       sp.position.set(layer.offsetX * this.envW, layer.offsetY * this.envH);
-    }
-    // attach, then order children back-to-front
-    let idx = 0;
-    for (const { s } of ordered) {
-      const sp = this.sprites.get(s.layer.id);
-      if (!sp) continue;
-      if (!sp.parent) this.layerRoot.addChild(sp);
-      this.layerRoot.setChildIndex(sp, idx++);
-    }
+      const root = layer.role === 'foreground' ? this.fgRoot : this.bgRoot;
+      if (sp.parent !== root) root.addChild(sp);
+      root.setChildIndex(sp, layer.role === 'foreground' ? counts.fg++ : counts.bg++);
+    });
+    this.dirty = true;
+  }
+
+  /** Object images. Objects without an asset are design markers drawn by the overlay only. */
+  async setObjects(sources: ObjectSource[]) {
+    const withImg = sources.filter((s) => s.object.assetId);
+    const wanted = new Set(withImg.map((s) => s.object.id));
+    for (const [id, sp] of this.objSprites) if (!wanted.has(id)) { sp.destroy(); this.objSprites.delete(id); }
+    const version = ++this.objVersion;
+    const texs = await Promise.all(withImg.map((s) => this.texture(s.object.assetId!, s.blobLoader)));
+    if (this.destroyed || version !== this.objVersion) return;
+    withImg.forEach(({ object: o }, k) => {
+      const tex = texs[k];
+      let sp = this.objSprites.get(o.id);
+      if (!tex) { sp?.destroy(); this.objSprites.delete(o.id); return; }
+      if (!sp) { sp = new Sprite(tex); sp.anchor.set(0.5); this.objSprites.set(o.id, sp); this.objRoot.addChild(sp); } else if (sp.texture !== tex) sp.texture = tex;
+      sp.visible = o.visible;
+      sp.position.set(o.position.x * this.envW, o.position.y * this.envH);
+      sp.width = o.width * this.envH; sp.height = o.height * this.envH;
+      this.objRoot.setChildIndex(sp, Math.min(k, this.objRoot.children.length - 1));
+    });
     this.dirty = true;
   }
 
@@ -353,6 +392,8 @@ export class SceneView {
       }
     }
 
+    this.drawObjects(g, m, px, P);
+
     // rubber band
     if (m.pendingFrom && m.cursor) {
       const a = m.graph.nodes.find((n) => n.id === m.pendingFrom);
@@ -366,6 +407,42 @@ export class SceneView {
       const r = (sel || hov || pend ? 8 : 6.5) * px;
       if (sel || pend) g.circle(x, y, r + 5 * px).fill({ color: pend ? 0xfacc15 : SELECT_COLOR, alpha: 0.3 });
       g.circle(x, y, r).fill({ color: NODE_COLORS[n.type] ?? 0xd4d4d4 }).stroke({ width: (sel ? 2.5 : 1.8) * px, color: sel ? 0x2563eb : 0x111827 });
+    }
+  }
+
+  private drawObjects(g: Graphics, m: OverlayModel, px: number, P: (p: Vec2) => [number, number]) {
+    for (const o of m.objects ?? []) {
+      const [cx, cy] = P(o.position);
+      const w = o.width * this.envH, h = o.height * this.envH;
+      const info = objectTypeInfo(o.type);
+      const sel = o.id === m.selectedObjectId;
+      const alpha = o.visible ? 1 : 0.35;
+      if (o.linkedNodeId) {
+        const n = m.graph.nodes.find((x) => x.id === o.linkedNodeId);
+        if (n) g.moveTo(cx, cy).lineTo(...P(n)).stroke({ width: 1.2 * px, color: info.color, alpha: 0.5 * alpha });
+      }
+      if (!o.assetId) {
+        const x0 = cx - w / 2, y0 = cy - h / 2, lw = 2 * px;
+        switch (o.type) {
+          case 'collectible': g.poly([cx, y0, cx + w / 2, cy, cx, y0 + h, cx - w / 2, cy]).fill({ color: info.color, alpha: 0.4 * alpha }).stroke({ width: lw, color: info.color, alpha }); break;
+          case 'interaction-point': g.circle(cx, cy, Math.min(w, h) / 2).fill({ color: info.color, alpha: 0.35 * alpha }).stroke({ width: lw, color: info.color, alpha }); g.circle(cx, cy, Math.min(w, h) / 6).fill({ color: info.color, alpha }); break;
+          case 'observation-point': g.circle(cx, cy, Math.min(w, h) / 2).stroke({ width: lw, color: info.color, alpha }); g.circle(cx, cy, Math.min(w, h) / 4).stroke({ width: lw, color: info.color, alpha }); break;
+          case 'entrance': case 'exit': {
+            g.roundRect(x0, y0, w, h, w * 0.3).fill({ color: info.color, alpha: 0.3 * alpha }).stroke({ width: lw, color: info.color, alpha });
+            const t = Math.min(w, h) * 0.28, dir = o.type === 'entrance' ? 1 : -1; // entrance: arrow in (down), exit: arrow out (up)
+            g.poly([cx - t, cy - dir * t * 0.6, cx + t, cy - dir * t * 0.6, cx, cy + dir * t]).fill({ color: info.color, alpha });
+            break;
+          }
+          case 'trigger': g.rect(x0, y0, w, h).fill({ color: info.color, alpha: 0.12 * alpha }).stroke({ width: lw, color: info.color, alpha: 0.9 * alpha }); break;
+          default: g.roundRect(x0, y0, w, h, Math.min(w, h) * 0.15).fill({ color: info.color, alpha: 0.35 * alpha }).stroke({ width: lw, color: info.color, alpha });
+        }
+      } else if (!o.visible) {
+        g.rect(cx - w / 2, cy - h / 2, w, h).stroke({ width: 1.5 * px, color: info.color, alpha: 0.4 });
+      }
+      if (sel) {
+        g.rect(cx - w / 2 - 3 * px, cy - h / 2 - 3 * px, w + 6 * px, h + 6 * px).stroke({ width: 2 * px, color: 0xffffff, alpha: 0.9 });
+        g.rect(cx + w / 2 - 5 * px, cy + h / 2 - 5 * px, 10 * px, 10 * px).fill({ color: 0xfde047 }).stroke({ width: 1.5 * px, color: 0x000000, alpha: 0.7 });
+      }
     }
   }
 

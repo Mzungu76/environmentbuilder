@@ -3,6 +3,7 @@ import type { CharacterRenderItem, PlaytestMarkers } from '@/engine/rendering/Sc
 import { createCharacter } from '@/engine/characters/factory';
 import type { EditorStore } from '@/lib/store/editorStore';
 import type { SceneView, ViewPointerEvent } from '@/engine/rendering/SceneView';
+import { cleanObjectLinks } from '@/engine/interaction/objects';
 import { addEdge, addNode, createEdge, createNode, findEdgeBetween, moveNode, removeEdge, removeNode, updateEdge } from './graph';
 import { clamp01, defaultBezier } from './geometry';
 import { hitTest, type Hit } from './hit';
@@ -28,13 +29,9 @@ export class NavigationEditor {
   markers: PlaytestMarkers | null = null;
 
   constructor(private store: EditorStore, private view: SceneView) {
-    this.attach();
     this.unsub = store.subscribe(() => this.refresh());
     this.refresh();
   }
-
-  /** (Re)claims pointer input for the editor tools. */
-  attach() { this.view.onPointer = (e) => this.handle(e); }
 
   dispose() { this.unsub(); }
 
@@ -53,6 +50,7 @@ export class NavigationEditor {
       preview: play ? !s.showPaths : s.preview,
       pendingFrom: play ? null : this.pendingFrom, cursor: this.cursor, hoverNodeId: play ? null : this.hover,
       markers: play ? this.markers : null,
+      objects: env.objects, selectedObjectId: s.selection?.kind === 'object' ? s.selection.id : null,
     });
     if (!play) {
       // editor mode: characters stand on their start node
@@ -70,13 +68,14 @@ export class NavigationEditor {
 
   deleteSelection() {
     const sel = this.store.getState().selection;
-    if (!sel) return;
+    if (!sel || sel.kind === 'object') return;
     this.store.commitEnv((env) => {
       if (sel.kind === 'character') return { ...env, characters: env.characters.filter((c) => c.id !== sel.id) };
+      if (sel.kind === 'object') return env;
       const navigation = sel.kind === 'node' ? removeNode(env.navigation, sel.id) : removeEdge(env.navigation, sel.id);
       // characters starting on a deleted node lose their start (never dangle)
       const ids = new Set(navigation.nodes.map((n) => n.id));
-      return { ...env, navigation, characters: env.characters.map((c) => (c.startNodeId && !ids.has(c.startNodeId) ? { ...c, startNodeId: null } : c)) };
+      return cleanObjectLinks({ ...env, navigation, characters: env.characters.map((c) => (c.startNodeId && !ids.has(c.startNodeId) ? { ...c, startNodeId: null } : c)) });
     });
     this.store.setSelection(null);
     this.pendingFrom = null;
@@ -105,7 +104,7 @@ export class NavigationEditor {
 
   private inside(p: Vec2) { return p.x >= 0 && p.x <= 1 && p.y >= 0 && p.y <= 1; }
 
-  private handle(e: ViewPointerEvent) {
+  handle(e: ViewPointerEvent) {
     const env = this.store.env;
     if (!env.width || !env.height) return; // nothing imported yet
     const tool = this.store.getState().tool;

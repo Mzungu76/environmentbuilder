@@ -131,3 +131,25 @@ describe('autonomous movement', () => {
     expect(a.snapshot().nodeId).toBe(ids.A); // nothing allowed → stays put
   });
 });
+
+describe('arrival events and blocked destinations', () => {
+  it('reports a final arrival on the last node of a route', () => {
+    const { env, ids } = scene();
+    const a = mkAgent(env, ids.A, { speed: 1 });
+    a.goTo(ids.C); expect(a.arrivalSeq).toBe(0);
+    run(a, 3);
+    expect(a.arrivalSeq).toBeGreaterThanOrEqual(2);
+    expect(a.arrivalFinal).toBe(true);
+    expect(a.snapshot().nodeId).toBe(ids.C);
+  });
+  it('autonomous mode never picks blocked nodes (exits) as destination', () => {
+    const { env, ids } = scene();
+    env.navigation = updateEdge(env.navigation, env.navigation.edges[2].id, { direction: 'both' });
+    const a = mkAgent(env, ids.A, { speed: 1, behavior: { mode: 'autonomous', pauseMin: 0, pauseMax: 0.2, stopProbability: 0, turnProbability: 0, decisionInterval: 1, edgeWeights: {} } });
+    a.blocked = new Set([ids.C]);
+    const stops = new Set<string>();
+    for (let i = 0; i < 60 * 120; i++) { a.step(1 / 60); const s = a.snapshot(); if (a.arrivalFinal && s.nodeId) stops.add(s.nodeId); }
+    expect(stops.has(ids.C)).toBe(false);
+    expect(stops.size).toBeGreaterThan(0);
+  });
+});
