@@ -46,6 +46,8 @@ export interface Character {
   speed: number;
   shadow: boolean;
   startNodeId: string | null;
+  /** Rigged character from the Studio used instead of sprite/placeholder (schema v3). */
+  puppetId?: string | null;
   /** Abilities matched against edge requirements (e.g. "can-climb"). */
   abilities: string[];
   behavior: CharacterBehavior;

@@ -76,6 +76,7 @@ export function TopBar(p: Props) {
           </div>
         )}
       </div>
+      <Link href={`/studio?id=${state.project.id}`} className={`${styles.btn} ${styles.iconBtn}`} title="Studio personaggi" aria-label="Studio personaggi" data-testid="open-studio">{Icon.character}</Link>
       <Link href="/manuale" target="_blank" rel="noreferrer" className={`${styles.btn} ${styles.iconBtn} ${styles.hideXs}`} title="Manuale (si apre in una nuova scheda)" aria-label="Manuale" data-testid="open-manual">{Icon.help}</Link>
       <button className={`${styles.btn} ${styles.iconBtn} ${styles.inspToggle}`} onClick={p.onToggleInspector} aria-label="Mostra/nascondi inspector" title="Inspector">{Icon.panel}</button>
     </header>

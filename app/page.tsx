@@ -74,6 +74,7 @@ export default function LibraryPage() {
                 <span className={styles.envs}>{p.environments.slice(0, 6).map((e) => <button key={e.id} className={styles.envChip} onClick={() => router.push(`/editor?id=${p.id}&env=${e.id}`)} title={`Apri “${e.name}”`}>{e.name}</button>)}{p.environments.length > 6 && <span className={styles.meta}>+{p.environments.length - 6}</span>}</span><span className={styles.meta}>{p.environmentCount} {p.environmentCount === 1 ? 'ambiente' : 'ambienti'} · {new Date(p.updatedAt).toLocaleString('it-IT')}</span></div>
               <div className={styles.foot}>
                 <button className={`${styles.btn} ${styles.primary}`} onClick={() => router.push(`/editor?id=${p.id}`)}>Apri</button>
+                <button className={styles.btn} onClick={() => router.push(`/studio?id=${p.id}`)} data-testid="open-studio" title="Studio personaggi: crea personaggi con scheletro e animazioni">Personaggi</button>
                 <button className={styles.btn} aria-label={`Duplica ${p.name}`} title="Duplica progetto" data-testid="dup-project" onClick={async () => { try { await duplicateProject(p.id, uid('proj'), `${p.name} (copia)`); await refresh(); } catch (e) { setError(e instanceof Error ? e.message : String(e)); } }}>{Icon.copy}</button>
                 {confirmId === p.id
                   ? <button className={`${styles.btn} ${styles.danger}`} onClick={async () => { await deleteProject(p.id); setConfirmId(null); void refresh(); }}>Eliminare “{p.name}”?</button>

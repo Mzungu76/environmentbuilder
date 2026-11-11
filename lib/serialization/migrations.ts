@@ -12,6 +12,12 @@ const migrations: Record<number, (doc: any) => any> = {
   }),
 };
 
+// v2 → v3: rigged characters (puppets) and the optional link from a character to one.
+migrations[2] = (doc) => ({
+  ...doc, schemaVersion: 3, puppets: doc.puppets ?? [],
+  environments: (doc.environments ?? []).map((env: any) => ({ ...env, characters: (env.characters ?? []).map((c: any) => ({ ...c, puppetId: c.puppetId ?? null })) })),
+});
+
 function normalizeInteraction(i: any) {
   return {
     id: i.id, kind: i.kind ?? 'custom', label: i.label ?? i.kind ?? 'Interazione', trigger: i.trigger ?? 'manual', once: i.once ?? false,
@@ -38,7 +44,7 @@ export function migrateProject(input: unknown): Project {
   for (const env of doc.environments) {
     if (!env?.navigation || !Array.isArray(env.navigation.nodes) || !Array.isArray(env.navigation.edges))
       throw new SchemaError(`L’ambiente “${env?.name ?? '?'}” ha un grafo di navigazione non valido`);
-    doc.customProfiles ??= [];
+    doc.customProfiles ??= []; doc.puppets ??= [];
     env.layers ??= []; env.assets ??= []; env.objects ??= []; env.entrances ??= []; env.exits ??= []; env.characters ??= []; env.profiles ??= ['custom'];
   }
   return doc as Project;

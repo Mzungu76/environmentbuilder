@@ -6,7 +6,7 @@ const root = path.resolve(import.meta.dirname, '..');
 const res = await build({
   entryPoints: [path.join(root, 'tools/standalone/entry.tsx')], bundle: true, write: false, outdir: path.join(root, 'dist'),
   format: 'iife', minify: true, target: 'es2022', jsx: 'automatic', platform: 'browser',
-  loader: { '.module.css': 'local-css', '.css': 'css', '.md': 'text' },
+  loader: { '.module.css': 'local-css', '.css': 'css', '.md': 'text', '.txt': 'text', '.png': 'dataurl' },
   alias: { 'next/link': path.join(root, 'tools/standalone/next-link.tsx'), 'next/navigation': path.join(root, 'tools/standalone/next-navigation.ts'), '@': root },
   define: { 'process.env.NODE_ENV': '"production"' }, logLevel: 'warning',
 });

@@ -130,6 +130,14 @@ function EdgePanel({ store, env, edge, select, onToggleCurve }: { store: EditorS
         <TextField id="e-req" label="Requisiti" value={edge.requirements.join(', ')} onCommit={(v) => edit({ requirements: v.split(',').map((s) => s.trim()).filter(Boolean) })} />
         <span className={styles.help}>Abilità richieste, separate da virgola (es. can-climb). Un personaggio senza tutte le abilità non può percorrere il collegamento.</span>
       </div>
+      <div className={styles.section}>
+        <Field label="Vista del personaggio con scheletro" id="e-view" help="Per i personaggi creati nello Studio: su questo collegamento mostra il profilo, il fronte o il retro (es. scale verso lo spettatore). Automatico = profilo mentre cammina.">
+          <select id="e-view" className={styles.select} value={edge.props.view ?? ''} data-testid="edge-view"
+            onChange={(ev) => { const props = { ...edge.props }; if (ev.target.value) props.view = ev.target.value; else delete props.view; edit({ props }); }}>
+            <option value="">Automatica</option><option value="side">Profilo</option><option value="front">Fronte</option><option value="back">Retro</option>
+          </select>
+        </Field>
+      </div>
       <div className={styles.section}><PropsField id="e-props" value={edge.props} onCommit={(p) => edit({ props: p })} /></div>
     </>
   );

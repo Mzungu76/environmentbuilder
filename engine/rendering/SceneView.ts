@@ -1,4 +1,4 @@
-import { Application, Container, Graphics, Rectangle, Sprite, Texture } from 'pixi.js';
+import { Application, Container, Graphics, MeshSimple, Rectangle, Sprite, Texture } from 'pixi.js';
 import type { SpriteDraw } from '@/engine/characters/sprites';
 import type { CharacterState, InteractiveObject, NavigationGraph, SceneLayer, Vec2 } from '@/types';
 import { objectTypeInfo } from '@/engine/interaction/objects';
@@ -49,6 +49,18 @@ export interface PlaytestMarkers {
   routeEdgeIds: string[];
 }
 
+/** A rigged character frame: skinned vertices in cut-out pixels + the static mesh data. */
+export interface PuppetDraw {
+  assetId: string;
+  positions: Float32Array;
+  uvs: number[];
+  indices: number[];
+  pivot: { x: number; y: number };
+  figureHeight: number;
+  flip: boolean;
+  viewKey: string;
+}
+
 export interface CharacterRenderItem {
   id: string;
   /** Feet position, normalized. */
@@ -66,6 +78,7 @@ export interface CharacterRenderItem {
   /** Seconds since the state started; ignored when `liveClock` (editor: idle animation plays on its own). */
   stateTime: number;
   liveClock: boolean;
+  puppet?: PuppetDraw | null;
 }
 
 export interface LayerSource { layer: SceneLayer; blobLoader: () => Promise<Blob | undefined> }
@@ -103,6 +116,8 @@ export class SceneView {
   private chars: CharacterRenderItem[] = [];
   private charRoot = new Container();
   private charSprites = new Map<string, Sprite>();
+  private puppetMeshes = new Map<string, { mesh: MeshSimple; key: string }>();
+  private typed = new WeakMap<object, Float32Array | Uint32Array>();
   private frameTex = new Map<string, Texture>();
   /** Loads the binary of an image asset (set by the host component). */
   assetLoader: (assetId: string) => Promise<Blob | undefined> = async () => undefined;
@@ -494,11 +509,13 @@ export class SceneView {
     g.clear();
     const t = performance.now() / 1000;
     const H = this.envH, W = this.envW;
-    const seen = new Set<string>();
+    const seen = new Set<string>(), seenMesh = new Set<string>();
     for (const c of this.chars) {
       const h = c.height * H, w = c.width * H;
       const cx = c.x * W, cy = c.y * H;
       const lift = c.lift;
+      // --- rigged puppet (skinned mesh) when available
+      if (c.puppet && this.drawPuppetMesh(g, c, cx, cy, h, w, lift)) { seenMesh.add(c.id); continue; }
       // --- sprite (image / sprite sheet) when available; procedural placeholder otherwise
       if (c.sprite) {
         const base = this.textures.get(c.sprite.assetId);
@@ -522,6 +539,31 @@ export class SceneView {
       this.drawProcedural(g, c, cx, cy, w, h, lift, t);
     }
     for (const [id, sp] of this.charSprites) if (!seen.has(id)) { sp.destroy(); this.charSprites.delete(id); }
+    for (const [id, m] of this.puppetMeshes) if (!seenMesh.has(id)) { m.mesh.destroy(); this.puppetMeshes.delete(id); }
+  }
+
+  /** Draws a skinned puppet with a Pixi mesh; false while its texture is still loading (placeholder is used meanwhile). */
+  private drawPuppetMesh(g: Graphics, c: CharacterRenderItem, cx: number, cy: number, h: number, w: number, lift: number): boolean {
+    const pd = c.puppet!;
+    const base = this.textures.get(pd.assetId);
+    if (!base) { void this.texture(pd.assetId, () => this.assetLoader(pd.assetId)); return false; }
+    const cached = (arr: number[], Ctor: typeof Float32Array | typeof Uint32Array) => { let t = this.typed.get(arr); if (!t) { t = Ctor.from(arr); this.typed.set(arr, t); } return t; };
+    let entry = this.puppetMeshes.get(c.id);
+    if (!entry || entry.key !== pd.viewKey) {
+      entry?.mesh.destroy();
+      const mesh = new MeshSimple({ texture: base, vertices: new Float32Array(pd.positions), uvs: cached(pd.uvs, Float32Array) as Float32Array, indices: cached(pd.indices, Uint32Array) as Uint32Array });
+      this.charRoot.addChild(mesh);
+      entry = { mesh, key: pd.viewKey }; this.puppetMeshes.set(c.id, entry);
+    }
+    const m = entry.mesh;
+    m.vertices = pd.positions;
+    const s = h / pd.figureHeight;
+    m.pivot.set(pd.pivot.x, pd.pivot.y);
+    m.scale.set(s * (pd.flip ? -1 : 1), s);
+    m.position.set(cx, cy - lift);
+    if (c.shadow) g.ellipse(cx, cy, w * 0.55, Math.max(2, h * 0.05)).fill({ color: 0x000000, alpha: 0.35 });
+    if (c.selected) g.ellipse(cx, cy, w * 0.8, Math.max(3, h * 0.09)).stroke({ width: 2 / this.zoom, color: 0xffffff, alpha: 0.9 });
+    return true;
   }
 
   private drawProcedural(g: Graphics, c: CharacterRenderItem, cx: number, cy: number, w: number, h: number, lift: number, t: number) {

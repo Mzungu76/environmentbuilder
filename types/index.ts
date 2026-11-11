@@ -3,3 +3,4 @@ export * from './environment';
 export * from './navigation';
 export * from './character';
 export * from './interaction';
+export * from './puppet';

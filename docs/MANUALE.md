@@ -63,17 +63,33 @@ Sfondo (obbligatorio) + piani intermedi + primi piani. Per ogni livello: mostra/
 Senza immagine è usato un personaggio provvisorio (colore, dimensioni, ombra). Per usare i tuoi disegni: **Importa sprite** (immagine singola) oppure spunta *È uno sprite sheet*, indica la dimensione del fotogramma e assegna a ogni stato (IDLE, WALK, CLIMB, INTERACT, COLLECT, JUMP, FALL, CUSTOM) i fotogrammi (`0-3`, `0, 2, 4`), i fotogrammi/s e se ripetere. Lo sprite guarda a destra (a sinistra viene specchiato); uno stato senza animazione usa IDLE.
 **Comportamento:** *Manuale* (clicchi un nodo di destinazione) o *Autonomo* (sceglie da solo destinazioni raggiungibili). Parametri: velocità, sosta min/max, probabilità di sosta ai nodi, frequenza delle decisioni, probabilità di cambio direzione, **preferenze per tipo di collegamento** (1 neutro, >1 preferito, 0 mai). Le uscite non sono mai scelte in autonomia.
 
-## 8. Playtest
+## 8. Studio personaggi (modellini con scheletro)
+
+Sezione a parte (icona personaggio nella barra dell’editor, oppure *Personaggi* nella Libreria) che trasforma **un foglio di rotazione** — un’unica immagine con fronte, profilo verso destra e retro dello stesso personaggio — in un personaggio con **scheletro e animazioni**. Il builder non genera immagini: nel passo 1 trovi la **guida da dare al tuo generatore AI** (sagoma, mappa delle parti, prompt già scritto da compilare). Pensato per il computer; i passi si possono ripetere e correggere in ogni momento (`Ctrl+Z`, salvataggio automatico).
+
+1. **Importa** — carica il foglio. Qui trovi anche la guida e il prompt (pulsante *Copia*).
+2. **Sfondo** — rimuove lo sfondo piatto. Le tolleranze servono perché le immagini AI non sono mai perfette: *tolleranza colore* (sfondi sporchi o JPEG), *morbidezza del bordo*, *restringi/allarga il contorno* (per eliminare gli aloni), *pulizia dell’alone*, *elimina macchie*, e l’opzione «solo lo sfondo collegato ai bordi» che salva i dettagli chiari dentro il personaggio. Il contagocce sceglie il colore a mano. Anteprima: risultato, originale o confronto.
+3. **Viste** — il foglio viene diviso nelle tre figure (rilevamento automatico). Se non coincidono, **trascina i bordi dei rettangoli** o scrivi i valori. *Genera le viste* ritaglia ogni figura. Poi: **gomma** e **ripristina** per ritoccare i difetti, **altezza della figura** (se una vista è venuta più alta o bassa delle altre) e **punto di appoggio** dei piedi.
+4. **Scheletro** — 19 giunti piazzati in automatico dalle proporzioni del modello e agganciati alla sagoma. Trascinali dove servono (*Affina sul contorno*, *Specchia sx→dx*, *Simmetria* aiutano). Nel profilo «vicino» è l’arto più vicino a chi guarda, «lontano» quello nascosto.
+5. **Mesh e pesi** — crea una rete di triangoli sul personaggio e calcola quanto ogni osso muove ogni punto. *Morbidezza delle giunture* e *Lisciatura* regolano la deformazione; il **pennello dei pesi** (assegna, aggiungi, togli, sfuma) corregge a mano. *Prova deformazione* ruota un osso per vedere subito se qualcosa si strappa. Nel profilo, *Gamba/Braccio lontano* aggiungono una **copia dell’arto vicino dietro al corpo**, così la camminata di profilo mostra entrambi gli arti.
+6. **Animazioni** — preset (riposo, camminata, arrampicata, salto, caduta, interazione, raccolta) da modificare: **trascina i cerchi bianchi** per ruotare le ossa; dove trascini si crea una *chiave*. Timeline, riproduzione, durata, ripetizione e **passo per ciclo** (sincronizza la camminata alla velocità: niente piedi che scivolano). Per ogni stato (IDLE, WALK, CLIMB…) scegli quale animazione usare.
+7. **Anteprima ed esporta** — provi ogni stato e vista, controlli la lista di verifica, **esporti il pacchetto** per un gioco e **assegni l’aspetto** ai personaggi del progetto (o ne crei uno).
+
+Nell’editor, il personaggio usa il modellino scegliendolo in *Aspetto con scheletro* (Inspector del personaggio). Nel Playtest cammina con la vista di profilo (specchiata a sinistra), sosta di fronte, e su un collegamento puoi forzare la vista *Fronte/Retro* (Inspector del percorso → *Vista del personaggio*), ad esempio per scale verso lo spettatore.
+
+**Limiti:** l’immagine unica non contiene ciò che è nascosto (dietro un braccio, l’altra gamba): le copie degli arti lontani e il pennello dei pesi compensano, ma movimenti molto ampi mostrano deformazioni. L’aspetto non cambia con l’inventario.
+
+## 9. Playtest
 
 Nasconde gli strumenti. **Play / Pausa / Stop / Reset** (`Spazio` = Play/Pausa). *Stop* riporta tutti alla partenza; *Reset* riparte da capo. In manuale clicca un nodo (cerchi bianchi) o usa l’elenco; destinazioni non raggiungibili vengono rifiutate con un messaggio. Pannelli: **Interazioni** (pulsanti manuali, inventario, eventi inviati al gioco), **Diagnostica** (posizione, nodo, collegamento, velocità, stato, percorso), **Parametri** (modificano davvero il personaggio). *Mostra percorsi* sovrappone i nodi di progetto. Tornando all’Editor **nulla è perso**: il Playtest non modifica il progetto (inventario e oggetti raccolti sono solo temporanei).
 
-## 9. Salvataggio ed esportazione
+## 10. Salvataggio ed esportazione
 
 - **Esporta → ZIP:** `project.json` + `manifest.json` + tutte le immagini (`assets/`). È il formato di backup e di consegna. **Importa** dalla Libreria (crea sempre un *nuovo* progetto, non sovrascrive).
 - **Esporta → JSON:** solo configurazione, senza immagini.
 - Vecchi progetti (schema v1) vengono aggiornati automaticamente; file più recenti dell’app vengono rifiutati con un avviso.
 
-## 10. Integrazione con altri giochi
+## 11. Integrazione con altri giochi
 
 1. Esporta lo ZIP: le coordinate sono **normalizzate (0–1)** rispetto alla dimensione originale dell’immagine, quindi indipendenti da schermo e risoluzione; moltiplica per larghezza/altezza dell’immagine del livello.
 2. Per riusare movimento, percorsi, uscite e interazioni senza riscriverli: `npm run build:runtime` produce `dist/environment-runtime.mjs` (~19 KB, nessuna dipendenza, niente DOM):
@@ -85,10 +101,11 @@ Nasconde gli strumenti. **Play / Pausa / Stop / Reset** (`Spazio` = Play/Pausa).
    eroe.step(1 / 60);         // passo fisso, deterministico
    eroe.snapshot();           // { x, y, facing, state, nodeId, edgeId, … }
    ```
+   Per i personaggi dello Studio vedi **docs/INTEGRAZIONE-PERSONAGGI.md** e il pacchetto *Esporta pacchetto ZIP* (include runtime e `demo.html`).
    Sono esportati anche `findRoute`, `resolveExit`, `availableInteractions`, `performInteraction`, `registerMovementType` (nuovi tipi di movimento).
 3. **Eventi in uscita dal Playtest** (per prove di integrazione): ogni evento (`arrival`, `interaction`, `transition`, con il nome evento configurato) è un `CustomEvent` sulla `window` — `window.addEventListener('environment-builder:event', e => e.detail)` — e un `postMessage` al genitore se l’app è in un iframe (`{ source: 'environment-builder', event }`).
 
-## 11. Limiti noti e consigli
+## 12. Limiti noti e consigli
 
 - Niente fisica/collisioni (scelta di progetto: movimento guidato dal grafo).
 - Immagini oltre la dimensione massima di texture della GPU (spesso 8192–16384 px) possono non comparire: verrà mostrato un avviso.

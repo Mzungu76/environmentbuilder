@@ -1,0 +1,101 @@
+import type { CharacterState } from './character';
+import type { ImageAssetMeta } from './environment';
+import type { Vec2 } from './navigation';
+
+/** A rigged character ("modellino"): one cut-out image per view, deformed with a bone skeleton. Added in schema v3. */
+
+export type ViewId = 'side' | 'front' | 'back';
+export const VIEW_IDS: ViewId[] = ['side', 'front', 'back'];
+
+/**
+ * Skeleton landmarks (pixel coordinates of the view's cut-out image).
+ * L / R are the sides AS SEEN IN THE IMAGE for front/back views; in the side view (character facing right)
+ * R = the NEAR limbs, L = the FAR limbs.
+ */
+export const LANDMARK_IDS = [
+  'headTop', 'neck', 'shoulderL', 'shoulderR', 'elbowL', 'elbowR', 'wristL', 'wristR', 'handL', 'handR',
+  'pelvis', 'hipL', 'hipR', 'kneeL', 'kneeR', 'ankleL', 'ankleR', 'toeL', 'toeR',
+] as const;
+export type LandmarkId = (typeof LANDMARK_IDS)[number];
+
+export const BONE_IDS = [
+  'pelvis', 'torso', 'head', 'uarmL', 'farmL', 'handL', 'uarmR', 'farmR', 'handR',
+  'thighL', 'shinL', 'footL', 'thighR', 'shinR', 'footR',
+] as const;
+export type BoneId = (typeof BONE_IDS)[number];
+
+export interface Rect { x: number; y: number; w: number; h: number }
+
+/** Triangle mesh over the cut-out (positions in cut-out pixels). */
+export interface Mesh { cell: number; vertices: number[]; uvs: number[]; indices: number[] }
+/** Up to 4 bone influences per vertex, flattened (4 entries per vertex). Bone index = position in BONE_IDS. */
+export interface Skin { idx: number[]; w: number[] }
+
+/** Rotations in degrees relative to the parent bone (rest = 0). dx/dy move the whole body, in figure heights. */
+export interface Pose { rot: Partial<Record<BoneId, number>>; dx: number; dy: number }
+export interface Keyframe { t: number; pose: Pose }
+export interface Clip {
+  id: string;
+  name: string;
+  /** Seconds per cycle. */
+  duration: number;
+  loop: boolean;
+  /** Keyframes with t in [0,1] (fraction of the cycle), sorted. */
+  keys: Keyframe[];
+  /** Distance covered per cycle, in figure heights: lets the runtime sync the speed and avoid foot sliding. */
+  cycleLength?: number;
+}
+
+export interface WeightParams {
+  /** Joint softness: larger = smoother bends, smaller = more rigid limbs. */
+  falloff: number;
+  smooth: number;
+  /** Side view: how strongly vertices prefer the NEAR limbs (R) over the far ones (L). */
+  farPenalty: number;
+}
+
+export interface PuppetView {
+  id: ViewId;
+  /** Region of the source sheet (pixels) that contains this figure. */
+  crop: Rect;
+  /** Processed cut-out (transparent background) image asset. */
+  cutoutAssetId: string | null;
+  width: number;
+  height: number;
+  /** Height of the figure in cut-out pixels (used to scale all views to the same size; editable). */
+  figureHeight: number;
+  /** Ground contact point (feet centre), in cut-out pixels. */
+  pivot: Vec2;
+  landmarks: Partial<Record<LandmarkId, Vec2>>;
+  mesh: Mesh | null;
+  skin: Skin | null;
+  /** Profile only: draw copies of the near arm/leg behind the body as the far limbs (the flat image hides them). */
+  farLimbs?: { arm: boolean; leg: boolean };
+  weightParams: WeightParams;
+  clips: Clip[];
+  stateClips: Partial<Record<CharacterState, string>>;
+}
+
+export interface KeyParams {
+  /** Background colour to remove (null = detect from the borders). */
+  color: [number, number, number] | null;
+  tolerance: number;
+  feather: number;
+  /** Positive shrinks the silhouette, negative grows it (pixels). */
+  choke: number;
+  defringe: number;
+  floodFromBorder: boolean;
+  minIsland: number;
+}
+
+export interface Puppet {
+  id: string;
+  name: string;
+  source: { assetId: string; width: number; height: number } | null;
+  keying: KeyParams;
+  views: Partial<Record<ViewId, PuppetView>>;
+  /** View used when standing still. */
+  idleView: ViewId;
+  /** Asset metadata for every image of this puppet (source + cut-outs), exported with the project. */
+  assets: ImageAssetMeta[];
+}

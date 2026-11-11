@@ -2,6 +2,7 @@ import type { Vec2 } from '@/types';
 import type { CharacterRenderItem, PlaytestMarkers } from '@/engine/rendering/SceneView';
 import { createCharacter } from '@/engine/characters/factory';
 import { spriteFor } from '@/engine/characters/sprites';
+import { PuppetPlayer } from '@/engine/puppet/player';
 import type { EditorStore } from '@/lib/store/editorStore';
 import type { SceneView, ViewPointerEvent } from '@/engine/rendering/SceneView';
 import { cleanObjectLinks } from '@/engine/interaction/objects';
@@ -25,6 +26,7 @@ export class NavigationEditor {
   private drag: Drag = null;
   private lastTool = '';
   private unsub: () => void;
+  private players = new Map<string, PuppetPlayer>();
 
   /** Set by the playtest controller (destination markers); null in the editor. */
   markers: PlaytestMarkers | null = null;
@@ -59,10 +61,21 @@ export class NavigationEditor {
       for (const c of env.characters) {
         const n = env.navigation.nodes.find((x) => x.id === c.startNodeId);
         if (!n) continue;
-        items.push({ id: c.id, x: n.x, y: n.y, width: c.width, height: c.height, color: c.color, facing: 1, state: 'IDLE', shadow: c.shadow, selected: s.selection?.kind === 'character' && s.selection.id === c.id, lift: 0, sprite: spriteFor(c, 'IDLE'), stateTime: 0, liveClock: true });
+        items.push({ id: c.id, x: n.x, y: n.y, width: c.width, height: c.height, color: c.color, facing: 1, state: 'IDLE', shadow: c.shadow, selected: s.selection?.kind === 'character' && s.selection.id === c.id, lift: 0, sprite: spriteFor(c, 'IDLE'), stateTime: 0, liveClock: true, puppet: this.puppetDraw(c) });
       }
       this.view.setCharacters(items);
     }
+  }
+
+  /** Static idle pose of a rigged character (editor mode). */
+  private puppetDraw(c: { id: string; puppetId?: string | null }): CharacterRenderItem['puppet'] {
+    const puppet = c.puppetId ? this.store.project.puppets.find((p) => p.id === c.puppetId) : undefined;
+    if (!puppet) return null;
+    let pl = this.players.get(c.id); if (!pl) { pl = new PuppetPlayer(); this.players.set(c.id, pl); }
+    const f = pl.frame(puppet, 'IDLE', 0, 0);
+    const assetId = f?.view.cutoutAssetId;
+    if (!f || !assetId || !f.view.mesh) return null;
+    return { assetId, positions: f.positions, uvs: f.view.mesh.uvs, indices: f.view.mesh.indices, pivot: f.view.pivot, figureHeight: f.view.figureHeight, flip: false, viewKey: `${puppet.id}:${f.viewId}:${assetId}` };
   }
 
   cancelPending() { this.pendingFrom = null; this.refresh(); }

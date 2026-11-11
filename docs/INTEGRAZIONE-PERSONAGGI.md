@@ -1,0 +1,76 @@
+# Usare i personaggi dello Studio in un gioco
+
+Lo Studio esporta ogni personaggio come **pacchetto ZIP** (*Anteprima ed esporta → Esporta pacchetto ZIP*):
+
+```
+puppet.json                scheletro, mesh, pesi e animazioni di ogni vista
+textures/side.png          profilo (guarda a destra)
+textures/front.png         fronte
+textures/back.png          retro
+environment-runtime.mjs    runtime senza dipendenze (nessuna build)
+demo.html                  lettore autonomo: doppio click, funziona anche da file://
+README.md                  promemoria d'uso
+```
+
+Il progetto intero (*Esporta → ZIP*) contiene anche i personaggi (`puppets` in `project.json`, schema v3) con le loro immagini.
+
+## Come funziona in breve
+Ogni vista è **una sola immagine** deformata da uno **scheletro di 15 ossa**. A ogni frame il runtime:
+1. sceglie la vista (`chooseView`);
+2. avanza il tempo dell'animazione (`advancePhase`) e calcola la posa (`poseAt`);
+3. restituisce i **vertici deformati** (`skinVertices`) da disegnare con le UV e gli indici della mesh.
+
+Le coordinate dei vertici sono in **pixel della texture**; `view.pivot` è il punto di appoggio dei piedi e `view.figureHeight` l'altezza della figura in pixel (uguale per tutte le viste dopo la correzione fatta nello Studio).
+
+## Esempio minimo (Canvas 2D)
+```js
+import * as R from './environment-runtime.mjs';
+const data = await (await fetch('puppet.json')).json();
+const img = {};                                   // texture per vista
+for (const [id, v] of Object.entries(data.views)) { img[id] = new Image(); img[id].src = v.texture; await img[id].decode(); }
+
+let phase = 0, state = 'IDLE';
+function frame(dt, { moving, speedPx, targetHeightPx, x, y, facingLeft, viewHint }) {
+  const vid = R.chooseView(data.views, moving, data.idleView, viewHint);   // 'side' | 'front' | 'back'
+  const view = data.views[vid];
+  phase = R.advancePhase(view, state, phase, dt, speedPx / targetHeightPx);  // passo sincronizzato alla velocità
+  const pos = R.skinVertices(view, R.poseAt(view, state, phase));
+  const scale = targetHeightPx / view.figureHeight;
+  R.drawPuppet(ctx, img[vid], pos, view.mesh.uvs, view.mesh.indices,
+    { x, y, scale, flip: facingLeft && vid === 'side', pivot: view.pivot });
+}
+```
+`state` è lo stato del tuo personaggio: `IDLE`, `WALK`, `CLIMB`, `INTERACT`, `COLLECT`, `JUMP`, `FALL`, `CUSTOM`. Uno stato senza animazione usa IDLE.
+
+## Con PixiJS (WebGL)
+```js
+import { MeshSimple, Assets } from 'pixi.js';
+const tex = await Assets.load(view.texture);
+const mesh = new MeshSimple({ texture: tex, vertices: new Float32Array(view.mesh.vertices),
+  uvs: new Float32Array(view.mesh.uvs), indices: new Uint32Array(view.mesh.indices) });
+mesh.pivot.set(view.pivot.x, view.pivot.y);
+app.stage.addChild(mesh);
+// ogni frame:
+phase = R.advancePhase(view, state, phase, dt, speed / heightPx);
+mesh.vertices = R.skinVertices(view, R.poseAt(view, state, phase), buffer);   // riusa lo stesso Float32Array
+mesh.scale.set((heightPx / view.figureHeight) * (flip ? -1 : 1), heightPx / view.figureHeight);
+mesh.position.set(feetX, feetY);
+```
+(Per cambiare vista serve una mesh per vista: crea tre `MeshSimple` e mostra quella scelta.)
+
+## Convenzioni da rispettare
+- **Orientamento:** il profilo guarda a **destra**; per andare a sinistra specchia (`flip`). Fronte e retro non si specchiano.
+- **Velocità e passo:** passa a `advancePhase` la velocità in *altezze del personaggio al secondo* (`px/s ÷ altezza in px`). Le clip di camminata hanno `cycleLength` (distanza per ciclo): il passo resta agganciato al terreno. Con velocità 0 la clip gira alla sua durata naturale.
+- **Scelta della vista:** `chooseView(views, moving, idleView, hint)`: di profilo quando ci si muove, `idleView` da fermi, oppure `hint` (`'side'|'front'|'back'`). Nel builder il suggerimento è la proprietà `view` di un collegamento (Inspector del percorso); nel tuo gioco puoi usarla per scale verso lo spettatore, porte, ecc.
+- **Ordine di disegno:** la mesh di profilo contiene anche le **copie degli arti lontani**, già ordinate dietro al corpo: disegna i triangoli nell'ordine dell'array `indices`.
+- **Animazioni proprie:** le clip sono dati (`view.clips[].keys[].pose.rot` = gradi per osso, relativi al genitore). Puoi crearne altre da codice (`R.makePreset(kind, view, ampiezza)`) o dallo Studio.
+
+## Ossa
+`pelvis, torso, head, uarmL, farmL, handL, uarmR, farmR, handR, thighL, shinL, footL, thighR, shinR, footR`.
+L/R = lati dell'immagine nelle viste fronte/retro; nel profilo **R = arti vicini, L = arti lontani**. Una posa è `{ rot: { thighR: -28, … }, dx, dy }` (rotazioni in gradi, positive in senso orario sullo schermo; `dx`/`dy` spostano il corpo, in altezze della figura).
+
+## Eventi di gioco e ambienti
+Per percorsi, uscite, interazioni e inventario degli ambienti vedi `docs/MANUALE.md` (sezione *Integrazione con altri giochi*) e la stessa libreria `environment-runtime.mjs` (`Agent`, `findRoute`, `resolveExit`, `availableInteractions`…): lo stesso file serve sia per muovere il personaggio sul grafo sia per animarlo.
+
+## Compatibilità e versioni
+`puppet.json` riporta `format: "environment-builder-puppet"` e `schemaVersion`. File di schemi precedenti si aggiornano con `R.migrateProject` (per i progetti interi). Il runtime non ha dipendenze e gira in qualunque browser moderno e in Node (solo `drawPuppet` richiede Canvas).

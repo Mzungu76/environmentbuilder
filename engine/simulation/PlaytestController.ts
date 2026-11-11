@@ -3,6 +3,7 @@ import type { EditorStore } from '@/lib/store/editorStore';
 import type { CharacterRenderItem, SceneView, ViewPointerEvent } from '@/engine/rendering/SceneView';
 import type { SceneController } from '@/engine/editor/SceneController';
 import { spriteFor } from '@/engine/characters/sprites';
+import { PuppetPlayer } from '@/engine/puppet/player';
 import { Agent, type AgentSnapshot } from './Agent';
 import { exitNodeIds, resolveExit } from '@/engine/interaction/objects';
 import { availableInteractions, createRuntimeState, performInteraction, resetRuntimeState, type Available, type GameEvent, type RuntimeState } from '@/engine/interaction/system';
@@ -56,6 +57,8 @@ export class PlaytestController {
   private pan: { x: number; y: number } | null = null;
 
   private lastSeq = new Map<string, number>();
+  private players = new Map<string, PuppetPlayer>();
+  private lastRender = performance.now();
   readonly runtime: RuntimeState;
 
   constructor(private store: EditorStore, private view: SceneView, private editor: SceneController, private opts: PlaytestOptions = {}) {
@@ -217,11 +220,25 @@ export class PlaytestController {
     this.publish();
   }
 
+  private puppetFor(c: Character, s: AgentSnapshot, dt: number): CharacterRenderItem['puppet'] {
+    const puppet = c.puppetId ? this.store.project.puppets.find((p) => p.id === c.puppetId) : undefined;
+    if (!puppet) return null;
+    let pl = this.players.get(c.id); if (!pl) { pl = new PuppetPlayer(); this.players.set(c.id, pl); }
+    const figurePx = Math.max(1, c.height * this.env.height);
+    const hint = s.edgeId ? this.env.navigation.edges.find((e) => e.id === s.edgeId)?.props.view : undefined;
+    const f = pl.frame(puppet, s.state, dt, s.speedPx / figurePx, hint);
+    const assetId = f?.view.cutoutAssetId;
+    if (!f || !assetId || !f.view.mesh) return null;
+    return { assetId, positions: f.positions, uvs: f.view.mesh.uvs, indices: f.view.mesh.indices, pivot: f.view.pivot, figureHeight: f.view.figureHeight, flip: f.viewId === 'side' && s.facing < 0, viewKey: `${puppet.id}:${f.viewId}:${assetId}` };
+  }
+
   private pushRender() {
+    const now = performance.now(), dt = this.status === 'playing' ? Math.min(0.1, (now - this.lastRender) / 1000) : 0;
+    this.lastRender = now;
     const items: CharacterRenderItem[] = [];
     for (const [id, a] of this.agents) {
       const c = a.config, s = a.snapshot();
-      items.push({ id, x: s.x, y: s.y, width: c.width, height: c.height, color: c.color, facing: s.facing, state: s.state, shadow: c.shadow, selected: false, lift: s.lift, sprite: spriteFor(c, s.state), stateTime: s.stateTime, liveClock: false });
+      items.push({ id, x: s.x, y: s.y, width: c.width, height: c.height, color: c.color, facing: s.facing, state: s.state, shadow: c.shadow, selected: false, lift: s.lift, sprite: spriteFor(c, s.state), stateTime: s.stateTime, liveClock: false, puppet: this.puppetFor(c, s, dt) });
     }
     this.view.setCharacters(items);
   }
