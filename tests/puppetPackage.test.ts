@@ -30,8 +30,8 @@ describe('puppet package', () => {
     expect(validatePuppet(incomplete).errors.join(' ')).toMatch(/mesh e pesi/);
     const ok = build(['side', 'front']);
     expect(validatePuppet(ok).errors).toEqual([]);
-    expect(validatePuppet(ok).warnings.join(' ')).not.toMatch(/profilo/i);
-    expect(validatePuppet(build(['front'])).warnings.join(' ')).toMatch(/profilo/i);
+    expect(validatePuppet(ok).warnings.join(' ')).not.toMatch(/Manca la vista di profilo/);
+    expect(validatePuppet(build(['front'])).warnings.join(' ')).toMatch(/Manca la vista di profilo/);
   });
   it('puppet.json uses texture paths instead of asset ids and keeps the rig data', () => {
     const j = puppetJson(build(['side', 'front'])) as any;

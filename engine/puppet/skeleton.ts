@@ -79,7 +79,14 @@ export function apply(m: Mat, p: Vec2): Vec2 { return { x: m[0] * p.x + m[2] * p
  * Default landmarks from the proportions of the reference guide, scaled to the figure's bounding box.
  * It is only a starting point: real characters never match 100%, so everything stays editable.
  */
+const POSE_TEMPLATES: Record<'climb' | 'jump', Record<string, [number, number]>> = {"climb": {"headTop": [0.0155, 0.0669], "neck": [0.0088, 0.2109], "pelvis": [-0.0113, 0.569], "shoulderR": [0.0155, 0.2678], "shoulderL": [0.0071, 0.2678], "elbowR": [0.1577, 0.2008], "elbowL": [0.1243, 0.1757], "wristR": [0.2038, 0.0795], "wristL": [0.1703, 0.0544], "handR": [0.2096, 0.0251], "handL": [0.1762, 0.0], "hipR": [-0.0046, 0.5941], "hipL": [-0.013, 0.5941], "kneeR": [0.1159, 0.7029], "kneeL": [-0.0013, 0.7866], "ankleR": [0.049, 0.8285], "ankleL": [-0.018, 0.9791], "toeR": [0.1285, 0.8494], "toeL": [0.0657, 1.0]}, "jump": {"headTop": [0.0317, 0.0], "neck": [0.0172, 0.1889], "pelvis": [-0.0183, 0.6444], "shoulderR": [0.0239, 0.2611], "shoulderL": [0.0128, 0.2611], "elbowR": [0.1928, 0.2], "elbowL": [0.1483, 0.1667], "wristR": [0.315, 0.1], "wristL": [0.2706, 0.0667], "handR": [0.365, 0.0667], "handL": [0.3206, 0.0333], "hipR": [-0.0117, 0.6889], "hipL": [-0.0228, 0.6889], "kneeR": [0.1706, 0.7722], "kneeL": [0.1372, 0.8333], "ankleR": [0.065, 0.9278], "ankleL": [0.035, 0.9778], "toeR": [0.1728, 0.95], "toeL": [0.1428, 1.0]}};
+
 export function templateLandmarks(view: ViewId, bounds: Rect, cx: number): Partial<Record<LandmarkId, Vec2>> {
+  if (view === 'climb' || view === 'jump') {
+    const t = POSE_TEMPLATES[view], out: Partial<Record<LandmarkId, Vec2>> = {};
+    for (const [k, [fx, fy]] of Object.entries(t)) out[k as LandmarkId] = { x: cx + fx * bounds.h, y: bounds.y + fy * bounds.h };
+    return out;
+  }
   const H = bounds.h, top = bounds.y;
   const Y = (f: number) => top + f * H;
   const lm: Partial<Record<LandmarkId, Vec2>> = {
@@ -115,9 +122,11 @@ export function templateLandmarks(view: ViewId, bounds: Rect, cx: number): Parti
 }
 
 /** Horizontal centre of the body: opaque centroid of the torso rows. */
-export function bodyCenterX(img: Img, bounds: Rect): number {
+export function bodyCenterX(img: Img, bounds: Rect, view?: ViewId): number {
   let sum = 0, n = 0;
-  for (let f = 0.25; f <= 0.45; f += 0.02) {
+  // pose views have raised arms in the upper rows: use the lower torso instead
+  const [from, to] = view === 'climb' || view === 'jump' ? [0.42, 0.56] : [0.25, 0.45];
+  for (let f = from; f <= to; f += 0.02) {
     const runs = rowRuns(img, bounds.y + f * bounds.h);
     if (!runs.length) continue;
     const x0 = runs[0][0], x1 = runs[runs.length - 1][1];
@@ -132,9 +141,9 @@ export function bodyCenterX(img: Img, bounds: Rect): number {
  */
 export function refineLandmarks(img: Img, lm: Partial<Record<LandmarkId, Vec2>>, view: ViewId, bounds: Rect): Partial<Record<LandmarkId, Vec2>> {
   const out = { ...lm };
-  if (view === 'side') {
-    // snap vertical landmarks to the silhouette
-    out.headTop = { x: out.headTop?.x ?? bounds.x + bounds.w / 2, y: bounds.y + 1 };
+  if (view === 'side' || view === 'climb' || view === 'jump') {
+    // profile-like poses: snap the landmarks to the silhouette (limb blobs overlap, so no row analysis)
+    if (view === 'side') out.headTop = { x: out.headTop?.x ?? bounds.x + bounds.w / 2, y: bounds.y + 1 };
     return snapInside(img, out);
   }
   const pairs: [LandmarkId, LandmarkId][] = [['kneeL', 'kneeR'], ['ankleL', 'ankleR']];

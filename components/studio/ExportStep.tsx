@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { CharacterState, ViewId } from '@/types';
 import { VIEW_IDS } from '@/types';
-import { advancePhase, chooseView, poseAt } from '@/engine/puppet/runtime';
+import { advancePhase, chooseViewForState, flipsWithFacing, poseAt } from '@/engine/puppet/runtime';
 import { createCharacter } from '@/engine/characters/factory';
 import { buildPuppetPackage, validatePuppet } from '@/lib/import-export/puppetPackage';
 import { downloadBlob, safeFileName } from '@/lib/import-export/archive';
@@ -39,8 +39,7 @@ export function ExportStep({ store, puppet, projectId }: StepProps) {
     let raf = 0, last = performance.now();
     const loop = (now: number) => {
       const dt = Math.min(0.1, (now - last) / 1000); last = now;
-      const moving = state === 'WALK' || state === 'CLIMB' || state === 'JUMP' || state === 'FALL';
-      const vid = forced ?? chooseView(puppet.views, moving, puppet.idleView);
+      const vid = forced ?? chooseViewForState(puppet.views, state, puppet.idleView);
       const view = vid ? puppet.views[vid] : undefined;
       if (view) phase.current = advancePhase(view, state, phase.current, dt, speed);
       setVer((n) => n + 1); raf = requestAnimationFrame(loop);
@@ -49,8 +48,7 @@ export function ExportStep({ store, puppet, projectId }: StepProps) {
     return () => cancelAnimationFrame(raf);
   }, [state, forced, speed, puppet.views, puppet.idleView]);
 
-  const moving = state === 'WALK' || state === 'CLIMB' || state === 'JUMP' || state === 'FALL';
-  const vid = forced ?? chooseView(puppet.views, moving, puppet.idleView);
+  const vid = forced ?? chooseViewForState(puppet.views, state, puppet.idleView);
   const view = vid ? puppet.views[vid] : undefined;
   const cnv = vid ? canvases.current[vid] : undefined;
 
@@ -78,7 +76,7 @@ export function ExportStep({ store, puppet, projectId }: StepProps) {
         </div>
         <div className={st.canvasWrap}>
           {view && cnv ? <ZoomCanvas contentWidth={view.width} contentHeight={view.height} version={ver} fitKey={vid ?? ''} checker testId="preview-canvas"
-            draw={(ctx) => { renderPuppet(ctx, cnv, view, poseAt(view, state, phase.current), flip && vid === 'side'); }} />
+            draw={(ctx) => { renderPuppet(ctx, cnv, view, poseAt(view, state, phase.current), flip && flipsWithFacing(view)); }} />
             : <div className={st.empty}>{ready ? 'Caricamento…' : 'Completa i passi precedenti per vedere l’anteprima.'}</div>}
         </div>
       </div>

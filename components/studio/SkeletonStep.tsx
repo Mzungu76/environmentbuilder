@@ -27,7 +27,7 @@ export function SkeletonStep({ store, puppet, projectId, go }: StepProps) {
   const autoPlace = () => {
     if (!cut || !view) return;
     const b = opaqueBounds(cut.img); if (!b) return;
-    const lm = refineLandmarks(cut.img, templateLandmarks(vid, b, bodyCenterX(cut.img, b)), vid, b);
+    const lm = refineLandmarks(cut.img, templateLandmarks(vid, b, bodyCenterX(cut.img, b, vid)), vid, b);
     setLm(lm);
   };
   const refine = () => { if (!cut || !view) return; const b = opaqueBounds(cut.img); if (b) setLm(refineLandmarks(cut.img, view.landmarks, vid, b)); };
@@ -96,7 +96,7 @@ export function SkeletonStep({ store, puppet, projectId, go }: StepProps) {
       <aside className={st.panel}>
         <div className={ed.section}>
           <h4>Giunti — {VIEW_LABEL[vid]}</h4>
-          <span className={ed.help}>{vid === 'side' ? 'Profilo: «vicino» = arti più vicini a chi guarda, «lontano» = arti nascosti dietro.' : 'Sx/dx sono i lati dell’immagine, non del personaggio.'} Trascina i punti bianchi sulla figura: il posizionamento automatico è solo un punto di partenza.</span>
+          <span className={ed.help}>{vid === 'side' || vid === 'climb' || vid === 'jump' ? 'Profilo: «vicino» = arti più vicini a chi guarda, «lontano» = arti nascosti dietro.' : 'Sx/dx sono i lati dell’immagine, non del personaggio.'} Trascina i punti bianchi sulla figura: il posizionamento automatico è solo un punto di partenza.</span>
           <div className={st.list}>
             {LANDMARK_IDS.map((k) => (
               <button key={k} className={st.item} aria-current={sel === k} onClick={() => setSel(k)}>

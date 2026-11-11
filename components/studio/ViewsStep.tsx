@@ -4,15 +4,13 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Puppet, PuppetView, Rect, ViewId } from '@/types';
 import { VIEW_IDS } from '@/types';
 import { cloneImg, crop, detectCells, opaqueBounds, paintAlpha, trim, type Img } from '@/engine/puppet/imageProc';
-import { DEFAULT_WEIGHT_PARAMS } from '@/engine/puppet/mesh';
-import { bodyCenterX, refineLandmarks, templateLandmarks } from '@/engine/puppet/skeleton';
-import { defaultClips } from '@/engine/puppet/animation';
-import { imgToBlob, imgToCanvas, processedSheet, pruneAssets, storePuppetImage, updatePuppet, forgetAsset } from '@/lib/studio/pipeline';
+import { imgToBlob, imgToCanvas, makeView, processedSheet, pruneAssets, storePuppetImage, updatePuppet, forgetAsset } from '@/lib/studio/pipeline';
+import { ExtraViews } from './ExtraViews';
 import { ZoomCanvas } from './ZoomCanvas';
 import { ed, st, useAssetImage, useView, ViewTabs, VIEW_LABEL, type StepProps } from './shared';
 import { NumberField } from '../inspector/fields';
 
-const COLORS: Record<ViewId, string> = { front: '#4f8cff', side: '#3ecf8e', back: '#f5b84a' };
+const COLORS: Partial<Record<ViewId, string>> = { front: '#4f8cff', side: '#3ecf8e', back: '#f5b84a' };
 const ORDER: ViewId[] = ['front', 'side', 'back']; // as in the turnaround sheet: left → right
 
 /** Step 3 — cut the sheet into views (adjustable rectangles), then retouch each cut-out and fix its proportions. */
@@ -33,7 +31,7 @@ export function ViewsStep({ store, puppet, projectId, go }: StepProps) {
   // initial rectangles: existing crops, else auto-detected
   useEffect(() => {
     if (!sheet || cells) return;
-    const existing = Object.fromEntries(VIEW_IDS.filter((v) => puppet.views[v]).map((v) => [v, puppet.views[v]!.crop])) as Partial<Record<ViewId, Rect>>;
+    const existing = Object.fromEntries(ORDER.filter((v) => puppet.views[v] && !puppet.views[v]!.sourceAssetId).map((v) => [v, puppet.views[v]!.crop])) as Partial<Record<ViewId, Rect>>;
     if (Object.keys(existing).length === 3) { setCells(existing as Record<ViewId, Rect>); return; }
     detect(sheet.processed);
   }, [sheet]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -59,17 +57,8 @@ export function ViewsStep({ store, puppet, projectId, go }: StepProps) {
         const blob = await imgToBlob(t.img);
         const meta = await storePuppetImage(store, blob, `${puppet.name}-${id}.png`, t.img.width, t.img.height);
         metas.push(meta);
-        // feet pivot: centre of the lowest rows
-        let sx = 0, n = 0;
-        for (let y = Math.max(b.y, b.y + b.h - Math.max(4, Math.round(b.h * 0.04))); y < b.y + b.h; y++) for (let x = 0; x < t.img.width; x++) if (t.img.data[(y * t.img.width + x) * 4 + 3] > 24) { sx += x; n++; }
-        const old = views[id];
-        const clips = old?.clips?.length ? { clips: old.clips, stateClips: old.stateClips } : defaultClips(id);
-        views[id] = {
-          id, crop: { x: cell.x + t.offset.x, y: cell.y + t.offset.y, w: t.img.width, h: t.img.height },
-          cutoutAssetId: meta.id, width: t.img.width, height: t.img.height, figureHeight: b.h,
-          pivot: { x: n ? sx / n : b.x + b.w / 2, y: b.y + b.h }, landmarks: refineLandmarks(t.img, templateLandmarks(id, b, bodyCenterX(t.img, b)), id, b), mesh: null, skin: null,
-          weightParams: old?.weightParams ?? { ...DEFAULT_WEIGHT_PARAMS }, ...clips,
-        };
+        const view = makeView(id, t.img, { x: cell.x + t.offset.x, y: cell.y + t.offset.y, w: t.img.width, h: t.img.height }, meta.id, views[id]);
+        if (view) views[id] = view;
       }
       updatePuppet(store, puppet.id, (p) => ({ ...p, views, assets: [...p.assets, ...metas] }));
       await pruneAssets(store, puppet.id);
@@ -100,8 +89,8 @@ export function ViewsStep({ store, puppet, projectId, go }: StepProps) {
           ctx.drawImage(sheet.canvas, 0, 0);
           ORDER.forEach((id) => {
             const r = cells[id];
-            ctx.strokeStyle = COLORS[id]; ctx.lineWidth = 2 / v.zoom; ctx.strokeRect(r.x, r.y, r.w, r.h);
-            ctx.fillStyle = COLORS[id]; ctx.font = `${16 / v.zoom}px sans-serif`; ctx.fillText(VIEW_LABEL[id], r.x + 4 / v.zoom, r.y + 18 / v.zoom);
+            ctx.strokeStyle = COLORS[id]!; ctx.lineWidth = 2 / v.zoom; ctx.strokeRect(r.x, r.y, r.w, r.h);
+            ctx.fillStyle = COLORS[id]!; ctx.font = `${16 / v.zoom}px sans-serif`; ctx.fillText(VIEW_LABEL[id], r.x + 4 / v.zoom, r.y + 18 / v.zoom);
           });
         }}
         onPointer={(e, v) => {
@@ -143,6 +132,7 @@ export function ViewsStep({ store, puppet, projectId, go }: StepProps) {
             ))}
           </div>
         )}
+        <ExtraViews store={store} puppet={puppet} projectId={projectId} />
         {have && <Retouch store={store} puppet={puppet} projectId={projectId} source={sheet?.source ?? null} />}
       </aside>
     </div>
@@ -153,6 +143,8 @@ export function ViewsStep({ store, puppet, projectId, go }: StepProps) {
 function Retouch({ store, puppet, projectId, source }: { store: StepProps['store']; puppet: Puppet; projectId: string; source: Img | null }) {
   const [view, setView, v] = useView(puppet);
   const cut = useAssetImage(projectId, v?.cutoutAssetId);
+  const own = useAssetImage(projectId, v?.sourceAssetId);
+  const restoreSrc = v?.sourceAssetId ? own?.img ?? null : source;
   const [tool, setTool] = useState<'erase' | 'restore' | 'pivot' | 'pan'>('erase');
   const [size, setSize] = useState(14);
   const [ver, setVer] = useState(0);
@@ -165,9 +157,9 @@ function Retouch({ store, puppet, projectId, source }: { store: StepProps['store
     if (!cut || !v) { work.current = null; return; }
     const img = cloneImg(cut.img);
     let orig: Img | null = null;
-    if (source) { orig = cloneImg(crop(source, v.crop)); for (let i = 3; i < orig.data.length; i += 4) orig.data[i] = 255; }
+    if (restoreSrc) { orig = cloneImg(crop(restoreSrc, v.crop)); for (let i = 3; i < orig.data.length; i += 4) orig.data[i] = 255; }
     work.current = { img, canvas: imgToCanvas(img), orig }; setVer((n) => n + 1);
-  }, [cut, v?.crop.x, v?.crop.y, source]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [cut, v?.crop.x, v?.crop.y, restoreSrc]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const save = useCallback(async () => {
     const w = work.current; if (!w || !v || !dirty.current) return;

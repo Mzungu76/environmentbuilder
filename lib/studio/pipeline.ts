@@ -1,8 +1,11 @@
-import type { ImageAssetMeta, Puppet, Rect } from '@/types';
+import type { ImageAssetMeta, Puppet, PuppetView, Rect, ViewId } from '@/types';
 import type { EditorStore } from '@/lib/store/editorStore';
 import { getAsset, putAsset, deleteAsset } from '@/lib/persistence/db';
 import { uid } from '@/lib/ids';
-import { DEFAULT_KEYING, keyBackground, newImg, type Img } from '@/engine/puppet/imageProc';
+import { DEFAULT_KEYING, keyBackground, newImg, opaqueBounds, type Img } from '@/engine/puppet/imageProc';
+import { DEFAULT_WEIGHT_PARAMS } from '@/engine/puppet/mesh';
+import { defaultClips } from '@/engine/puppet/animation';
+import { bodyCenterX, refineLandmarks, templateLandmarks } from '@/engine/puppet/skeleton';
 
 /** Browser-side glue: decoding/encoding images and keeping puppet documents + assets in sync. */
 
@@ -59,7 +62,7 @@ export async function storePuppetImage(store: EditorStore, blob: Blob, name: str
 export async function pruneAssets(store: EditorStore, puppetId: string) {
   const p = puppetOf(store, puppetId);
   if (!p) return;
-  const used = new Set<string>([p.source?.assetId, ...Object.values(p.views).map((v) => v?.cutoutAssetId)].filter(Boolean) as string[]);
+  const used = new Set<string>([p.source?.assetId, ...Object.values(p.views).flatMap((v) => [v?.cutoutAssetId, v?.sourceAssetId])].filter(Boolean) as string[]);
   const stale = p.assets.filter((a) => !used.has(a.id));
   if (!stale.length) return;
   for (const a of stale) { await deleteAsset(store.project.id, a.id).catch(() => {}); forgetAsset(store.project.id, a.id); }
@@ -76,6 +79,25 @@ export async function processedSheet(projectId: string, puppet: Puppet): Promise
   let processed = sheetCache.get(key);
   if (!processed) { processed = keyBackground(source, puppet.keying); sheetCache.set(key, processed); if (sheetCache.size > 4) sheetCache.delete(sheetCache.keys().next().value as string); }
   return { processed, source };
+}
+
+/**
+ * Builds a view from a trimmed cut-out: measures the figure, places the feet pivot, proposes the skeleton (model proportions
+ * snapped to the silhouette) and keeps the clips/weight settings of the view it replaces.
+ */
+export function makeView(id: ViewId, trimmed: Img, crop: Rect, cutoutAssetId: string, old?: PuppetView, sourceAssetId?: string): PuppetView | null {
+  const b = opaqueBounds(trimmed);
+  if (!b) return null;
+  let sx = 0, n = 0;
+  for (let y = Math.max(b.y, b.y + b.h - Math.max(4, Math.round(b.h * 0.04))); y < b.y + b.h; y++) for (let x = 0; x < trimmed.width; x++) if (trimmed.data[(y * trimmed.width + x) * 4 + 3] > 24) { sx += x; n++; }
+  const clips = old?.clips?.length ? { clips: old.clips, stateClips: old.stateClips } : defaultClips(id);
+  return {
+    id, crop, sourceAssetId, cutoutAssetId, width: trimmed.width, height: trimmed.height, figureHeight: b.h,
+    pivot: { x: n ? sx / n : b.x + b.w / 2, y: b.y + b.h },
+    landmarks: refineLandmarks(trimmed, templateLandmarks(id, b, bodyCenterX(trimmed, b, id)), id, b),
+    mesh: null, skin: null, farLimbs: old?.farLimbs, flipWithFacing: old?.flipWithFacing,
+    weightParams: old?.weightParams ?? { ...DEFAULT_WEIGHT_PARAMS }, ...clips,
+  };
 }
 
 export const emptyRect = (): Rect => ({ x: 0, y: 0, w: 0, h: 0 });

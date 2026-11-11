@@ -21,7 +21,7 @@ export function validatePuppet(p: Puppet): PuppetValidation {
   if (!views.length) errors.push('Nessuna vista generata.');
   for (const v of views) {
     const w = p.views[v]!;
-    const label = v === 'side' ? 'Profilo' : v === 'front' ? 'Fronte' : 'Retro';
+    const label = ({ side: 'Profilo', front: 'Fronte', back: 'Retro', climb: 'Arrampicata', jump: 'Salto' } as Record<string, string>)[v];
     if (!w.cutoutAssetId) errors.push(`${label}: manca l’immagine.`);
     if (Object.keys(w.landmarks).length < 19) errors.push(`${label}: scheletro incompleto.`);
     else if (!w.mesh || !w.skin) errors.push(`${label}: mesh e pesi non generati.`);
@@ -30,6 +30,8 @@ export function validatePuppet(p: Puppet): PuppetValidation {
     if (v === 'side' && !w.stateClips.WALK) warnings.push('Profilo: manca la camminata (WALK).');
   }
   if (!p.views.side) warnings.push('Manca la vista di profilo: serve per camminare a destra e a sinistra.');
+  if (!p.views.climb) warnings.push('Nessuna vista di arrampicata: nello stato CLIMB si userà il profilo.');
+  if (!p.views.jump) warnings.push('Nessuna vista di salto: negli stati JUMP e FALL si userà il profilo.');
   return { errors, warnings };
 }
 
@@ -40,8 +42,8 @@ export function puppetJson(p: Puppet) {
   for (const v of VIEW_IDS) {
     const w = p.views[v];
     if (!w) continue;
-    const { cutoutAssetId, crop: _crop, ...rest } = w as PuppetView;
-    void cutoutAssetId; void _crop;
+    const { cutoutAssetId, crop: _crop, sourceAssetId, ...rest } = w as PuppetView;
+    void cutoutAssetId; void _crop; void sourceAssetId;
     views[v] = { ...rest, texture: texturePath(v) };
   }
   return { format: PUPPET_FORMAT, schemaVersion: SCHEMA_VERSION, name: p.name, idleView: p.idleView, views };
@@ -85,13 +87,13 @@ Uso minimo (browser, ES module; serve un piccolo server locale per fetch/import)
     const img = await loadImage(views.side.texture);
 
     // ogni frame:
-    const viewId = R.chooseView(views, isMoving, data.idleView, edgeViewHint);   // 'side' | 'front' | 'back'
+    const viewId = R.chooseViewForState(views, state, data.idleView, edgeViewHint);   // 'side' | 'front' | 'back' | 'climb' | 'jump'
     const view = views[viewId];
     phase = R.advancePhase(view, state, phase, dt, speedInFigureHeights);        // state: 'IDLE' | 'WALK' | 'CLIMB' | ...
     const pose = R.poseAt(view, state, phase);
     const pos = R.skinVertices(view, pose);                                       // Float32Array di vertici deformati
     const s = targetHeightPx / view.figureHeight;                                 // scala: tutte le viste hanno la stessa altezza
-    R.drawPuppet(ctx, img, pos, view.mesh.uvs, view.mesh.indices, { x: feetX, y: feetY, scale: s, flip: facingLeft, pivot: view.pivot });
+    R.drawPuppet(ctx, img, pos, view.mesh.uvs, view.mesh.indices, { x: feetX, y: feetY, scale: s, flip: facingLeft && R.flipsWithFacing(view), pivot: view.pivot });
 
 Con PixiJS / WebGL usa gli stessi array (pos, view.mesh.uvs, view.mesh.indices) in una Mesh e aggiorna i vertici a ogni frame.
 
@@ -129,15 +131,14 @@ mk($('views'), ['auto', ...ids], () => forced ?? 'auto', (v) => { forced = v ===
 $('info').textContent = data.name + ' · viste: ' + ids.join(', ');
 function frame(now) {
   const dt = Math.min(0.1, (now - last) / 1000); last = now;
-  const moving = state === 'WALK' || state === 'CLIMB' || state === 'JUMP' || state === 'FALL';
-  const vid = forced ?? R.chooseView(data.views, moving, data.idleView);
+  const vid = forced ?? R.chooseViewForState(data.views, state, data.idleView);
   const view = data.views[vid];
   if (view) {
     phase = R.advancePhase(view, state, phase, dt, Number($('spd').value));
     const pos = R.skinVertices(view, R.poseAt(view, state, phase));
     const dpr = devicePixelRatio || 1; cv.width = cv.clientWidth * dpr; cv.height = cv.clientHeight * dpr;
     ctx.setTransform(dpr,0,0,dpr,0,0);
-    if (pos) { const s = (cv.clientHeight * 0.8) / view.figureHeight; R.drawPuppet(ctx, imgs[vid], pos, view.mesh.uvs, view.mesh.indices, { x: cv.clientWidth / 2, y: cv.clientHeight * 0.92, scale: s, flip: $('flip').checked, pivot: view.pivot }); }
+    if (pos) { const s = (cv.clientHeight * 0.8) / view.figureHeight; R.drawPuppet(ctx, imgs[vid], pos, view.mesh.uvs, view.mesh.indices, { x: cv.clientWidth / 2, y: cv.clientHeight * 0.92, scale: s, flip: $('flip').checked && R.flipsWithFacing(view), pivot: view.pivot }); }
   }
   requestAnimationFrame(frame);
 }

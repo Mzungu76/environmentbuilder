@@ -7,6 +7,8 @@ puppet.json                scheletro, mesh, pesi e animazioni di ogni vista
 textures/side.png          profilo (guarda a destra)
 textures/front.png         fronte
 textures/back.png          retro
+textures/climb.png         arrampicata (opzionale, di profilo a destra)
+textures/jump.png          salto e caduta (opzionale, di profilo a destra)
 environment-runtime.mjs    runtime senza dipendenze (nessuna build)
 demo.html                  lettore autonomo: doppio click, funziona anche da file://
 README.md                  promemoria d'uso
@@ -31,13 +33,13 @@ for (const [id, v] of Object.entries(data.views)) { img[id] = new Image(); img[i
 
 let phase = 0, state = 'IDLE';
 function frame(dt, { moving, speedPx, targetHeightPx, x, y, facingLeft, viewHint }) {
-  const vid = R.chooseView(data.views, moving, data.idleView, viewHint);   // 'side' | 'front' | 'back'
+  const vid = R.chooseViewForState(data.views, state, data.idleView, viewHint);   // 'side' | 'front' | 'back' | 'climb' | 'jump'
   const view = data.views[vid];
   phase = R.advancePhase(view, state, phase, dt, speedPx / targetHeightPx);  // passo sincronizzato alla velocità
   const pos = R.skinVertices(view, R.poseAt(view, state, phase));
   const scale = targetHeightPx / view.figureHeight;
   R.drawPuppet(ctx, img[vid], pos, view.mesh.uvs, view.mesh.indices,
-    { x, y, scale, flip: facingLeft && vid === 'side', pivot: view.pivot });
+    { x, y, scale, flip: facingLeft && R.flipsWithFacing(view), pivot: view.pivot });
 }
 ```
 `state` è lo stato del tuo personaggio: `IDLE`, `WALK`, `CLIMB`, `INTERACT`, `COLLECT`, `JUMP`, `FALL`, `CUSTOM`. Uno stato senza animazione usa IDLE.
@@ -59,9 +61,9 @@ mesh.position.set(feetX, feetY);
 (Per cambiare vista serve una mesh per vista: crea tre `MeshSimple` e mostra quella scelta.)
 
 ## Convenzioni da rispettare
-- **Orientamento:** il profilo guarda a **destra**; per andare a sinistra specchia (`flip`). Fronte e retro non si specchiano.
+- **Orientamento:** profilo, salto e arrampicata guardano a **destra**. Per andare a sinistra specchia con `R.flipsWithFacing(view)` (vero per profilo e salto; falso per fronte, retro e arrampicata, salvo `view.flipWithFacing`).
 - **Velocità e passo:** passa a `advancePhase` la velocità in *altezze del personaggio al secondo* (`px/s ÷ altezza in px`). Le clip di camminata hanno `cycleLength` (distanza per ciclo): il passo resta agganciato al terreno. Con velocità 0 la clip gira alla sua durata naturale.
-- **Scelta della vista:** `chooseView(views, moving, idleView, hint)`: di profilo quando ci si muove, `idleView` da fermi, oppure `hint` (`'side'|'front'|'back'`). Nel builder il suggerimento è la proprietà `view` di un collegamento (Inspector del percorso); nel tuo gioco puoi usarla per scale verso lo spettatore, porte, ecc.
+- **Scelta della vista:** `chooseViewForState(views, state, idleView, hint)`: `climb` per CLIMB e `jump` per JUMP/FALL se il personaggio le ha, altrimenti di profilo quando ci si muove e `idleView` da fermi; `hint` (`'side'|'front'|'back'|'climb'|'jump'`) vince su tutto. (`chooseView` resta per chi non usa gli stati.) Nel builder il suggerimento è la proprietà `view` di un collegamento (Inspector del percorso); nel tuo gioco puoi usarla per scale verso lo spettatore, porte, ecc.
 - **Ordine di disegno:** la mesh di profilo contiene anche le **copie degli arti lontani**, già ordinate dietro al corpo: disegna i triangoli nell'ordine dell'array `indices`.
 - **Animazioni proprie:** le clip sono dati (`view.clips[].keys[].pose.rot` = gradi per osso, relativi al genitore). Puoi crearne altre da codice (`R.makePreset(kind, view, ampiezza)`) o dallo Studio.
 

@@ -78,3 +78,66 @@ def smooth(im):
 smooth(sheet(False)).save(os.path.join(OUT, 'guida-silhouette.png'))
 sheet(True).save(os.path.join(OUT, 'guida-mappa-parti.png'))
 print('ok')
+
+# ======================================================================================================================
+# Pose extra: arrampicata e salto (profilo verso destra). Le coordinate dei giunti servono sia per disegnare la sagoma
+# sia per ricavare i modelli di posizionamento automatico dello scheletro (frazioni dell'altezza della figura).
+# L = arti lontani, R = arti vicini.
+# ======================================================================================================================
+import json
+POSES = {
+  'climb': dict(
+    headTop=(520, 200), neck=(512, 372), pelvis=(488, 800), shoulderR=(520, 440), shoulderL=(510, 440),
+    elbowR=(690, 360), elbowL=(650, 330), wristR=(745, 215), wristL=(705, 185), handR=(752, 150), handL=(712, 120),
+    hipR=(496, 830), hipL=(486, 830), kneeR=(640, 960), kneeL=(500, 1060), ankleR=(560, 1110), ankleL=(480, 1290),
+    toeR=(655, 1135), toeL=(580, 1315)),
+  'jump': dict(
+    headTop=(545, 250), neck=(532, 420), pelvis=(500, 830), shoulderR=(538, 485), shoulderL=(528, 485),
+    elbowR=(690, 430), elbowL=(650, 400), wristR=(800, 340), wristL=(760, 310), handR=(845, 310), handL=(805, 280),
+    hipR=(506, 870), hipL=(496, 870), kneeR=(670, 945), kneeL=(640, 1000), ankleR=(575, 1085), ankleL=(548, 1130),
+    toeR=(672, 1105), toeL=(645, 1150)),
+}
+
+def draw_pose(d, lm, c):
+    P = lambda k: lm[k]
+    # arti lontani (L) dietro, poi corpo, poi arti vicini (R)
+    for side in ('L', 'R'):
+        if side == 'R':
+            mid = ((P('shoulderL')[0] + P('shoulderR')[0]) / 2, (P('shoulderL')[1] + P('shoulderR')[1]) / 2)
+            limb(d, ((mid[0] + P('neck')[0]) / 2, mid[1] - 20), P('pelvis'), 62, 54, c('torso'))
+            ell(d, P('pelvis'), 60, 50, c('pelvis'))
+            limb(d, (P('neck')[0], P('neck')[1] - 40), P('neck'), 26, 30, c('neck'))
+            ell(d, (P('headTop')[0], P('headTop')[1] + 80), 70, 80, c('head'))
+        limb(d, P('hip' + side), P('knee' + side), 52, 40, c('thigh' + side))
+        limb(d, P('knee' + side), P('ankle' + side), 40, 29, c('shin' + side))
+        tx, ty = P('toe' + side); ax, ay = P('ankle' + side)
+        limb(d, (ax, ay), (tx, ty), 34, 26, c('foot' + side))
+        limb(d, P('shoulder' + side), P('elbow' + side), 30, 25, c('uarm' + side))
+        limb(d, P('elbow' + side), P('wrist' + side), 25, 19, c('farm' + side))
+        hx, hy = P('hand' + side); wx, wy = P('wrist' + side)
+        ell(d, ((hx + wx) / 2, (hy + wy) / 2), 26, 34, c('hand' + side))
+
+def pose_sheet(kinds, mapmode):
+    im = Image.new('RGB', (CW * len(kinds), CH), '#f4f5f7' if mapmode else '#ffffff'); d = ImageDraw.Draw(im)
+    grey = lambda k: '#aeb4bb'
+    c = (lambda k: COL[k]) if mapmode else grey
+    for i, k in enumerate(kinds):
+        lm = {n: (x + CW * i, y) for n, (x, y) in POSES[k].items()}
+        draw_pose(d, lm, c)
+    if mapmode:
+        for i, k in enumerate(kinds):
+            d.text((CW * i + CW // 2, 50), {'climb': 'ARRAMPICATA', 'jump': 'SALTO'}[k] + '  (guarda a destra)', fill='#222', font=font(40), anchor='mm')
+            if i: d.line([(CW * i, 0), (CW * i, CH)], fill='#c8ccd2', width=3)
+    return im
+
+KINDS = ['climb', 'jump']
+smooth(pose_sheet(KINDS, False)).save(os.path.join(OUT, 'guida-pose-extra.png'))
+pose_sheet(KINDS, True).save(os.path.join(OUT, 'guida-pose-extra-mappa.png'))
+
+# frazioni (x rispetto al centro del busto, y dalla cima della figura) per i modelli di posizionamento automatico
+fr = {}
+for k, lm in POSES.items():
+    ys = [p[1] for p in lm.values()]; top, bottom = min(ys), max(ys); H = bottom - top
+    cx = lm['pelvis'][0] * 0.5 + (lm['shoulderL'][0] + lm['shoulderR'][0]) / 4  # centro del busto
+    fr[k] = {n: [round((x - cx) / H, 4), round((y - top) / H, 4)] for n, (x, y) in lm.items()}
+print('TEMPLATE_JSON=' + json.dumps(fr))

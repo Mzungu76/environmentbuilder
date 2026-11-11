@@ -39,6 +39,7 @@ const pose = (rot: Partial<Record<BoneId, number>>, dx = 0, dy = 0): Pose => ({ 
 
 /** Parametric starting clips (sampled into keyframes the user can edit). `amount` scales the motion (0.2 … 2). */
 export function makePreset(kind: PresetKind, view: ViewId, amount = 1): Clip {
+  if (view === 'climb' || view === 'jump') return makePosePreset(kind, view, amount);
   const keys: { t: number; pose: Pose }[] = [];
   const N = kind === 'walk' ? 8 : kind === 'idle' ? 6 : 0;
   const a = amount;
@@ -97,8 +98,50 @@ export function makePreset(kind: PresetKind, view: ViewId, amount = 1): Clip {
   return base('Raccolta', 1.1, { loop: false });
 }
 
+/**
+ * Pose views (climb / jump) are drawn IN the posture, so their clips are small movements AROUND the rest pose
+ * (alternating limbs for climbing, a tuck/stretch for jumping and falling) instead of full cycles.
+ */
+function makePosePreset(kind: PresetKind, view: 'climb' | 'jump', amount: number): Clip {
+  const keys: { t: number; pose: Pose }[] = [];
+  const a = amount, N = 8;
+  const mk = (name: string, duration: number, loop = true, extra?: Partial<Clip>): Clip => ({ id: uid('clip'), name, duration, loop, keys, ...extra });
+  if (view === 'climb' && kind === 'climb') {
+    for (let i = 0; i < N; i++) {
+      const p = i / N, s = Math.sin(2 * Math.PI * p), c = Math.cos(2 * Math.PI * p);
+      keys.push({ t: p, pose: pose({ uarmR: -14 * s * a, uarmL: 14 * s * a, farmR: -8 * c * a, farmL: 8 * c * a, thighR: 14 * s * a, thighL: -14 * s * a, shinR: -10 * Math.max(0, s) * a, shinL: 10 * Math.max(0, -s) * a, torso: 2.5 * s * a, head: -2 * s * a }, 0.004 * s * a, -0.008 * Math.abs(c) * a) });
+    }
+    return mk('Arrampicata', 1.2, true, { cycleLength: 0.5 });
+  }
+  if (view === 'jump' && kind === 'jump') {
+    for (let i = 0; i < 6; i++) {
+      const p = i / 6, s = Math.sin(2 * Math.PI * p);
+      keys.push({ t: p, pose: pose({ thighR: -9 * s * a, thighL: -7 * s * a, shinR: 12 * s * a, shinL: 10 * s * a, uarmR: -10 * s * a, uarmL: -8 * s * a, torso: 2 * s * a }, 0, -0.012 * s * a) });
+    }
+    return mk('Salto', 0.7);
+  }
+  if (view === 'jump' && kind === 'fall') {
+    for (let i = 0; i < 6; i++) {
+      const p = i / 6, s = Math.sin(2 * Math.PI * p);
+      keys.push({ t: p, pose: pose({ thighR: 14 + 6 * s * a, thighL: 8 - 6 * s * a, shinR: -8 * a, shinL: -6 * a, uarmR: -22 - 8 * s * a, uarmL: -18 + 8 * s * a, torso: -3 }, 0, 0.004 * s * a) });
+    }
+    return mk('Caduta', 0.5);
+  }
+  // everything else: a tiny breathing motion around the pose
+  for (let i = 0; i < 4; i++) { const p = i / 4, s = Math.sin(2 * Math.PI * p); keys.push({ t: p, pose: pose({ torso: 1.2 * s * a, head: -1 * s * a, uarmR: -2 * s * a, uarmL: 2 * s * a }, 0, -0.003 * s * a) }); }
+  return mk('Riposo', 2.4);
+}
+
 /** Default set: every state gets a clip (the front/back views get a gentler walk). */
 export function defaultClips(view: ViewId): { clips: Clip[]; stateClips: Partial<Record<CharacterState, string>> } {
+  if (view === 'climb') {
+    const idle = makePreset('idle', view), climb = makePreset('climb', view);
+    return { clips: [climb, idle], stateClips: { CLIMB: climb.id, IDLE: idle.id, CUSTOM: idle.id } };
+  }
+  if (view === 'jump') {
+    const idle = makePreset('idle', view), jump = makePreset('jump', view), fall = makePreset('fall', view);
+    return { clips: [jump, fall, idle], stateClips: { JUMP: jump.id, FALL: fall.id, IDLE: idle.id, CUSTOM: idle.id } };
+  }
   const kinds: PresetKind[] = ['idle', 'walk', 'climb', 'jump', 'fall', 'interact', 'collect'];
   const clips = kinds.map((k) => makePreset(k, view));
   const stateClips: Partial<Record<CharacterState, string>> = {};

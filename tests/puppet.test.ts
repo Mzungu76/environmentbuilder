@@ -151,3 +151,41 @@ describe('far limbs (profile)', () => {
   });
   it('does nothing when both options are off', () => { const m = generateMesh(figure(), 16, 4); const s = { idx: new Array((m.vertices.length / 2) * 4).fill(0), w: new Array((m.vertices.length / 2) * 4).fill(0).map((_, i) => (i % 4 === 0 ? 1 : 0)) }; expect(addFarLimbs(m, s, { arm: false, leg: false }).mesh).toBe(m); });
 });
+
+import { chooseViewForState, flipsWithFacing } from '@/engine/puppet/runtime';
+import { PROFILE_VIEWS } from '@/types';
+
+describe('pose views (climb / jump)', () => {
+  const mkView = (id: any): PuppetView => ({ ...viewOf(figure(), 'side'), id, mesh: { cell: 1, vertices: [0, 0], uvs: [0, 0], indices: [] }, skin: { idx: [0, 0, 0, 0], w: [1, 0, 0, 0] } });
+  const views = { side: mkView('side'), front: mkView('front'), climb: mkView('climb'), jump: mkView('jump') };
+  it('picks the view from the state: climb → climb view, jump/fall → jump view, otherwise the usual choice', () => {
+    expect(chooseViewForState(views, 'CLIMB', 'front')).toBe('climb');
+    expect(chooseViewForState(views, 'JUMP', 'front')).toBe('jump');
+    expect(chooseViewForState(views, 'FALL', 'front')).toBe('jump');
+    expect(chooseViewForState(views, 'WALK', 'front')).toBe('side');
+    expect(chooseViewForState(views, 'IDLE', 'front')).toBe('front');
+    expect(chooseViewForState(views, 'CLIMB', 'front', 'front')).toBe('front'); // an explicit hint wins
+    expect(chooseViewForState({ side: views.side }, 'CLIMB', 'side')).toBe('side'); // no climb view → profile
+    expect(chooseViewForState({ side: { ...views.side, mesh: null } }, 'WALK', 'side')).toBeNull();
+  });
+  it('mirrors profile and jump views when facing left; front, back and climb stay put unless overridden', () => {
+    expect(flipsWithFacing({ id: 'side' })).toBe(true); expect(flipsWithFacing({ id: 'jump' })).toBe(true);
+    expect(flipsWithFacing({ id: 'front' })).toBe(false); expect(flipsWithFacing({ id: 'climb' })).toBe(false);
+    expect(flipsWithFacing({ id: 'climb', flipWithFacing: true })).toBe(true);
+    expect(PROFILE_VIEWS).toEqual(['side', 'climb', 'jump']);
+  });
+  it('default clips: climb view animates CLIMB, jump view animates JUMP and FALL, both have IDLE; motions stay small', () => {
+    const c = defaultClips('climb'), j = defaultClips('jump');
+    expect(c.stateClips.CLIMB && c.stateClips.IDLE).toBeTruthy(); expect(c.stateClips.JUMP).toBeUndefined();
+    expect(j.stateClips.JUMP && j.stateClips.FALL && j.stateClips.IDLE).toBeTruthy();
+    const climb = c.clips.find((x) => x.id === c.stateClips.CLIMB)!;
+    for (const k of climb.keys) for (const v of Object.values(k.pose.rot)) expect(Math.abs(v!)).toBeLessThan(25); // around the rest pose, not a full cycle
+    expect(climb.cycleLength).toBeGreaterThan(0);
+  });
+  it('pose templates place the arms above the head for climbing and in front for jumping', () => {
+    const img = figure(); const b = opaqueBounds(img)!;
+    const climb = templateLandmarks('climb', b, 200), jump = templateLandmarks('jump', b, 200);
+    expect(climb.wristR!.y).toBeLessThan(climb.neck!.y); expect(Object.keys(climb)).toHaveLength(19);
+    expect(jump.wristR!.x).toBeGreaterThan(jump.shoulderR!.x + 50); expect(jump.kneeR!.x).toBeGreaterThan(jump.hipR!.x);
+  });
+});

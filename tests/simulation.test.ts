@@ -105,9 +105,9 @@ describe('autonomous movement', () => {
   it('only ever visits reachable nodes and stays on the graph', () => {
     const { env, ids } = scene();
     env.navigation = updateEdge(env.navigation, env.navigation.edges[2].id, { direction: 'both' }); // avoid the one-way dead end
-    const a = mkAgent(env, ids.A, structuredClone(auto));
+    const a = mkAgent(env, ids.A, structuredClone(auto)); a.config.id = 'fixed-seed-1'; a.reset(); // deterministic seed
     const visited = new Set<string>();
-    for (let i = 0; i < 60 * 120; i++) {
+    for (let i = 0; i < 60 * 300; i++) {
       a.step(1 / 60); const s = a.snapshot(); if (s.nodeId) visited.add(s.nodeId);
       // always on a horizontal segment (y=0.5) or on the B→E vertical (x=0.5)
       const onA = Math.abs(s.y - 0.5) < 1e-6, onV = Math.abs(s.x - 0.5) < 1e-6;

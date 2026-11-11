@@ -52,8 +52,27 @@ export const poseAt = (view: PuppetView, state: CharacterState, phase: number): 
 
 /** Which view to show: explicit hint (edge `props.view`), else side when moving and the puppet's idle view when still. */
 export function chooseView(views: Partial<Record<ViewId, PuppetView>>, moving: boolean, idleView: ViewId, hint?: string): ViewId | null {
-  const ok = (v: string | undefined): v is ViewId => (v === 'side' || v === 'front' || v === 'back') && !!views[v]?.mesh;
+  const ok = (v: string | undefined): v is ViewId => !!v && !!views[v as ViewId]?.mesh && ['side', 'front', 'back', 'climb', 'jump'].includes(v);
   if (ok(hint)) return hint;
-  const prefer: ViewId[] = moving ? ['side', 'front', 'back'] : [idleView, 'side', 'front', 'back'];
+  const prefer: ViewId[] = moving ? ['side', 'front', 'back'] : [idleView, 'side', 'front', 'back'];  // pose views are chosen by state (see chooseViewForState)
   return prefer.find((v) => ok(v)) ?? null;
+}
+
+/**
+ * View for a character state: an explicit `hint` wins; CLIMB uses the climb view and JUMP/FALL the jump view when the puppet has
+ * them; everything else falls back to chooseView (profile while moving, `idleView` when still).
+ */
+export function chooseViewForState(views: Partial<Record<ViewId, PuppetView>>, state: CharacterState, idleView: ViewId, hint?: string): ViewId | null {
+  const has = (v: ViewId) => !!views[v]?.mesh;
+  if (!hint) {
+    if (state === 'CLIMB' && has('climb')) return 'climb';
+    if ((state === 'JUMP' || state === 'FALL') && has('jump')) return 'jump';
+  }
+  const moving = state === 'WALK' || state === 'CLIMB' || state === 'JUMP' || state === 'FALL';
+  return chooseView(views, moving, idleView, hint);
+}
+
+/** Should the view be mirrored when the character faces left? Profile and jump yes; front, back and climb no (unless set on the view). */
+export function flipsWithFacing(view: Pick<PuppetView, 'id' | 'flipWithFacing'>): boolean {
+  return view.flipWithFacing ?? (view.id === 'side' || view.id === 'jump');
 }

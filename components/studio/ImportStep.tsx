@@ -4,6 +4,8 @@ import { useRef, useState } from 'react';
 import silhouetteMod from '@/docs/guida-di-prova/guida-silhouette.png';
 import mapMod from '@/docs/guida-di-prova/guida-mappa-parti.png';
 import promptText from '@/docs/guida-di-prova/prompt-guida.txt';
+import posesMod from '@/docs/guida-di-prova/guida-pose-extra.png';
+import posesPrompt from '@/docs/guida-di-prova/prompt-pose-extra.txt';
 import { readImageFile, ACCEPTED_IMAGE_TYPES } from '@/lib/import-export/image';
 import { putAsset } from '@/lib/persistence/db';
 import { updatePuppet, pruneAssets } from '@/lib/studio/pipeline';
@@ -66,6 +68,14 @@ export function ImportStep({ store, puppet, projectId, go }: StepProps) {
           <div className={st.promptBox} data-testid="prompt-text">{promptText}</div>
           <button className={ed.btn} onClick={async () => { try { await navigator.clipboard.writeText(promptText); setCopied(true); setTimeout(() => setCopied(false), 1500); } catch { setErr('Copia non riuscita: seleziona il testo a mano.'); } }}>{copied ? 'Copiato ✓' : 'Copia il prompt'}</button>
           <span className={ed.help}>Compila i parametri tra {'{{ }}'} (personaggio, vestiti, palette, stile, sfondo).</span>
+        </div>
+        <div className={ed.section}>
+          <h4>3 · Pose aggiuntive: arrampicata e salto (opzionale)</h4>
+          <span className={ed.help}>Si generano dopo il foglio, usando come riferimento il personaggio già approvato. Si importano nel passo 3 («Pose aggiuntive»).</span>
+          <img className={st.guideImg} src={url(posesMod)} alt="Guida: pose di arrampicata e salto" />
+          <a className={ed.btn} href={url(posesMod)} download="guida-pose-extra.png">Scarica la sagoma delle pose</a>
+          <div className={st.promptBox} data-testid="prompt-poses">{posesPrompt}</div>
+          <button className={ed.btn} onClick={async () => { try { await navigator.clipboard.writeText(posesPrompt); } catch { setErr('Copia non riuscita: seleziona il testo a mano.'); } }}>Copia il prompt delle pose</button>
         </div>
       </aside>
     </div>

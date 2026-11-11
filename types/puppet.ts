@@ -4,8 +4,14 @@ import type { Vec2 } from './navigation';
 
 /** A rigged character ("modellino"): one cut-out image per view, deformed with a bone skeleton. Added in schema v3. */
 
-export type ViewId = 'side' | 'front' | 'back';
-export const VIEW_IDS: ViewId[] = ['side', 'front', 'back'];
+/**
+ * side/front/back come from the turnaround sheet. `climb` and `jump` are extra POSE views (drawn in that posture, facing
+ * right): they are shown automatically for the CLIMB and JUMP/FALL states and animated around their own rest pose.
+ */
+export type ViewId = 'side' | 'front' | 'back' | 'climb' | 'jump';
+export const VIEW_IDS: ViewId[] = ['side', 'front', 'back', 'climb', 'jump'];
+/** Views that look to the right and are drawn in profile (limbs: R = near, L = far). */
+export const PROFILE_VIEWS: ViewId[] = ['side', 'climb', 'jump'];
 
 /**
  * Skeleton landmarks (pixel coordinates of the view's cut-out image).
@@ -56,8 +62,12 @@ export interface WeightParams {
 
 export interface PuppetView {
   id: ViewId;
-  /** Region of the source sheet (pixels) that contains this figure. */
+  /** Region of the source image (pixels) that contains this figure. */
   crop: Rect;
+  /** Extra pose views come from their own image; when absent the puppet's turnaround sheet is the source. */
+  sourceAssetId?: string;
+  /** Mirror the view when the character faces left (default: profile views yes, front/back no, climb no). */
+  flipWithFacing?: boolean;
   /** Processed cut-out (transparent background) image asset. */
   cutoutAssetId: string | null;
   width: number;

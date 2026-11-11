@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { BONE_IDS, type BoneId, type Pose, type Skin } from '@/types';
+import { BONE_IDS, PROFILE_VIEWS, type BoneId, type Pose, type Skin } from '@/types';
 import { addFarLimbs, adjacency, autoWeights, denseToSkin, generateMesh, paintWeights, skinToDense, type BrushMode } from '@/engine/puppet/mesh';
 import { buildRig } from '@/engine/puppet/skeleton';
 import { updatePuppet } from '@/lib/studio/pipeline';
@@ -46,7 +46,7 @@ export function MeshStep({ store, puppet, projectId, go }: StepProps) {
     const base = generateMesh(cut.img, cell, margin);
     const skin0 = denseToSkin(autoWeights(base, rig, vid, view.weightParams, cut.img));
     const far = view.farLimbs ?? { arm: vid === 'side', leg: vid === 'side' };
-    const r = vid === 'side' ? addFarLimbs(base, skin0, far) : { mesh: base, skin: skin0 };
+    const r = PROFILE_VIEWS.includes(vid) ? addFarLimbs(base, skin0, far) : { mesh: base, skin: skin0 };
     setView({ mesh: r.mesh, skin: r.skin, farLimbs: far });
   };
   const recompute = () => {
@@ -114,10 +114,10 @@ export function MeshStep({ store, puppet, projectId, go }: StepProps) {
           <Slider id="m-cell" label="Dimensione delle celle" value={cell} min={8} max={32} onChange={setCell} fmt={(v) => `${v}px (più piccole = più morbido, più lento)`} />
           <Slider id="m-mar" label="Margine attorno alla sagoma" value={margin} min={0} max={24} onChange={setMargin} fmt={(v) => `${v}px`} />
           <button className={`${ed.btn} ${ed.btnPrimary}`} onClick={generate} data-testid="generate-mesh">{view.mesh ? 'Rigenera mesh e pesi' : 'Genera mesh e pesi'}</button>
-          {vid === 'side' && (
+          {PROFILE_VIEWS.includes(vid) && (
             <>
-              <CheckField id="far-leg" label="Gamba lontana (copia dietro il corpo)" checked={view.farLimbs?.leg ?? true} onChange={(v) => setView({ farLimbs: { arm: view.farLimbs?.arm ?? true, leg: v } })} />
-              <CheckField id="far-arm" label="Braccio lontano (copia dietro il corpo)" checked={view.farLimbs?.arm ?? true} onChange={(v) => setView({ farLimbs: { leg: view.farLimbs?.leg ?? true, arm: v } })} />
+              <CheckField id="far-leg" label="Gamba lontana (copia dietro il corpo)" checked={view.farLimbs?.leg ?? vid === 'side'} onChange={(v) => setView({ farLimbs: { arm: view.farLimbs?.arm ?? vid === 'side', leg: v } })} />
+              <CheckField id="far-arm" label="Braccio lontano (copia dietro il corpo)" checked={view.farLimbs?.arm ?? vid === 'side'} onChange={(v) => setView({ farLimbs: { leg: view.farLimbs?.leg ?? vid === 'side', arm: v } })} />
               <span className={ed.help}>Nel profilo l’immagine mostra una sola gamba e un solo braccio. Le copie permettono di vedere i due arti muoversi in modo opposto. Rigenera la mesh dopo aver cambiato queste opzioni.</span>
             </>
           )}
@@ -129,7 +129,7 @@ export function MeshStep({ store, puppet, projectId, go }: StepProps) {
               <h4>Pesi automatici</h4>
               <Slider id="w-fall" label="Morbidezza delle giunture" value={view.weightParams.falloff} min={0.05} max={1} step={0.05} onChange={(v) => setView({ weightParams: { ...view.weightParams, falloff: v } }, 'live')} fmt={(v) => v.toFixed(2)} />
               <Slider id="w-smo" label="Lisciatura" value={view.weightParams.smooth} min={0} max={8} onChange={(v) => setView({ weightParams: { ...view.weightParams, smooth: v } }, 'live')} />
-              {vid === 'side' && <Slider id="w-far" label="Preferenza per gli arti vicini" value={view.weightParams.farPenalty} min={0} max={3} step={0.1} onChange={(v) => setView({ weightParams: { ...view.weightParams, farPenalty: v } }, 'live')} fmt={(v) => v.toFixed(1)} />}
+              {PROFILE_VIEWS.includes(vid) && <Slider id="w-far" label="Preferenza per gli arti vicini" value={view.weightParams.farPenalty} min={0} max={3} step={0.1} onChange={(v) => setView({ weightParams: { ...view.weightParams, farPenalty: v } }, 'live')} fmt={(v) => v.toFixed(1)} />}
               <button className={ed.btn} onClick={recompute} data-testid="recompute-weights">Ricalcola i pesi (cancella le pennellate)</button>
             </div>
             <div className={ed.section}>

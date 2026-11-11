@@ -1,5 +1,5 @@
 import type { CharacterState, Puppet, PuppetView, ViewId } from '@/types';
-import { advancePhase, chooseView, poseAt, skinVertices } from './runtime';
+import { advancePhase, chooseViewForState, poseAt, skinVertices } from './runtime';
 
 export interface PuppetFrame { viewId: ViewId; view: PuppetView; positions: Float32Array }
 
@@ -14,8 +14,7 @@ export class PuppetPlayer {
 
   /** `speedFigureHeights` = travel speed divided by the figure height (px/s ÷ px). `dt` = 0 renders without advancing. */
   frame(puppet: Puppet, state: CharacterState, dt: number, speedFigureHeights: number, hint?: string): PuppetFrame | null {
-    const moving = state === 'WALK' || state === 'CLIMB' || state === 'JUMP' || state === 'FALL';
-    const viewId = chooseView(puppet.views, moving, puppet.idleView, hint);
+    const viewId = chooseViewForState(puppet.views, state, puppet.idleView, hint);
     if (!viewId) return null;
     const view = puppet.views[viewId]!;
     if (state !== this.lastState) { this.lastState = state; this.phase = 0; }

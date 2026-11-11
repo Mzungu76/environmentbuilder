@@ -1,5 +1,5 @@
 import type { Mesh, Skin, ViewId, WeightParams } from '@/types';
-import { BONE_IDS } from '@/types';
+import { BONE_IDS, PROFILE_VIEWS } from '@/types';
 import type { Img } from './imageProc';
 import type { Rig } from './skeleton';
 
@@ -89,7 +89,7 @@ export function autoWeights(mesh: Mesh, rig: Rig, view: ViewId, params: WeightPa
     for (const b of rig.bones) {
       let d = segDist(px, py, b.head.x, b.head.y, b.tail.x, b.tail.y) / (b.radius * H);
       const left = b.id.endsWith('L'), right = b.id.endsWith('R');
-      if (view !== 'side') { // never let a limb of one side grab pixels clearly on the other side of the body
+      if (!PROFILE_VIEWS.includes(view)) { // never let a limb of one side grab pixels clearly on the other side of the body
         if (left && px > axis) d += 3; if (right && px < axis) d += 3;
       } else if (left) d += params.farPenalty * 1.2;
       dn.push(d); if (d < dmin) dmin = d;

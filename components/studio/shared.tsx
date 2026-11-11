@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import type { BoneId, LandmarkId, Puppet, PuppetView, ViewId } from '@/types';
-import { VIEW_IDS } from '@/types';
+import { PROFILE_VIEWS, VIEW_IDS } from '@/types';
 import type { EditorStore } from '@/lib/store/editorStore';
 import type { Img } from '@/engine/puppet/imageProc';
 import { imgToCanvas, loadAssetImg } from '@/lib/studio/pipeline';
@@ -13,12 +13,12 @@ export { editor as ed, styles as st };
 
 export interface StepProps { store: EditorStore; puppet: Puppet; projectId: string; go: (step: number) => void; version: number }
 
-export const VIEW_LABEL: Record<ViewId, string> = { front: 'Fronte', side: 'Profilo', back: 'Retro' };
+export const VIEW_LABEL: Record<ViewId, string> = { front: 'Fronte', side: 'Profilo', back: 'Retro', climb: 'Arrampicata', jump: 'Salto' };
 
 const BASE_LABEL: Record<string, string> = { pelvis: 'Bacino', torso: 'Busto', head: 'Testa', uarm: 'Braccio', farm: 'Avambraccio', hand: 'Mano', thigh: 'Coscia', shin: 'Stinco', foot: 'Piede' };
 const LM_LABEL: Record<string, string> = { headTop: 'Cima della testa', neck: 'Collo', pelvis: 'Bacino', shoulder: 'Spalla', elbow: 'Gomito', wrist: 'Polso', hand: 'Punta della mano', hip: 'Anca', knee: 'Ginocchio', ankle: 'Caviglia', toe: 'Punta del piede' };
 /** L/R = left/right of the image (front, back) or far/near (profile). */
-const side = (c: string, view: ViewId) => (view === 'side' ? (c === 'L' ? 'lontano' : 'vicino') : c === 'L' ? 'sx' : 'dx');
+const side = (c: string, view: ViewId) => (PROFILE_VIEWS.includes(view) ? (c === 'L' ? 'lontano' : 'vicino') : c === 'L' ? 'sx' : 'dx');
 export const boneLabel = (id: BoneId, view: ViewId) => { const m = id.match(/^(.*?)([LR])$/); return m && BASE_LABEL[m[1]] ? `${BASE_LABEL[m[1]]} ${side(m[2], view)}` : BASE_LABEL[id] ?? id; };
 export const landmarkLabel = (id: LandmarkId, view: ViewId) => { const m = id.match(/^(.*?)([LR])$/); return m && LM_LABEL[m[1]] ? `${LM_LABEL[m[1]]} ${side(m[2], view)}` : LM_LABEL[id] ?? id; };
 

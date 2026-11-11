@@ -4,6 +4,7 @@ import type { CharacterRenderItem, SceneView, ViewPointerEvent } from '@/engine/
 import type { SceneController } from '@/engine/editor/SceneController';
 import { spriteFor } from '@/engine/characters/sprites';
 import { PuppetPlayer } from '@/engine/puppet/player';
+import { flipsWithFacing } from '@/engine/puppet/runtime';
 import { Agent, type AgentSnapshot } from './Agent';
 import { exitNodeIds, resolveExit } from '@/engine/interaction/objects';
 import { availableInteractions, createRuntimeState, performInteraction, resetRuntimeState, type Available, type GameEvent, type RuntimeState } from '@/engine/interaction/system';
@@ -229,7 +230,7 @@ export class PlaytestController {
     const f = pl.frame(puppet, s.state, dt, s.speedPx / figurePx, hint);
     const assetId = f?.view.cutoutAssetId;
     if (!f || !assetId || !f.view.mesh) return null;
-    return { assetId, positions: f.positions, uvs: f.view.mesh.uvs, indices: f.view.mesh.indices, pivot: f.view.pivot, figureHeight: f.view.figureHeight, flip: f.viewId === 'side' && s.facing < 0, viewKey: `${puppet.id}:${f.viewId}:${assetId}` };
+    return { assetId, positions: f.positions, uvs: f.view.mesh.uvs, indices: f.view.mesh.indices, pivot: f.view.pivot, figureHeight: f.view.figureHeight, flip: flipsWithFacing(f.view) && s.facing < 0, viewKey: `${puppet.id}:${f.viewId}:${assetId}` };
   }
 
   private pushRender() {
