@@ -52,8 +52,8 @@ export function TopBar(p: Props) {
     <header className={styles.top}>
       <span className={styles.brand}>Environment Builder</span>
       <NameField className={styles.projectName} value={state.project.name} onCommit={p.onProjectName} label="Nome progetto" />
-      <span className={styles.hideSm} aria-hidden>/</span>
-      <NameField value={p.envName} onCommit={p.onEnvName} label="Nome ambiente" />
+      <span className={`${styles.hideSm} ${styles.hideXs}`} aria-hidden>/</span>
+      <NameField className={styles.hideXs} value={p.envName} onCommit={p.onEnvName} label="Nome ambiente" />
       <span className={`${styles.sep} ${styles.hideXs}`} />
       <Link href="/" className={`${styles.btn} ${styles.hideXs}`} title="Apri progetto (libreria)"><span className={styles.hideSm}>Apri</span>{Icon.folder}</Link>
       <button className={`${styles.btn} ${styles.hideSm}`} onClick={p.onNew} title="Nuovo progetto">{Icon.plus}Nuovo</button>
@@ -62,8 +62,8 @@ export function TopBar(p: Props) {
       <button className={`${styles.btn} ${styles.iconBtn}`} onClick={p.onUndo} disabled={!state.canUndo} title="Annulla (Ctrl+Z)" aria-label="Annulla" data-testid="undo">{Icon.undo}</button>
       <button className={`${styles.btn} ${styles.iconBtn}`} onClick={p.onRedo} disabled={!state.canRedo} title="Ripeti (Ctrl+Shift+Z)" aria-label="Ripeti" data-testid="redo">{Icon.redo}</button>
       <button className={styles.btn} onClick={p.onSave} title="Salva (Ctrl+S)" data-testid="save">{Icon.save}<span className={styles.hideSm}>Salva</span></button>
-      <span className={`${styles.sep} ${styles.hideSm}`} />
-      <div className={`${styles.seg} ${styles.hideSm}`} role="group" aria-label="Modalità">
+      <span className={`${styles.sep} ${styles.hideXs}`} />
+      <div className={`${styles.seg} ${styles.modeSeg}`} role="group" aria-label="Modalità">
         <button aria-pressed={state.mode === 'editor'} onClick={() => p.onMode('editor')} data-testid="mode-editor">Editor</button>
         <button aria-pressed={state.mode === 'playtest'} onClick={() => p.onMode('playtest')} disabled={!p.canPlaytest} title={p.canPlaytest ? 'Prova la simulazione' : 'Importa prima un’immagine'} data-testid="mode-playtest">Playtest</button>
       </div>
@@ -76,7 +76,7 @@ export function TopBar(p: Props) {
           </div>
         )}
       </div>
-      <Link href="/manuale" target="_blank" rel="noreferrer" className={`${styles.btn} ${styles.iconBtn}`} title="Manuale (si apre in una nuova scheda)" aria-label="Manuale" data-testid="open-manual">{Icon.help}</Link>
+      <Link href="/manuale" target="_blank" rel="noreferrer" className={`${styles.btn} ${styles.iconBtn} ${styles.hideXs}`} title="Manuale (si apre in una nuova scheda)" aria-label="Manuale" data-testid="open-manual">{Icon.help}</Link>
       <button className={`${styles.btn} ${styles.iconBtn} ${styles.inspToggle}`} onClick={p.onToggleInspector} aria-label="Mostra/nascondi inspector" title="Inspector">{Icon.panel}</button>
     </header>
   );

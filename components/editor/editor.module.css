@@ -120,3 +120,14 @@
 .typeBar { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); z-index: 6; display: flex; flex-wrap: wrap; gap: 4px; justify-content: center; max-width: calc(100% - 24px); background: rgba(23,26,32,.95); border: 1px solid var(--border-strong); padding: 4px; border-radius: 12px; }
 .typeBar .chip { font-size: 12px; }
 @media (max-width: 900px) { .typeBar { top: 8px; } }
+
+/* floating playtest transport + compact top bar on phones */
+.transport { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); z-index: 6; display: flex; gap: 6px; align-items: center; background: rgba(23,26,32,.95); border: 1px solid var(--border-strong); padding: 4px; border-radius: 12px; }
+.transportHint { font-size: 12px; color: var(--text-dim); padding: 0 8px; }
+.modeSeg button { white-space: nowrap; }
+@media (max-width: 560px) {
+  .top { gap: 4px; padding: 0 6px; overflow-x: auto; scrollbar-width: none; }
+  .nameInput { width: 72px; padding: 5px 4px; }
+  .modeSeg button { padding: 0 8px; font-size: 12px; }
+  .top .btn { flex: none; }
+}

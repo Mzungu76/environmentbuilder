@@ -13,6 +13,7 @@ import { ACCEPTED_IMAGE_TYPES } from '@/lib/import-export/image';
 import { SceneCanvas, type SceneHandle } from '@/components/scene/SceneCanvas';
 import { TopBar } from '@/components/toolbar/TopBar';
 import { TOOLS, ToolPalette } from '@/components/toolbar/ToolPalette';
+import { PlayTransport } from '@/components/panels/PlayTransport';
 import { PlaytestPanel } from '@/components/panels/PlaytestPanel';
 import { EnvTabs } from '@/components/panels/EnvTabs';
 import { OBJECT_TYPES } from '@/engine/interaction/objects';
@@ -202,6 +203,7 @@ function Editor({ store }: { store: EditorStore }) {
             </div>
           )}
           {hasImage && !state.preview && !playtest && <div className={styles.hint} style={state.tool === 'object' ? { top: 64 } : undefined}>{toolInfo.hint}</div>}
+          {playtest && ctrl && <PlayTransport ctrl={ctrl} />}
           {notice && <div className={styles.banner} role="alert">{notice}<button onClick={() => setNotice(null)}>Chiudi</button></div>}
           <div className={styles.hud}>
             <button className={`${styles.btn} ${styles.iconBtn}`} onClick={() => handle.current?.view.zoomCenter(0.8)} aria-label="Riduci" title="Riduci (-)">{Icon.minus}</button>
