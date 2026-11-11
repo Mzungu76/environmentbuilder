@@ -17,6 +17,7 @@ import { PlaytestPanel } from '@/components/panels/PlaytestPanel';
 import { EnvTabs } from '@/components/panels/EnvTabs';
 import { OBJECT_TYPES } from '@/engine/interaction/objects';
 import type { Character } from '@/types';
+import { createRuntimeState, resetRuntimeState } from '@/engine/interaction/system';
 import { PlaytestController } from '@/engine/simulation/PlaytestController';
 import { Inspector } from '@/components/inspector/Inspector';
 import { Icon } from '@/components/ui/icons';
@@ -71,12 +72,14 @@ function Editor({ store }: { store: EditorStore }) {
   // Walking into an exit switches the active environment and starts a new controller there (`playKey`).
   const entry = useRef<{ character: Character; entryNodeId: string; text: string } | null>(null);
   const [playKey, setPlayKey] = useState(0);
+  const runtime = useRef(createRuntimeState());
+  useEffect(() => { if (!playtest) resetRuntimeState(runtime.current); }, [playtest]);
   const playEnvId = env.id;
   useEffect(() => {
     if (!playtest || !sceneReady || !handle.current) return;
     const carried = entry.current; entry.current = null;
     const c = new PlaytestController(store, handle.current.view, handle.current.editor, {
-      carried: carried?.character, entryNodeId: carried?.entryNodeId, message: carried?.text, autoplay: !!carried,
+      carried: carried?.character, entryNodeId: carried?.entryNodeId, message: carried?.text, autoplay: !!carried, runtime: runtime.current,
       onTransition: (t) => {
         entry.current = { character: t.character, entryNodeId: t.entryNodeId, text: t.text };
         store.setActiveEnvironment(t.targetEnvId);

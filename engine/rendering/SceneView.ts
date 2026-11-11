@@ -1,6 +1,8 @@
-import { Application, Container, Graphics, Sprite, Texture } from 'pixi.js';
+import { Application, Container, Graphics, Rectangle, Sprite, Texture } from 'pixi.js';
+import type { SpriteDraw } from '@/engine/characters/sprites';
 import type { CharacterState, InteractiveObject, NavigationGraph, SceneLayer, Vec2 } from '@/types';
 import { objectTypeInfo } from '@/engine/interaction/objects';
+import { EDGE_COLOR } from '@/engine/movement/movementTypes';
 import { edgePolyline } from '@/engine/navigation/geometry';
 
 /**
@@ -58,13 +60,16 @@ export interface CharacterRenderItem {
   state: CharacterState;
   shadow: boolean;
   selected: boolean;
+  /** Visual lift in px (jump arcs). */
+  lift: number;
+  sprite: SpriteDraw | null;
+  /** Seconds since the state started; ignored when `liveClock` (editor: idle animation plays on its own). */
+  stateTime: number;
+  liveClock: boolean;
 }
 
 export interface LayerSource { layer: SceneLayer; blobLoader: () => Promise<Blob | undefined> }
 
-const EDGE_COLORS: Record<string, number> = {
-  walk: 0x2dd4bf, ramp: 0xfb923c, climb: 0xc084fc, stairs: 0xf472b6, 'platform-link': 0x60a5fa, curve: 0x4ade80,
-};
 const NODE_COLORS: Record<string, number> = {
   waypoint: 0xffffff, junction: 0xfacc15, endpoint: 0xf87171, platform: 0x60a5fa, entrance: 0x22c55e, exit: 0xef4444,
 };
@@ -78,6 +83,8 @@ export class SceneView {
   private objRoot = new Container();  // object images (below characters)
   private fgRoot = new Container();   // foreground (above characters)
   private objSprites = new Map<string, Sprite>();
+  /** Objects consumed at runtime (e.g. collected in the playtest): hidden but still part of the document. */
+  private hiddenObjects = new Set<string>();
   private loading = new Map<string, Promise<Texture | null>>();
   private overlay = new Graphics();
   private host!: HTMLElement;
@@ -94,6 +101,11 @@ export class SceneView {
   private resizeObs?: ResizeObserver;
   private charGfx = new Graphics();
   private chars: CharacterRenderItem[] = [];
+  private charRoot = new Container();
+  private charSprites = new Map<string, Sprite>();
+  private frameTex = new Map<string, Texture>();
+  /** Loads the binary of an image asset (set by the host component). */
+  assetLoader: (assetId: string) => Promise<Blob | undefined> = async () => undefined;
 
   /** When true, single-pointer drag pans the camera (pan tool / space held). */
   panMode = false;
@@ -121,7 +133,7 @@ export class SceneView {
     host.appendChild(app.canvas);
     app.canvas.style.touchAction = 'none';
     app.canvas.style.display = 'block';
-    this.world.addChild(this.bgRoot, this.objRoot, this.charGfx, this.fgRoot, this.overlay);
+    this.world.addChild(this.bgRoot, this.objRoot, this.charRoot, this.charGfx, this.fgRoot, this.overlay);
     app.stage.addChild(this.world);
     app.ticker.add((t) => {
       this.onTick(Math.min(0.1, t.deltaMS / 1000));
@@ -205,6 +217,12 @@ export class SceneView {
     this.dirty = true;
   }
 
+  setHiddenObjects(ids: Set<string>) {
+    this.hiddenObjects = new Set(ids);
+    for (const [id, sp] of this.objSprites) { const o = this.model?.objects?.find((x) => x.id === id); sp.visible = (o?.visible ?? true) && !this.hiddenObjects.has(id); }
+    this.dirty = true;
+  }
+
   /** Object images. Objects without an asset are design markers drawn by the overlay only. */
   async setObjects(sources: ObjectSource[]) {
     const withImg = sources.filter((s) => s.object.assetId);
@@ -218,7 +236,7 @@ export class SceneView {
       let sp = this.objSprites.get(o.id);
       if (!tex) { sp?.destroy(); this.objSprites.delete(o.id); return; }
       if (!sp) { sp = new Sprite(tex); sp.anchor.set(0.5); this.objSprites.set(o.id, sp); this.objRoot.addChild(sp); } else if (sp.texture !== tex) sp.texture = tex;
-      sp.visible = o.visible;
+      sp.visible = o.visible && !this.hiddenObjects.has(o.id);
       sp.position.set(o.position.x * this.envW, o.position.y * this.envH);
       sp.width = o.width * this.envH; sp.height = o.height * this.envH;
       this.objRoot.setChildIndex(sp, Math.min(k, this.objRoot.children.length - 1));
@@ -354,7 +372,7 @@ export class SceneView {
     for (const e of m.graph.edges) {
       const pts = edgePolyline(m.graph, e, 28);
       if (!pts) continue;
-      const color = EDGE_COLORS[e.type] ?? 0xa3a3a3;
+      const color = EDGE_COLOR(e.type);
       const selected = e.id === selEdge;
       if (m.markers?.routeEdgeIds.includes(e.id)) {
         g.moveTo(...P(pts[0]));
@@ -412,6 +430,7 @@ export class SceneView {
 
   private drawObjects(g: Graphics, m: OverlayModel, px: number, P: (p: Vec2) => [number, number]) {
     for (const o of m.objects ?? []) {
+      if (this.hiddenObjects.has(o.id)) continue;
       const [cx, cy] = P(o.position);
       const w = o.width * this.envH, h = o.height * this.envH;
       const info = objectTypeInfo(o.type);
@@ -460,35 +479,78 @@ export class SceneView {
   }
 
   // --- characters (procedural placeholder: no asset required) ---------------------------------
+  private frameTexture(base: Texture, sp: SpriteDraw, idx: number): Texture {
+    const fw = sp.frameWidth ?? base.width, fh = sp.frameHeight ?? base.height;
+    const cols = Math.max(1, Math.floor(base.width / fw)), rows = Math.max(1, Math.floor(base.height / fh));
+    const i = Math.min(Math.max(0, idx), cols * rows - 1);
+    const key = `${sp.assetId}:${fw}x${fh}:${i}`;
+    let t = this.frameTex.get(key);
+    if (!t) { t = new Texture({ source: base.source, frame: new Rectangle((i % cols) * fw, Math.floor(i / cols) * fh, fw, fh) }); this.frameTex.set(key, t); }
+    return t;
+  }
+
   private drawCharacters() {
     const g = this.charGfx;
     g.clear();
-    if (!this.chars.length) return;
     const t = performance.now() / 1000;
     const H = this.envH, W = this.envW;
+    const seen = new Set<string>();
     for (const c of this.chars) {
       const h = c.height * H, w = c.width * H;
       const cx = c.x * W, cy = c.y * H;
+      const lift = c.lift;
+      // --- sprite (image / sprite sheet) when available; procedural placeholder otherwise
+      if (c.sprite) {
+        const base = this.textures.get(c.sprite.assetId);
+        if (!base) void this.texture(c.sprite.assetId, () => this.assetLoader(c.sprite!.assetId));
+        else {
+          const st = c.liveClock ? t : c.stateTime;
+          const n = c.sprite.frames.length, k = Math.floor(st * c.sprite.fps);
+          const idx = c.sprite.frames[c.sprite.loop ? k % n : Math.min(k, n - 1)];
+          const ft = this.frameTexture(base, c.sprite, idx);
+          let sp = this.charSprites.get(c.id);
+          if (!sp) { sp = new Sprite(ft); sp.anchor.set(0.5, 1); this.charSprites.set(c.id, sp); this.charRoot.addChild(sp); }
+          sp.texture = ft;
+          sp.scale.set((w / ft.width) * c.facing, h / ft.height);
+          sp.position.set(cx, cy - lift);
+          seen.add(c.id);
+          if (c.shadow) g.ellipse(cx, cy, w * 0.55, Math.max(2, h * 0.05)).fill({ color: 0x000000, alpha: 0.35 });
+          if (c.selected) g.ellipse(cx, cy, w * 0.8, Math.max(3, h * 0.09)).stroke({ width: 2 / this.zoom, color: 0xffffff, alpha: 0.9 });
+          continue;
+        }
+      }
+      this.drawProcedural(g, c, cx, cy, w, h, lift, t);
+    }
+    for (const [id, sp] of this.charSprites) if (!seen.has(id)) { sp.destroy(); this.charSprites.delete(id); }
+  }
+
+  private drawProcedural(g: Graphics, c: CharacterRenderItem, cx: number, cy: number, w: number, h: number, lift: number, t: number) {
+    {
       const col = parseInt(c.color.replace('#', ''), 16) || 0x4f8cff;
       const f = c.facing;
-      const walk = c.state === 'WALK', climb = c.state === 'CLIMB';
+      const walk = c.state === 'WALK', climb = c.state === 'CLIMB', act = c.state === 'INTERACT' || c.state === 'COLLECT', air = c.state === 'JUMP' || c.state === 'FALL';
       const phase = Math.sin(t * (walk ? 11 : 7));
-      const bob = walk ? Math.abs(phase) * h * 0.035 : c.state === 'IDLE' ? Math.sin(t * 2) * h * 0.01 : phase * h * 0.015;
+      const bob = walk ? Math.abs(phase) * h * 0.035 : c.state === 'IDLE' ? Math.sin(t * 2) * h * 0.01 : act ? Math.abs(Math.sin(t * 6)) * h * 0.04 : phase * h * 0.015;
       const sway = climb ? phase * w * 0.12 : 0;
+      const gy = cy; // ground (shadow stays on the ground while the body is lifted)
+      cy -= lift;
 
-      if (c.shadow) g.ellipse(cx, cy, w * 0.55, Math.max(2, h * 0.05)).fill({ color: 0x000000, alpha: 0.35 });
+      if (c.shadow) g.ellipse(cx, gy, w * 0.55, Math.max(2, h * 0.05)).fill({ color: 0x000000, alpha: 0.35 });
       const hipY = cy - h * 0.34 - bob * 0.3;
-      // legs
-      const stride = walk ? phase * w * 0.3 : climb ? phase * w * 0.18 : 0;
+      const stride = walk ? phase * w * 0.3 : climb ? phase * w * 0.18 : air ? w * 0.25 : 0;
       g.moveTo(cx - w * 0.15 + sway, hipY).lineTo(cx - w * 0.15 + stride * f, cy - (climb ? Math.max(0, -phase) * h * 0.08 : 0))
         .stroke({ width: Math.max(2, w * 0.16), color: 0x111827, cap: 'round' });
       g.moveTo(cx + w * 0.15 + sway, hipY).lineTo(cx + w * 0.15 - stride * f, cy - (climb ? Math.max(0, phase) * h * 0.08 : 0))
         .stroke({ width: Math.max(2, w * 0.16), color: 0x111827, cap: 'round' });
-      // body + head
       g.roundRect(cx - w * 0.32 + sway, cy - h * 0.78 - bob, w * 0.64, h * 0.46, w * 0.2).fill({ color: col }).stroke({ width: Math.max(1.5, w * 0.05), color: 0x0b0f19, alpha: 0.85 });
+      if (act) { // arms raised while interacting / collecting
+        const up = Math.abs(Math.sin(t * 6)) * h * 0.12;
+        g.moveTo(cx - w * 0.32, cy - h * 0.7 - bob).lineTo(cx - w * 0.5, cy - h * 0.82 - up).stroke({ width: Math.max(2, w * 0.12), color: col, cap: 'round' });
+        g.moveTo(cx + w * 0.32, cy - h * 0.7 - bob).lineTo(cx + w * 0.5, cy - h * 0.82 - up).stroke({ width: Math.max(2, w * 0.12), color: col, cap: 'round' });
+      }
       g.circle(cx + sway, cy - h * 0.87 - bob, h * 0.13).fill({ color: 0xf3d3b5 }).stroke({ width: Math.max(1.5, w * 0.05), color: 0x0b0f19, alpha: 0.85 });
       g.circle(cx + sway + f * h * 0.06, cy - h * 0.88 - bob, Math.max(1.2, h * 0.02)).fill({ color: 0x111827 });
-      if (c.selected) g.ellipse(cx, cy, w * 0.8, Math.max(3, h * 0.09)).stroke({ width: 2 / this.zoom, color: 0xffffff, alpha: 0.9 });
+      if (c.selected) g.ellipse(cx, gy, w * 0.8, Math.max(3, h * 0.09)).stroke({ width: 2 / this.zoom, color: 0xffffff, alpha: 0.9 });
     }
   }
 }

@@ -2,6 +2,7 @@ import type { Character, CharacterState, Environment, Vec2 } from '@/types';
 import { buildTrack, pointAt, reverseTrack, type Track } from './track';
 import { canTraverse, findRoute, reachableNodes, type RouteStep } from './routing';
 import { createRng, hashString } from './rng';
+import { getMovementType } from '@/engine/movement/movementTypes';
 
 export interface AgentSnapshot {
   x: number; y: number;           // normalized
@@ -17,6 +18,9 @@ export interface AgentSnapshot {
   routeEdgeIds: string[];
   waiting: number;                // seconds of pause left
   time: number;
+  stateTime: number;              // seconds since the animation state last changed
+  lift: number;                   // visual lift in px (jump arcs)
+  acting: boolean;                // performing a queued interaction
 }
 
 export type GoToResult = { ok: true } | { ok: false; reason: 'no-node' | 'unreachable' };
@@ -43,6 +47,10 @@ export class Agent {
   private decisionTimer = 0;
   private facing: 1 | -1 = 1;
   private state: CharacterState = 'IDLE';
+  private stateSince = 0;
+  private lift = 0;
+  private actions: { state: CharacterState; seconds: number }[] = [];
+  private actionLeft = 0;
   private pos: Vec2 = { x: 0, y: 0 };
   private speedPx = 0;
   private time = 0;
@@ -64,7 +72,7 @@ export class Agent {
     const nav = this.env.navigation;
     const start = nav.nodes.find((n) => n.id === this.config.startNodeId) ?? nav.nodes[0] ?? null;
     this.track = null; this.s = 0; this.moving = false; this.route = []; this.destination = null;
-    this.pause = 0; this.decisionTimer = 0; this.state = 'IDLE'; this.speedPx = 0; this.time = 0; this.lastNodeId = null; this.arrivalSeq = 0; this.arrivalFinal = false;
+    this.pause = 0; this.decisionTimer = 0; this.state = 'IDLE'; this.stateSince = 0; this.lift = 0; this.actions = []; this.actionLeft = 0; this.speedPx = 0; this.time = 0; this.lastNodeId = null; this.arrivalSeq = 0; this.arrivalFinal = false;
     this.nodeId = start?.id ?? null;
     this.pos = start ? { x: start.x, y: start.y } : { x: 0, y: 0 };
   }
@@ -82,6 +90,12 @@ export class Agent {
     }
     return t ?? null;
   }
+
+  private setState(st: CharacterState) { if (st !== this.state) { this.state = st; this.stateSince = this.time; } }
+
+  /** Queues an animated action (interaction): the character stands still for `seconds` in `state`. */
+  queueAction(state: CharacterState, seconds: number) { this.actions.push({ state, seconds: Math.max(0.05, seconds) }); }
+  get busy() { return this.actions.length > 0 || this.actionLeft > 0; }
 
   private profile() { return { abilities: this.config.abilities, edgeWeights: this.config.behavior.edgeWeights }; }
   private pxSpeed() { return this.config.speed * this.env.height; }
@@ -119,7 +133,7 @@ export class Agent {
   }
 
   /** Stops moving right where the character is (it may stand in the middle of a path). */
-  halt() { this.route = []; this.destination = null; this.moving = false; this.pause = 0; if (this.track) this.speedPx = 0; this.state = 'IDLE'; }
+  halt() { this.route = []; this.destination = null; this.moving = false; this.pause = 0; if (this.track) this.speedPx = 0; this.setState('IDLE'); }
 
   private flip() {
     if (!this.track) return;
@@ -132,8 +146,10 @@ export class Agent {
   step(dt: number) {
     this.time += dt;
     const b = this.config.behavior;
+    if (this.actionLeft <= 0 && this.actions.length) { const a = this.actions.shift()!; this.actionLeft = a.seconds; this.setState(a.state); }
+    if (this.actionLeft > 0) { this.actionLeft -= dt; this.speedPx = 0; this.lift = 0; return; }
     if (this.pause > 0) {
-      this.pause -= dt; this.speedPx = 0; this.state = 'IDLE';
+      this.pause -= dt; this.speedPx = 0; this.setState('IDLE');
       if (this.pause > 0) return;
       dt = -this.pause; this.pause = 0;
       if (dt <= 0) return;
@@ -148,7 +164,7 @@ export class Agent {
     // start next route step from a node
     if (!this.track && this.route.length && this.nodeId) this.beginStep();
 
-    if (!this.track || !this.moving) { this.speedPx = 0; this.state = 'IDLE'; return; }
+    if (!this.track || !this.moving) { this.speedPx = 0; this.lift = 0; this.setState('IDLE'); return; }
 
     // direction-change decisions (autonomous only)
     if (b.mode === 'autonomous') {
@@ -159,20 +175,27 @@ export class Agent {
       }
     }
 
-    let budget = this.pxSpeed() * (this.track?.speedMul ?? 1) * dt; // px to travel this step
-    while (budget > 1e-9 && this.track && this.moving) {
+    let timeLeft = dt;
+    while (timeLeft > 1e-9 && this.track && this.moving) {
       const tr = this.track;
-      const left = tr.length - this.s;
-      const mul = tr.speedMul;
-      if (budget < left) { this.s += budget; budget = 0; }
+      const speed = this.currentSpeed(tr);
+      const tNeed = (tr.length - this.s) / speed;
+      if (timeLeft < tNeed) { this.s += speed * timeLeft; timeLeft = 0; }
       else {
-        this.s = tr.length; budget -= left;
+        this.s = tr.length; timeLeft -= tNeed;
         this.arrive(tr);
         if (this.pause > 0 || !this.moving) break;
-        if (this.track) budget *= (this.track.speedMul / mul); // convert leftover to the next edge's speed
       }
     }
     this.syncPose();
+  }
+
+  /** Effective speed (px/s) on a track: fixed duration, or character speed × edge multiplier × movement-type profile. */
+  private currentSpeed(tr: Track): number {
+    if (tr.duration && tr.length > 0) return tr.length / tr.duration;
+    const u = tr.length > 0 ? this.s / tr.length : 0;
+    const prof = getMovementType(tr.type).speedProfile?.(u) ?? 1;
+    return Math.max(1e-3, this.pxSpeed() * tr.speedMul * prof);
   }
 
   private beginStep() {
@@ -195,7 +218,7 @@ export class Agent {
       this.destination = null; this.moving = false;
       if (b.mode === 'autonomous') this.pause = this.randPause();
     }
-    this.state = 'IDLE'; this.speedPx = 0;
+    this.setState('IDLE'); this.speedPx = 0;
   }
 
   private randPause() { const b = this.config.behavior; const lo = Math.min(b.pauseMin, b.pauseMax), hi = Math.max(b.pauseMin, b.pauseMax); return lo + this.rng() * (hi - lo); }
@@ -232,9 +255,11 @@ export class Agent {
     if (this.track) {
       const p = pointAt(this.track, this.s);
       this.pos = { x: p.x / this.env.width, y: p.y / this.env.height };
-      if (Math.abs(p.dx) > 1e-6 && this.track.type !== 'climb') this.facing = p.dx >= 0 ? 1 : -1;
-      this.state = this.track.type === 'climb' ? 'CLIMB' : 'WALK';
-      this.speedPx = this.pxSpeed() * this.track.speedMul;
+      const mt = getMovementType(this.track.type);
+      if (Math.abs(p.dx) > 1e-6 && !mt.keepFacing) this.facing = p.dx >= 0 ? 1 : -1;
+      this.setState(mt.state);
+      this.speedPx = this.currentSpeed(this.track);
+      this.lift = mt.lift?.(this.track.length > 0 ? this.s / this.track.length : 0, this.track.length) ?? 0;
     }
   }
 
@@ -247,7 +272,7 @@ export class Agent {
       edgeType: this.track?.type ?? null, speedPx: this.moving && this.track ? this.speedPx : 0,
       destinationId: this.destination, routeNodeIds: this.track ? nodeIds : nodeIds.slice(1),
       routeEdgeIds: [...(this.track ? [this.track.edgeId] : []), ...this.route.map((r) => r.edgeId)],
-      waiting: Math.max(0, this.pause), time: this.time,
+      waiting: Math.max(0, this.pause), time: this.time, stateTime: this.time - this.stateSince, lift: this.lift, acting: this.actionLeft > 0 || this.actions.length > 0,
     };
   }
 }

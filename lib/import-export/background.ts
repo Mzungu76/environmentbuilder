@@ -41,3 +41,13 @@ export async function importObjectImage(store: EditorStore, objectId: string, fi
     return updateObject({ ...env, assets: [...env.assets.filter((a) => a.id !== meta.id), meta] }, objectId, { assetId: meta.id, width: Math.min(1, o.height * aspect) });
   });
 }
+
+/** Sets the character's sprite image (a static picture; configure frame size in the inspector to use it as a sprite sheet). */
+export async function importCharacterSprite(store: EditorStore, characterId: string, file: File): Promise<void> {
+  const { meta, blob } = await readImageFile(file);
+  await putAsset(store.project.id, meta.id, blob);
+  store.commitEnv((env) => ({
+    ...env, assets: [...env.assets.filter((a) => a.id !== meta.id), meta],
+    characters: env.characters.map((c) => (c.id === characterId ? { ...c, spriteAssetId: meta.id, spriteSheet: null } : c)),
+  }));
+}

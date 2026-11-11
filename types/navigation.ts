@@ -5,7 +5,7 @@ export interface Vec2 { x: number; y: number }
 /** Open set: new node types can be added without touching the engine. */
 export type NodeType = 'waypoint' | 'junction' | 'endpoint' | 'platform' | 'entrance' | 'exit' | (string & {});
 
-export type EdgeType = 'walk' | 'ramp' | 'climb' | 'stairs' | 'platform-link' | 'curve' | (string & {});
+export type EdgeType = 'walk' | 'ramp' | 'climb' | 'stairs' | 'platform-link' | 'curve' | 'jump' | 'fall' | 'teleport' | (string & {});
 
 /** 'both' = bidirectional; 'forward' = from→to only; 'backward' = to→from only. */
 export type EdgeDirection = 'both' | 'forward' | 'backward';

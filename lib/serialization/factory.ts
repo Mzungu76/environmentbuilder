@@ -12,5 +12,5 @@ export function createEnvironment(name = 'Ambiente 1'): Environment {
 export function createProject(name = 'Progetto senza titolo'): Project {
   const env = createEnvironment();
   const now = Date.now();
-  return { schemaVersion: SCHEMA_VERSION, id: uid('proj'), name, createdAt: now, updatedAt: now, environments: [env], activeEnvironmentId: env.id };
+  return { schemaVersion: SCHEMA_VERSION, id: uid('proj'), name, createdAt: now, updatedAt: now, environments: [env], activeEnvironmentId: env.id, customProfiles: [] };
 }

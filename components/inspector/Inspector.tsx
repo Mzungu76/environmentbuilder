@@ -1,11 +1,13 @@
 'use client';
 
 
-import type { EdgeDirection, Environment, NavigationEdge, NavigationNode, ProfileId } from '@/types';
+import type { EdgeDirection, Environment, NavigationEdge, NavigationNode } from '@/types';
 import type { EditorStore, Selection } from '@/lib/store/editorStore';
 import { reverseEdge, updateEdge, updateNode, validateGraph, moveNode } from '@/engine/navigation/graph';
 import { edgeLengthPx } from '@/engine/navigation/geometry';
-import { ALL_EDGE_TYPES, ALL_NODE_TYPES, PROFILES, suggestedTypes } from '@/engine/profiles';
+import { ALL_NODE_TYPES, allEdgeTypes, allProfiles, suggestedTypes } from '@/engine/profiles';
+import { getMovementType, movementTypes } from '@/engine/movement/movementTypes';
+import { ProfilesPanel } from './ProfilesPanel';
 import { Icon } from '@/components/ui/icons';
 import styles from '../editor/editor.module.css';
 import { CheckField, Field, NumberField, PropsField, TextField } from './fields';
@@ -44,7 +46,7 @@ export function Inspector({ store, env, selection, open, onFit, onReplaceImage, 
 
 function NodePanel({ store, env, node, select }: { store: EditorStore; env: Environment; node: NavigationNode; select: (s: Selection) => void }) {
   const nav = env.navigation;
-  const sug = suggestedTypes(env.profiles);
+  const sug = suggestedTypes(env.profiles, store.project.customProfiles);
   const types = Array.from(new Set([...ALL_NODE_TYPES, node.type]));
   const edit = (patch: Partial<NavigationNode>) => store.commitEnv((e) => ({ ...e, navigation: updateNode(e.navigation, node.id, patch) }));
   const move = (x: number, y: number) => store.commitEnv((e) => ({ ...e, navigation: moveNode(e.navigation, node.id, x, y) }));
@@ -87,8 +89,8 @@ function NodePanel({ store, env, node, select }: { store: EditorStore; env: Envi
 function EdgePanel({ store, env, edge, select, onToggleCurve }: { store: EditorStore; env: Environment; edge: NavigationEdge; select: (s: Selection) => void; onToggleCurve: (id: string) => void }) {
   const nav = env.navigation;
   const a = nav.nodes.find((n) => n.id === edge.from), b = nav.nodes.find((n) => n.id === edge.to);
-  const sug = suggestedTypes(env.profiles);
-  const types = Array.from(new Set([...ALL_EDGE_TYPES, edge.type]));
+  const sug = suggestedTypes(env.profiles, store.project.customProfiles);
+  const types = Array.from(new Set([...allEdgeTypes(), edge.type]));
   const edit = (patch: Partial<NavigationEdge>) => store.commitEnv((e) => ({ ...e, navigation: updateEdge(e.navigation, edge.id, patch) }));
   const len = a && b ? Math.round(edgeLengthPx(a, b, edge.geometry, env.width, env.height)) : 0;
   return (
@@ -97,7 +99,7 @@ function EdgePanel({ store, env, edge, select, onToggleCurve }: { store: EditorS
         <TextField id="e-id" label="ID" value={edge.id} readOnly mono />
         <Field label="Tipo" id="e-type">
           <select id="e-type" className={styles.select} value={edge.type} onChange={(e) => edit({ type: e.target.value })}>
-            {types.map((t) => <option key={t} value={t}>{t}{sug.edges.has(t) ? '' : ' (fuori profilo)'}</option>)}
+            {types.map((t) => <option key={t} value={t}>{getMovementType(t).label}{sug.edges.has(t) ? '' : ' (fuori profilo)'}</option>)}
           </select>
         </Field>
       </div>
@@ -137,12 +139,6 @@ function EnvPanel({ store, env, onFit, onReplaceImage }: { store: EditorStore; e
   const bg = env.layers.find((l) => l.role === 'background');
   const asset = env.assets.find((a) => a.id === bg?.assetId);
   const issues = validateGraph(env.navigation);
-  const toggleProfile = (id: ProfileId) => store.commitEnv((e) => {
-    const has = e.profiles.includes(id);
-    let next = has ? e.profiles.filter((p) => p !== id) : [...e.profiles.filter((p) => p !== 'custom' || id === 'custom'), id];
-    if (id === 'custom' && !has) next = ['custom'];
-    return { ...e, profiles: next.length ? next : ['custom'] };
-  });
   return (
     <>
       <div className={styles.section}>
@@ -174,15 +170,7 @@ function EnvPanel({ store, env, onFit, onReplaceImage }: { store: EditorStore; e
         {objectIssues(store.project, env).map((i, k) => <span key={k} className={styles.warn}>{i.message}</span>)}
         <span className={styles.help}>Aggiungili con lo strumento Oggetto (<kbd>I</kbd>).</span>
       </div>
-      <div className={styles.section}>
-        <h4>Profili</h4>
-        <div className={styles.checkGrid}>
-          {(Object.keys(PROFILES) as ProfileId[]).map((id) => (
-            <button key={id} className={styles.chip} aria-pressed={env.profiles.includes(id)} title={PROFILES[id].description} onClick={() => toggleProfile(id)}>{PROFILES[id].label}</button>
-          ))}
-        </div>
-        <span className={styles.help}>I profili suggeriscono soltanto i tipi. Nulla è limitato.</span>
-      </div>
+      <ProfilesPanel store={store} env={env} />
       <div className={styles.section}>
         <h4>Personaggi ({env.characters.length})</h4>
         <div className={styles.list}>
@@ -209,8 +197,8 @@ function EnvPanel({ store, env, onFit, onReplaceImage }: { store: EditorStore; e
       <div className={styles.section}>
         <h4>Legenda</h4>
         <div className={styles.legend}>
-          {[['walk', '#2dd4bf'], ['ramp', '#fb923c'], ['climb', '#c084fc'], ['stairs', '#f472b6'], ['platform-link', '#60a5fa'], ['curve', '#4ade80']].map(([n, c]) => (
-            <span key={n}><i className={styles.swatch} style={{ background: c }} />{n}</span>
+          {movementTypes().map((t) => (
+            <span key={t.id}><i className={styles.swatch} style={{ background: '#' + t.color.toString(16).padStart(6, '0') }} />{t.label}</span>
           ))}
           <span><i className={styles.swatchDot} style={{ background: '#fff' }} />nodo · <i className={styles.swatchDot} style={{ background: '#22c55e' }} />ingresso · <i className={styles.swatchDot} style={{ background: '#ef4444' }} />uscita</span>
         </div>

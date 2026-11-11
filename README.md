@@ -4,7 +4,9 @@ Editor 2D universale per trasformare illustrazioni (prodotte esternamente, es. c
 
 Tutto gira nel browser: nessun backend, nessun database remoto, nessun servizio a pagamento. I dati sono salvati in **IndexedDB**.
 
-## Stato: Milestone 1 (Editor base) ✅ · Milestone 2 (Simulazione) ✅ · Milestone 3 (Gestione ambienti) ✅
+## Stato: Milestone 1 (Editor base) ✅ · Milestone 2 (Simulazione) ✅ · Milestone 3 (Gestione ambienti) ✅ · Milestone 4 (Estensioni) ✅
+
+📘 **Manuale operativo:** [docs/MANUALE.md](docs/MANUALE.md)
 
 L’interfaccia è in **italiano** (stringhe ancora inline nei componenti; un livello i18n è da prevedere se servirà un’altra lingua).
 
@@ -21,6 +23,19 @@ L’interfaccia è in **italiano** (stringhe ancora inline nei componenti; un li
 | Esportazione ZIP (project.json + immagini + manifest) e JSON; importazione ZIP/JSON | ✅ |
 | Modalità anteprima senza strumenti (`O`) | ✅ |
 | Touch: selezione, trascinamento nodi, pinch-zoom e pan a due dita, layout responsive | ✅ |
+
+### Milestone 4 – Estensioni
+
+| Funzione | Stato |
+|---|---|
+| **Interazioni configurabili** sugli oggetti (raccolta, osservazione, attivazione, personalizzata): all'arrivo o manuali, durata, requisiti, messaggio, evento per il gioco ospite, «una volta sola». Mai per semplice vicinanza | ✅ |
+| Raccolta nel Playtest: inventario, oggetto nascosto, stato COLLECT/INTERACT, registro eventi; reset ripristina tutto | ✅ |
+| **Sprite e sprite sheet** importabili, animazioni per stato (frame, fps, ripetizione), specchio per l'orientamento; fallback su IDLE e sul personaggio procedurale | ✅ |
+| **Nuovi tipi di movimento** (registro estensibile): salto (arco, JUMP), caduta (accelera, FALL), teletrasporto (durata fissa); `props.duration` su qualunque collegamento | ✅ |
+| **Nuovi profili** (Dungeon, Città, Subacqueo, Spazio) e **profili personalizzati** per progetto | ✅ |
+| **Schema v2** con migrazione automatica da v1 (testata) | ✅ |
+| **Integrazione con giochi esterni**: runtime autonomo `dist/environment-runtime.mjs` (`npm run build:runtime`, ~19 KB, senza DOM) + eventi `window`/`postMessage` dal Playtest | ✅ |
+| Collisioni e fisica | ➖ Non implementate: per scelta il movimento è deterministico e guidato dal grafo |
 
 ### Milestone 3 – Gestione completa degli ambienti
 
@@ -67,6 +82,7 @@ npm run dev        # http://localhost:3000
 npm test           # test unitari (vitest)
 npm run typecheck
 npm run build      # export statico in ./out, pubblicabile su qualsiasi hosting statico
+npm run build:runtime      # dist/environment-runtime.mjs per giochi esterni
 npm run build:standalone   # genera dist/environment-builder.html, un singolo file apribile con doppio click
 ```
 
@@ -138,4 +154,5 @@ L'import crea sempre un **nuovo** progetto (nuovo id) e non sovrascrive quelli e
 
 ## Roadmap
 
-- **M4 – Estensioni** (raccolta/interazioni degli oggetti, sprite e animazioni, nuovi profili e tipi di movimento): nuovi profili, tipi di movimento, animazioni, interazioni configurabili.
+- **Idee future**: oggetti animati, condizioni/sequenze di interazioni, editor di sprite con anteprima, più lingue, collisioni solo se un gioco le richiedesse. (Le milestone M1–M4 sono completate.)
+- ~~M4~~ (completata): nuovi profili, tipi di movimento, animazioni, interazioni configurabili.

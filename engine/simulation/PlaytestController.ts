@@ -2,8 +2,11 @@ import type { Character, Environment } from '@/types';
 import type { EditorStore } from '@/lib/store/editorStore';
 import type { CharacterRenderItem, SceneView, ViewPointerEvent } from '@/engine/rendering/SceneView';
 import type { SceneController } from '@/engine/editor/SceneController';
+import { spriteFor } from '@/engine/characters/sprites';
 import { Agent, type AgentSnapshot } from './Agent';
 import { exitNodeIds, resolveExit } from '@/engine/interaction/objects';
+import { availableInteractions, createRuntimeState, performInteraction, resetRuntimeState, type Available, type GameEvent, type RuntimeState } from '@/engine/interaction/system';
+import { emitHostEvent } from '@/lib/integration/hostBridge';
 
 export type PlayStatus = 'stopped' | 'playing' | 'paused';
 
@@ -12,6 +15,10 @@ export interface PlaytestView {
   activeId: string | null;
   message: { text: string; kind: 'info' | 'error'; at: number } | null;
   snapshots: Record<string, AgentSnapshot>;
+  inventory: Record<string, number>;
+  events: GameEvent[];
+  /** Manual interactions the active character can run where it stands. */
+  available: { objectId: string; interactionId: string; label: string; objectName: string }[];
   version: number;
 }
 
@@ -25,6 +32,8 @@ export interface PlaytestOptions {
   message?: string;
   autoplay?: boolean;
   /** Called when a character reaches an exit linked to an entrance of another (or the same) environment. */
+  /** Runtime state (inventory, collected objects) shared across environments during one playtest. */
+  runtime?: RuntimeState;
   onTransition?: (t: { targetEnvId: string; entryNodeId: string; character: Character; text: string }) => void;
 }
 
@@ -47,9 +56,11 @@ export class PlaytestController {
   private pan: { x: number; y: number } | null = null;
 
   private lastSeq = new Map<string, number>();
+  readonly runtime: RuntimeState;
 
   constructor(private store: EditorStore, private view: SceneView, private editor: SceneController, private opts: PlaytestOptions = {}) {
     this.env = store.env;
+    this.runtime = opts.runtime ?? createRuntimeState();
     this.rebuild();
     if (opts.message) this.message = { text: opts.message, kind: 'info', at: Date.now() };
     if (opts.autoplay && this.agents.size) this.status = 'playing';
@@ -74,12 +85,15 @@ export class PlaytestController {
   private compute(): PlaytestView {
     const snapshots: Record<string, AgentSnapshot> = {};
     for (const [id, a] of this.agents) snapshots[id] = a.snapshot();
-    return { status: this.status, activeId: this.activeId, message: this.message, snapshots, version: (this.viewState?.version ?? 0) + 1 };
+    const act = this.active, sn = act?.snapshot();
+    const available = act && sn?.nodeId && !sn.acting ? availableInteractions(this.env, sn.nodeId, act.config.abilities, this.runtime, 'manual').map((a) => ({ objectId: a.object.id, interactionId: a.interaction.id, label: a.interaction.label, objectName: a.object.name })) : [];
+    return { status: this.status, activeId: this.activeId, message: this.message, snapshots, inventory: { ...this.runtime.inventory }, events: this.runtime.events.slice(-12), available, version: (this.viewState?.version ?? 0) + 1 };
   }
 
   dispose() {
     this.view.onTick = () => {};
     this.view.setCharacters([]);
+    this.view.setHiddenObjects(new Set());
     this.editor.markers = null;
     this.editor.attach();
     this.editor.refresh();
@@ -122,12 +136,13 @@ export class PlaytestController {
   pause() { if (this.status === 'playing') { this.status = 'paused'; this.publish(); } }
   togglePlay() { this.status === 'playing' ? this.pause() : this.play(); }
   /** Stop: halts the simulation and returns everybody to their start node. */
-  stop() { this.status = 'stopped'; this.resetAgents(); this.say('Simulazione fermata.', 'info'); }
+  stop() { this.status = 'stopped'; resetRuntimeState(this.runtime); this.resetAgents(); this.say('Simulazione fermata.', 'info'); }
   /** Reset: back to the initial state (and seed) keeping the current play/pause status. */
-  reset() { this.resetAgents(); this.say('Simulazione riportata allo stato iniziale.', 'info'); }
+  reset() { resetRuntimeState(this.runtime); this.resetAgents(); this.say('Simulazione riportata allo stato iniziale.', 'info'); }
   private resetAgents() {
     this.rebuild(); this.acc = 0;
     for (const a of this.agents.values()) a.reset();
+    this.view.setHiddenObjects(this.runtime.collected);
     this.updateMarkers(); this.pushRender(); this.publish();
   }
 
@@ -167,18 +182,46 @@ export class PlaytestController {
       const node = a.snapshot().nodeId;
       if (!a.arrivalFinal || !node) continue;
       const r = resolveExit(this.store.project, this.env, node);
-      if (!r || !this.opts.onTransition) continue;
+      if (!r || !this.opts.onTransition) { this.onArrival(a, node); continue; }
+      this.emit({ t: a.snapshot().time, type: 'transition', character: a.config.name, environment: this.env.name, node, message: `verso ${r.targetEnv.name}` });
       this.status = 'paused';
       this.opts.onTransition({ targetEnvId: r.targetEnv.id, entryNodeId: r.entranceNodeId, character: a.config, text: `${a.config.name} è passato da “${this.env.name}” a “${r.targetEnv.name}”.` });
       return;
     }
   }
 
+  private emit(e: GameEvent) { this.runtime.events.push(e); if (this.runtime.events.length > 200) this.runtime.events.shift(); emitHostEvent(e); }
+
+  /** A route ended on a node: report it and run the 'on-arrival' interactions available there. */
+  private onArrival(a: Agent, node: string) {
+    this.emit({ t: a.snapshot().time, type: 'arrival', character: a.config.name, environment: this.env.name, node });
+    for (const av of availableInteractions(this.env, node, a.config.abilities, this.runtime, 'on-arrival')) this.run(a, av);
+  }
+
+  private run(a: Agent, av: Available) {
+    const out = performInteraction(this.env, av, a.config, this.runtime, a.snapshot().time);
+    a.queueAction(out.state, out.seconds);
+    emitHostEvent(out.event);
+    this.say(out.message, 'info');
+    this.view.setHiddenObjects(this.runtime.collected);
+  }
+
+  /** Manual interaction (button in the panel): the active character must stand on the object's node. */
+  interact(objectId: string, interactionId: string) {
+    const a = this.active, node = a?.snapshot().nodeId;
+    if (!a || !node) return;
+    const av = availableInteractions(this.env, node, a.config.abilities, this.runtime, 'manual').find((x) => x.object.id === objectId && x.interaction.id === interactionId);
+    if (!av) return;
+    this.run(a, av);
+    if (this.status !== 'playing') this.status = 'playing';
+    this.publish();
+  }
+
   private pushRender() {
     const items: CharacterRenderItem[] = [];
     for (const [id, a] of this.agents) {
       const c = a.config, s = a.snapshot();
-      items.push({ id, x: s.x, y: s.y, width: c.width, height: c.height, color: c.color, facing: s.facing, state: s.state, shadow: c.shadow, selected: false });
+      items.push({ id, x: s.x, y: s.y, width: c.width, height: c.height, color: c.color, facing: s.facing, state: s.state, shadow: c.shadow, selected: false, lift: s.lift, sprite: spriteFor(c, s.state), stateTime: s.stateTime, liveClock: false });
     }
     this.view.setCharacters(items);
   }

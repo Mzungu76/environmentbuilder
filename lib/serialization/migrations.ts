@@ -2,8 +2,22 @@ import { SCHEMA_VERSION, type Project } from '@/types';
 
 /** One migration per version step: migrations[n] upgrades a version-n document to n+1. */
 const migrations: Record<number, (doc: any) => any> = {
-  // 1: (doc) => ({ ...doc, schemaVersion: 2, ... })
+  // v1 → v2: user-defined profiles; interactions get their full configurable shape.
+  1: (doc) => ({
+    ...doc, schemaVersion: 2, customProfiles: doc.customProfiles ?? [],
+    environments: (doc.environments ?? []).map((env: any) => ({
+      ...env,
+      objects: (env.objects ?? []).map((o: any) => ({ ...o, interactions: (o.interactions ?? []).map(normalizeInteraction) })),
+    })),
+  }),
 };
+
+function normalizeInteraction(i: any) {
+  return {
+    id: i.id, kind: i.kind ?? 'custom', label: i.label ?? i.kind ?? 'Interazione', trigger: i.trigger ?? 'manual', once: i.once ?? false,
+    requires: i.requires ?? [], duration: i.duration ?? 1, message: i.message ?? '', event: i.event ?? '', props: i.props ?? {},
+  };
+}
 
 export class SchemaError extends Error {}
 
@@ -24,6 +38,7 @@ export function migrateProject(input: unknown): Project {
   for (const env of doc.environments) {
     if (!env?.navigation || !Array.isArray(env.navigation.nodes) || !Array.isArray(env.navigation.edges))
       throw new SchemaError(`L’ambiente “${env?.name ?? '?'}” ha un grafo di navigazione non valido`);
+    doc.customProfiles ??= [];
     env.layers ??= []; env.assets ??= []; env.objects ??= []; env.entrances ??= []; env.exits ??= []; env.characters ??= []; env.profiles ??= ['custom'];
   }
   return doc as Project;

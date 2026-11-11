@@ -2,7 +2,8 @@
 
 import type { Character, CharacterBehavior } from '@/types';
 import type { EditorStore } from '@/lib/store/editorStore';
-import { ALL_EDGE_TYPES } from '@/engine/profiles';
+import { allEdgeTypes } from '@/engine/profiles';
+import { getMovementType } from '@/engine/movement/movementTypes';
 import { CheckField, Field, NumberField } from './fields';
 import styles from '../editor/editor.module.css';
 
@@ -25,8 +26,8 @@ export function BehaviorFields({ store, c, idp }: { store: EditorStore; c: Chara
       </div>
       <Field label="Preferenze di percorso" id={`${idp}-w`} help="Peso per tipo di collegamento: 1 = neutro, >1 preferito, <1 evitato, 0 = mai scelto in autonomia.">
         <div className={styles.row2}>
-          {ALL_EDGE_TYPES.map((t) => (
-            <NumberField key={t} id={`${idp}-w-${t}`} label={t} value={b.edgeWeights[t] ?? 1} min={0} max={10} step={0.5}
+          {allEdgeTypes().map((t) => (
+            <NumberField key={t} id={`${idp}-w-${t}`} label={getMovementType(t).label} value={b.edgeWeights[t] ?? 1} min={0} max={10} step={0.5}
               onCommit={(v) => setB({ edgeWeights: { ...b.edgeWeights, [t]: v } })} />
           ))}
         </div>

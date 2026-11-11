@@ -7,6 +7,7 @@ import { OBJECT_TYPES, objectIssues, updateObject } from '@/engine/interaction/o
 import { importObjectImage } from '@/lib/import-export/background';
 import { ACCEPTED_IMAGE_TYPES } from '@/lib/import-export/image';
 import { CheckField, Field, NumberField, PropsField, TextField } from './fields';
+import { InteractionsEditor } from './InteractionsEditor';
 import { Icon } from '@/components/ui/icons';
 import styles from '../editor/editor.module.css';
 
@@ -101,6 +102,7 @@ export function ObjectPanel({ store, env, o }: { store: EditorStore; env: Enviro
           </select>
         </Field>
       </div>
+      <InteractionsEditor store={store} o={o} />
       <div className={styles.section}><PropsField id="o-props" value={o.props} onCommit={(p) => edit({ props: p })} /></div>
     </>
   );

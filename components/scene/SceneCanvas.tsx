@@ -36,6 +36,7 @@ export function SceneCanvas({ store, onReady, onZoom, onAssetError }: Props) {
       .then((v) => {
         if (cancelled) { v.destroy(); return; }
         view = v;
+        v.assetLoader = (id) => getAsset(store.project.id, id);
         v.onCamera = (z) => cbs.current.onZoom(z);
         v.onAssetError = (id, msg) => cbs.current.onAssetError(id, msg);
         editor = new SceneController(store, v);

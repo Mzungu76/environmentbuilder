@@ -1,6 +1,7 @@
 import type { Vec2 } from '@/types';
 import type { CharacterRenderItem, PlaytestMarkers } from '@/engine/rendering/SceneView';
 import { createCharacter } from '@/engine/characters/factory';
+import { spriteFor } from '@/engine/characters/sprites';
 import type { EditorStore } from '@/lib/store/editorStore';
 import type { SceneView, ViewPointerEvent } from '@/engine/rendering/SceneView';
 import { cleanObjectLinks } from '@/engine/interaction/objects';
@@ -58,7 +59,7 @@ export class NavigationEditor {
       for (const c of env.characters) {
         const n = env.navigation.nodes.find((x) => x.id === c.startNodeId);
         if (!n) continue;
-        items.push({ id: c.id, x: n.x, y: n.y, width: c.width, height: c.height, color: c.color, facing: 1, state: 'IDLE', shadow: c.shadow, selected: s.selection?.kind === 'character' && s.selection.id === c.id });
+        items.push({ id: c.id, x: n.x, y: n.y, width: c.width, height: c.height, color: c.color, facing: 1, state: 'IDLE', shadow: c.shadow, selected: s.selection?.kind === 'character' && s.selection.id === c.id, lift: 0, sprite: spriteFor(c, 'IDLE'), stateTime: 0, liveClock: true });
       }
       this.view.setCharacters(items);
     }

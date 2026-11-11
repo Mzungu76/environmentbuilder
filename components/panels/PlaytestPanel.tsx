@@ -90,6 +90,29 @@ export function PlaytestPanel({ store, env, ctrl, showPaths, open }: { store: Ed
             <CheckField id="pt-diag" label="Pannello diagnostico" checked={diag} onChange={setDiag} />
           </div>
 
+          {(v.available.length > 0 || Object.keys(v.inventory).length > 0 || v.events.length > 0) && (
+            <div className={styles.section} data-testid="interaction-panel">
+              <h4>Interazioni</h4>
+              {v.available.length > 0 && (
+                <div className={styles.list}>
+                  {v.available.map((a) => <button key={a.objectId + a.interactionId} className={styles.listItem} onClick={() => ctrl.interact(a.objectId, a.interactionId)} data-testid="interact-btn"><span>{a.label}</span><span className={styles.badge}>{a.objectName}</span></button>)}
+                </div>
+              )}
+              {Object.keys(v.inventory).length > 0 && (
+                <div data-testid="inventory"><span className={styles.help}>Inventario</span>
+                  <div className={styles.checkGrid}>{Object.entries(v.inventory).map(([k, n]) => <span key={k} className={styles.chip}>{k} × {n}</span>)}</div>
+                </div>
+              )}
+              {v.events.length > 0 && (
+                <div><span className={styles.help}>Eventi inviati al gioco ospite</span>
+                  <ol className={styles.help} style={{ margin: '4px 0 0', paddingLeft: 18 }} data-testid="event-log">
+                    {v.events.slice().reverse().map((e, k) => <li key={k}><b>{e.type}</b>{e.event ? ` · ${e.event}` : e.kind ? ` · ${e.kind}` : ''} — {e.character}{e.objectName ? ` / ${e.objectName}` : ''}</li>)}
+                  </ol>
+                </div>
+              )}
+            </div>
+          )}
+
           {diag && snap && c && (
             <div className={styles.section} data-testid="diagnostics">
               <h4>Diagnostica</h4>

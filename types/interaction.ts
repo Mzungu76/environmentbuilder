@@ -5,10 +5,25 @@ export type ObjectType =
   | 'generic' | 'collectible' | 'interaction-point' | 'observation-point'
   | 'entrance' | 'exit' | 'trigger' | (string & {});
 
+/** 'on-arrival': runs when a character ends a route on the object's node. 'manual': offered as a button in the playtest. */
+export type InteractionTrigger = 'on-arrival' | 'manual';
+
+/** Built-in kinds: 'collect' (adds to the inventory, hides the object), 'inspect' (message), 'activate', 'custom'. Open set. */
 export interface Interaction {
   id: string;
-  /** Free-form verb understood by the host game (e.g. "collect", "inspect"). */
   kind: string;
+  label: string;
+  trigger: InteractionTrigger;
+  /** Can run only once per playtest. */
+  once: boolean;
+  /** Abilities the character needs. */
+  requires: string[];
+  /** Seconds the character spends performing it (INTERACT / COLLECT state). */
+  duration: number;
+  /** Text shown to the player/tester. */
+  message: string;
+  /** Name of the event sent to the host game (see integration docs). */
+  event: string;
   props: Record<string, string>;
 }
 

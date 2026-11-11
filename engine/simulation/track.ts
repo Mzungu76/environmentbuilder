@@ -1,5 +1,6 @@
 import type { NavigationEdge, NavigationGraph, Vec2 } from '@/types';
 import { sampleEdge } from '@/engine/navigation/geometry';
+import { getMovementType } from '@/engine/movement/movementTypes';
 
 /**
  * A Track is an edge sampled in PIXEL space with cumulative arc length, so a character moves
@@ -12,6 +13,8 @@ export interface Track {
   to: string;
   /** Speed multiplier of the edge. */
   speedMul: number;
+  /** Fixed travel time in seconds (edge `props.duration` or the movement type default), if any. */
+  duration?: number;
   pts: Vec2[];      // pixel coordinates
   cum: number[];    // cumulative length at each point
   length: number;
@@ -24,7 +27,9 @@ export function buildTrack(g: NavigationGraph, e: NavigationEdge, reversed: bool
   if (reversed) pts = pts.slice().reverse();
   const cum = [0];
   for (let i = 1; i < pts.length; i++) cum.push(cum[i - 1] + Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y));
-  return { edgeId: e.id, type: e.type, from: reversed ? e.to : e.from, to: reversed ? e.from : e.to, speedMul: e.speed, pts, cum, length: cum[cum.length - 1] };
+  const custom = parseFloat(e.props?.duration ?? '');
+  const duration = custom > 0 ? custom : getMovementType(e.type).duration;
+  return { edgeId: e.id, type: e.type, from: reversed ? e.to : e.from, to: reversed ? e.from : e.to, speedMul: e.speed, duration, pts, cum, length: cum[cum.length - 1] };
 }
 
 export function reverseTrack(t: Track): Track {

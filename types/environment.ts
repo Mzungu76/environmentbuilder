@@ -26,7 +26,9 @@ export interface ImageAssetMeta {
   bytes: number;
 }
 
-export type ProfileId = 'cave' | 'forest' | 'building' | 'ship' | 'industrial' | 'outdoor' | 'custom';
+export type BuiltinProfileId = 'cave' | 'forest' | 'building' | 'ship' | 'industrial' | 'outdoor' | 'dungeon' | 'city' | 'underwater' | 'space' | 'custom';
+/** Built-in id or the id of a user-defined profile stored in the project (`Project.customProfiles`). */
+export type ProfileId = BuiltinProfileId | (string & {});
 
 export interface Environment {
   id: string;

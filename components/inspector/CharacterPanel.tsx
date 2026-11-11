@@ -4,6 +4,7 @@ import type { Character, Environment } from '@/types';
 import type { EditorStore } from '@/lib/store/editorStore';
 import { Field, TextField } from './fields';
 import { AppearanceFields, BehaviorFields } from './CharacterFields';
+import { SpriteEditor } from './SpriteEditor';
 import styles from '../editor/editor.module.css';
 
 export function CharacterPanel({ store, env, c }: { store: EditorStore; env: Environment; c: Character }) {
@@ -21,6 +22,7 @@ export function CharacterPanel({ store, env, c }: { store: EditorStore; env: Env
         </Field>
       </div>
       <div className={styles.section}><h4>Aspetto</h4><AppearanceFields store={store} c={c} idp="c" /></div>
+      <SpriteEditor store={store} env={env} c={c} />
       <div className={styles.section}>
         <h4>Capacità</h4>
         <TextField id="c-abil" label="Abilità" value={c.abilities.join(', ')} onCommit={(v) => set({ abilities: v.split(',').map((s) => s.trim()).filter(Boolean) })} />
