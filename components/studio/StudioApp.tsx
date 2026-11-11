@@ -7,19 +7,21 @@ import { loadProject } from '@/lib/persistence/db';
 import { migrateProject } from '@/lib/serialization/migrations';
 import { createPuppet } from '@/lib/studio/pipeline';
 import { VIEW_IDS } from '@/types';
+import { resolveView } from '@/engine/puppet/runtime';
 import { validatePuppet } from '@/lib/import-export/puppetPackage';
 import { ImportStep } from './ImportStep';
 import { BackgroundStep } from './BackgroundStep';
 import { ViewsStep } from './ViewsStep';
 import { SkeletonStep } from './SkeletonStep';
 import { MeshStep } from './MeshStep';
+import { ManikinStep } from './ManikinStep';
 import { AnimateStep } from './AnimateStep';
 import { ExportStep } from './ExportStep';
 import { DollStudio } from './DollStudio';
 import { Icon } from '@/components/ui/icons';
 import { ed, st, type StepProps } from './shared';
 
-const STEPS = ['Importa', 'Sfondo', 'Viste', 'Scheletro', 'Mesh e pesi', 'Animazioni', 'Anteprima ed esporta'];
+const STEPS = ['Importa', 'Sfondo', 'Viste', 'Scheletro', 'Mesh e pesi', 'Manichino', 'Animazioni', 'Anteprima ed esporta'];
 
 export function StudioApp({ projectId, puppetId }: { projectId: string | null; puppetId: string | null }) {
   const [store, setStore] = useState<EditorStore | null>(null);
@@ -72,7 +74,7 @@ function Studio({ store, initialPuppet }: { store: EditorStore; initialPuppet: s
   const done = useMemo(() => {
     if (!puppet) return [] as boolean[];
     const vs = VIEW_IDS.map((v) => puppet.views[v]).filter(Boolean);
-    return [!!puppet.source, !!puppet.source, vs.length > 0, vs.length > 0 && vs.every((v) => Object.keys(v!.landmarks).length >= 19), vs.length > 0 && vs.every((v) => !!v!.skin), vs.length > 0 && vs.every((v) => v!.clips.length > 0), validatePuppet(puppet).errors.length === 0];
+    return [!!puppet.source, !!puppet.source, vs.length > 0, vs.length > 0 && vs.every((v) => Object.keys(v!.landmarks).length >= 19), vs.length > 0 && vs.every((v) => !!resolveView(v!).skin), vs.some((v) => !!v!.manikin?.enabled), vs.length > 0 && vs.every((v) => v!.clips.length > 0), validatePuppet(puppet).errors.length === 0];
   }, [puppet]);
 
   const create = () => { const p = createPuppet(`Personaggio ${puppets.length + 1}`); store.commitProject((pr) => ({ ...pr, puppets: [...pr.puppets, p] })); setPid(p.id); setStep(0); };
@@ -122,8 +124,9 @@ function Studio({ store, initialPuppet }: { store: EditorStore; initialPuppet: s
           {step === 2 && <ViewsStep {...props} />}
           {step === 3 && <SkeletonStep {...props} />}
           {step === 4 && <MeshStep {...props} />}
-          {step === 5 && <AnimateStep {...props} />}
-          {step === 6 && <ExportStep {...props} />}
+          {step === 5 && <ManikinStep {...props} />}
+          {step === 6 && <AnimateStep {...props} />}
+          {step === 7 && <ExportStep {...props} />}
         </>
       )}
     </div>

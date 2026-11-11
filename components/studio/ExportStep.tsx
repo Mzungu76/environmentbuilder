@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { CharacterState, ViewId } from '@/types';
 import { VIEW_IDS } from '@/types';
-import { advancePhase, chooseViewForState, flipsWithFacing, poseAt } from '@/engine/puppet/runtime';
+import { advancePhase, chooseViewForState, flipsWithFacing, poseAt, resolveView } from '@/engine/puppet/runtime';
 import { createCharacter } from '@/engine/characters/factory';
 import { buildPuppetPackage, validatePuppet } from '@/lib/import-export/puppetPackage';
 import { downloadBlob, safeFileName } from '@/lib/import-export/archive';
@@ -31,7 +31,7 @@ export function ExportStep({ store, puppet, projectId }: StepProps) {
 
   useEffect(() => {
     let alive = true;
-    (async () => { for (const v of VIEW_IDS) { const w = puppet.views[v]; if (w?.cutoutAssetId) { const img = await loadAssetImg(projectId, w.cutoutAssetId); if (img && alive) canvases.current[v] = imgToCanvas(img); } } setVer((n) => n + 1); })();
+    (async () => { for (const v of VIEW_IDS) { const w = puppet.views[v] ? resolveView(puppet.views[v]!) : undefined; if (w?.cutoutAssetId) { const img = await loadAssetImg(projectId, w.cutoutAssetId); if (img && alive) canvases.current[v] = imgToCanvas(img); } } setVer((n) => n + 1); })();
     return () => { alive = false; };
   }, [puppet.views, projectId]);
 
@@ -49,7 +49,7 @@ export function ExportStep({ store, puppet, projectId }: StepProps) {
   }, [state, forced, speed, puppet.views, puppet.idleView]);
 
   const vid = forced ?? chooseViewForState(puppet.views, state, puppet.idleView);
-  const view = vid ? puppet.views[vid] : undefined;
+  const view = vid ? resolveView(puppet.views[vid]!) : undefined;
   const cnv = vid ? canvases.current[vid] : undefined;
 
   const exportZip = async () => {
@@ -85,7 +85,7 @@ export function ExportStep({ store, puppet, projectId }: StepProps) {
           <h4>Controlli</h4>
           <div className={ed.checkGrid}>
             <button className={ed.chip} aria-pressed={!forced} onClick={() => setForced(null)}>Vista automatica</button>
-            {VIEW_IDS.filter((v) => puppet.views[v]?.mesh).map((v) => <button key={v} className={ed.chip} aria-pressed={forced === v} onClick={() => setForced(v)}>{VIEW_LABEL[v]}</button>)}
+            {VIEW_IDS.filter((v) => puppet.views[v] && resolveView(puppet.views[v]!).mesh).map((v) => <button key={v} className={ed.chip} aria-pressed={forced === v} onClick={() => setForced(v)}>{VIEW_LABEL[v]}</button>)}
           </div>
           <Slider id="x-spd" label="Velocità (altezze/s)" value={speed} min={0} max={2} step={0.05} onChange={setSpeed} fmt={(v) => v.toFixed(2)} />
           <CheckField id="x-flip" label="Specchia (profilo verso sinistra)" checked={flip} onChange={setFlip} />

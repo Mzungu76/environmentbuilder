@@ -60,6 +60,35 @@ export interface WeightParams {
   farPenalty: number;
 }
 
+export interface ManikinParams {
+  /** Extra length of each part beyond its joints (fraction of the bone length) so bends stay closed. */
+  overlap: number;
+  /** Rows along each part. */
+  segments: number;
+  /** Columns across each part. */
+  cols: number;
+  /** Scales the measured thickness of the parts. */
+  widthScale: number;
+  /** Darkening of the far limbs (profile views). */
+  farShade: number;
+  /** Fill the areas hidden by other parts (e.g. the torso under the arm) from their surroundings. */
+  inpaint: boolean;
+}
+
+/**
+ * "Manichino" (prototype): the figure rebuilt as separate parts, each with its own mesh and UV island in a texture atlas
+ * baked from the view's image. Drawn instead of the single-image mesh when `enabled`; same skeleton and animations.
+ */
+export interface ManikinData {
+  enabled: boolean;
+  atlasAssetId: string;
+  width: number;
+  height: number;
+  mesh: Mesh;
+  skin: Skin;
+  params: ManikinParams;
+}
+
 export interface PuppetView {
   id: ViewId;
   /** Region of the source image (pixels) that contains this figure. */
@@ -79,6 +108,8 @@ export interface PuppetView {
   landmarks: Partial<Record<LandmarkId, Vec2>>;
   mesh: Mesh | null;
   skin: Skin | null;
+  /** Optional part-based rebuild of this view (see ManikinData). */
+  manikin?: ManikinData;
   /** Profile only: draw copies of the near arm/leg behind the body as the far limbs (the flat image hides them). */
   farLimbs?: { arm: boolean; leg: boolean };
   weightParams: WeightParams;

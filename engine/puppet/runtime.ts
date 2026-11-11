@@ -4,6 +4,19 @@ import { phaseRate, samplePose } from './animation';
 
 /** Runtime evaluation of a rigged view. No DOM: usable by any host game. */
 
+const resolved = new WeakMap<PuppetView, PuppetView>();
+/**
+ * The view as it must be DRAWN: when a manikin (part-based rebuild) is enabled its mesh, skin and atlas texture replace the
+ * single-image ones. The skeleton and animations are shared, so everything else works unchanged.
+ */
+export function resolveView(view: PuppetView): PuppetView {
+  const m = view.manikin;
+  if (!m?.enabled) return view;
+  let r = resolved.get(view);
+  if (!r) { r = { ...view, mesh: m.mesh, skin: m.skin, cutoutAssetId: m.atlasAssetId, width: m.width, height: m.height }; resolved.set(view, r); }
+  return r;
+}
+
 const rigCache = new WeakMap<PuppetView, Rig | null>();
 export function rigOf(view: PuppetView): Rig | null {
   if (!rigCache.has(view)) rigCache.set(view, buildRig(view));
@@ -52,7 +65,7 @@ export const poseAt = (view: PuppetView, state: CharacterState, phase: number): 
 
 /** Which view to show: explicit hint (edge `props.view`), else side when moving and the puppet's idle view when still. */
 export function chooseView(views: Partial<Record<ViewId, PuppetView>>, moving: boolean, idleView: ViewId, hint?: string): ViewId | null {
-  const ok = (v: string | undefined): v is ViewId => !!v && !!views[v as ViewId]?.mesh && ['side', 'front', 'back', 'climb', 'jump'].includes(v);
+  const ok = (v: string | undefined): v is ViewId => !!v && ['side', 'front', 'back', 'climb', 'jump'].includes(v) && !!views[v as ViewId] && !!resolveView(views[v as ViewId]!).mesh;
   if (ok(hint)) return hint;
   const prefer: ViewId[] = moving ? ['side', 'front', 'back'] : [idleView, 'side', 'front', 'back'];  // pose views are chosen by state (see chooseViewForState)
   return prefer.find((v) => ok(v)) ?? null;
@@ -63,7 +76,7 @@ export function chooseView(views: Partial<Record<ViewId, PuppetView>>, moving: b
  * them; everything else falls back to chooseView (profile while moving, `idleView` when still).
  */
 export function chooseViewForState(views: Partial<Record<ViewId, PuppetView>>, state: CharacterState, idleView: ViewId, hint?: string): ViewId | null {
-  const has = (v: ViewId) => !!views[v]?.mesh;
+  const has = (v: ViewId) => !!views[v] && !!resolveView(views[v]!).mesh;
   if (!hint) {
     if (state === 'CLIMB' && has('climb')) return 'climb';
     if ((state === 'JUMP' || state === 'FALL') && has('jump')) return 'jump';

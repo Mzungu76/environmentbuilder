@@ -3,6 +3,7 @@ import type { Project, Puppet, PuppetView, ViewId } from '@/types';
 import { SCHEMA_VERSION, VIEW_IDS } from '@/types';
 import { getAsset } from '@/lib/persistence/db';
 import { RUNTIME_SOURCE } from '@/lib/generated/runtimeSource';
+import { resolveView } from '@/engine/puppet/runtime';
 
 /**
  * Self-contained puppet package for host games:
@@ -20,7 +21,7 @@ export function validatePuppet(p: Puppet): PuppetValidation {
   const views = VIEW_IDS.filter((v) => p.views[v]);
   if (!views.length) errors.push('Nessuna vista generata.');
   for (const v of views) {
-    const w = p.views[v]!;
+    const w = resolveView(p.views[v]!);
     const label = ({ side: 'Profilo', front: 'Fronte', back: 'Retro', climb: 'Arrampicata', jump: 'Salto' } as Record<string, string>)[v];
     if (!w.cutoutAssetId) errors.push(`${label}: manca l’immagine.`);
     if (Object.keys(w.landmarks).length < 19) errors.push(`${label}: scheletro incompleto.`);
@@ -40,10 +41,11 @@ const texturePath = (v: ViewId) => `textures/${v}.png`;
 export function puppetJson(p: Puppet) {
   const views: Record<string, unknown> = {};
   for (const v of VIEW_IDS) {
-    const w = p.views[v];
-    if (!w) continue;
-    const { cutoutAssetId, crop: _crop, sourceAssetId, ...rest } = w as PuppetView;
-    void cutoutAssetId; void _crop; void sourceAssetId;
+    const w0 = p.views[v];
+    if (!w0) continue;
+    const w = resolveView(w0);   // when a manikin is enabled it is exported as THE mesh/texture of the view
+    const { cutoutAssetId, crop: _crop, sourceAssetId, manikin, ...rest } = w as PuppetView;
+    void cutoutAssetId; void _crop; void sourceAssetId; void manikin;
     views[v] = { ...rest, texture: texturePath(v) };
   }
   return { format: PUPPET_FORMAT, schemaVersion: SCHEMA_VERSION, name: p.name, idleView: p.idleView, views };
@@ -56,7 +58,7 @@ export async function buildPuppetPackage(project: Project, puppet: Puppet): Prom
   const json = puppetJson(puppet);
   const urls: Record<string, string> = {};
   for (const v of VIEW_IDS) {
-    const w = puppet.views[v];
+    const w = puppet.views[v] ? resolveView(puppet.views[v]!) : undefined;
     if (!w?.cutoutAssetId) continue;
     const blob = await getAsset(project.id, w.cutoutAssetId);
     if (!blob) throw new Error(`Immagine mancante per la vista «${v}»`);

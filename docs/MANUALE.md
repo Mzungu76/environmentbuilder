@@ -83,6 +83,8 @@ Nell’editor, il personaggio usa il modellino scegliendolo in *Aspetto con sche
 
 **Limiti:** l’immagine unica non contiene ciò che è nascosto (dietro un braccio, l’altra gamba): le copie degli arti lontani e il pennello dei pesi compensano, ma movimenti molto ampi mostrano deformazioni. L’aspetto non cambia con l’inventario.
 
+**Manichino a parti (prototipo, passo 6).** Per i movimenti molto ampi (arrampicata, salto, passi lunghi) l'immagine unica si strappa. Il passo *Manichino* ricostruisce la figura come **parti separate** (testa, busto, braccia, gambe…), ciascuna con la propria mesh e la propria porzione di texture «cotta» dalla vista; le zone nascoste (il busto sotto il braccio) vengono ricostruite sfumando i dintorni, e negli profili gli arti lontani sono copie scurite di quelli vicini. Scheletro e animazioni restano gli stessi. Nel passo trovi *Confronto* (immagine unica a sinistra, manichino a destra) con pose di prova, *Parti* e *Atlante* per ispezionare il risultato; con l'opzione «Usa il manichino» attiva, anteprima, Playtest ed esportazione lo usano al posto dell'immagine. Limiti: è 2.5D (non vero 3D), la zona ricostruita è sfocata e il risultato dipende da quanto la vista è pulita; riprova con *Spessore delle parti* e *Sovrapposizione*.
+
 ## 9. Omini (personaggi procedurali)
 
 Nello Studio personaggi, il pulsante **Omini** (accanto a *Modellini*) apre l’editor di un personaggio **senza immagini**: un omino con testa, busto, **braccia, gambe**, vestiti e accessori, disegnato dal programma e animato con lo stesso scheletro dei modellini. Ha uno stile pulito e coerente, si adatta a qualunque scena ed è leggerissimo.

@@ -6,6 +6,7 @@ import { makePreset, PRESET_LABEL, PRESET_STATE, samplePose, type PresetKind } f
 import { apply, boneMatrices, parentRotation, restAngle, buildRig } from '@/engine/puppet/skeleton';
 import { updatePuppet } from '@/lib/studio/pipeline';
 import { uid } from '@/lib/ids';
+import { resolveView } from '@/engine/puppet/runtime';
 import { ZoomCanvas } from './ZoomCanvas';
 import { renderPuppet } from './draw';
 import { ed, st, boneLabel, Slider, useAssetImage, useView, ViewTabs, type StepProps } from './shared';
@@ -17,7 +18,8 @@ const KINDS = Object.keys(PRESET_LABEL) as PresetKind[];
 /** Step 6 — clips made of keyframes: start from a preset, then drag the bones (a key is created where you drag). */
 export function AnimateStep({ store, puppet, projectId, go }: StepProps) {
   const [vid, setVid, view] = useView(puppet);
-  const cut = useAssetImage(projectId, view?.cutoutAssetId);
+  const rv = view ? resolveView(view) : undefined;     // the manikin when enabled
+  const cut = useAssetImage(projectId, rv?.cutoutAssetId);
   const [clipId, setClipId] = useState<string | null>(null);
   const [phase, setPhase] = useState(0);
   const [playing, setPlaying] = useState(false);
@@ -42,7 +44,7 @@ export function AnimateStep({ store, puppet, projectId, go }: StepProps) {
   }, [playing, clip?.id, clip?.duration, clip?.loop]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!view) return <div className={st.empty}>Genera prima le viste (passo 3).</div>;
-  if (!view.mesh || !view.skin || !rig) return <div className={st.empty}>Completa scheletro, mesh e pesi per questa vista (passi 4–5).</div>;
+  if (!rv || !rv.mesh || !rv.skin || !rig) return <div className={st.empty}>Completa scheletro, mesh e pesi per questa vista (passi 4–5).</div>;
 
   const setClips = (fn: (clips: Clip[], sc: PuppetView['stateClips']) => { clips: Clip[]; stateClips?: PuppetView['stateClips'] }, mode: 'commit' | 'live' = 'commit') =>
     updatePuppet(store, puppet.id, (p) => { const v = p.views[vid]!; const r = fn(v.clips, v.stateClips); return { ...p, views: { ...p.views, [vid]: { ...v, clips: r.clips, stateClips: r.stateClips ?? v.stateClips } } }; }, mode);
@@ -65,12 +67,12 @@ export function AnimateStep({ store, puppet, projectId, go }: StepProps) {
         <div className={st.toolbar}>
           <ViewTabs puppet={puppet} value={vid} onChange={(v) => { setVid(v); setClipId(null); setSelKey(null); }} requireMesh />
           <button className={`${ed.btn} ${playing ? ed.btnPrimary : ''}`} onClick={() => setPlaying((p) => !p)} data-testid="anim-play">{playing ? 'Pausa' : 'Riproduci'}</button>
-          <button className={`${ed.btn} ${ed.btnPrimary}`} onClick={() => go(6)} data-testid="next-step">Avanti: anteprima ed esporta →</button>
+          <button className={`${ed.btn} ${ed.btnPrimary}`} onClick={() => go(7)} data-testid="next-step">Avanti: anteprima ed esporta →</button>
         </div>
         <div className={st.canvasWrap} style={{ display: 'grid', gridTemplateRows: '1fr auto', gap: 8 }}>
-          {cut && <ZoomCanvas contentWidth={cut.img.width} contentHeight={cut.img.height} version={ver} fitKey={`${vid}${view.cutoutAssetId}`} checker testId="anim-canvas"
+          {cut && <ZoomCanvas contentWidth={view.width} contentHeight={view.height} version={ver} fitKey={`${vid}${view.cutoutAssetId}`} checker testId="anim-canvas"
             draw={(ctx, v) => {
-              renderPuppet(ctx, cut.canvas, view, pose);
+              renderPuppet(ctx, cut.canvas, rv, pose);
               const mats = boneMatrices(rig, pose);
               for (const b of rig.bones) {
                 const t = apply(mats[b.index], b.tail);

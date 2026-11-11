@@ -69,7 +69,7 @@ export function MeshStep({ store, puppet, projectId, go }: StepProps) {
           <div className={ed.seg} role="group" aria-label="Visualizzazione">
             {([['weights', 'Pesi'], ['wire', 'Mesh'], ['test', 'Prova deformazione']] as const).map(([m, l]) => <button key={m} aria-pressed={show === m} onClick={() => setShow(m)} data-testid={`show-${m}`}>{l}</button>)}
           </div>
-          <button className={`${ed.btn} ${ed.btnPrimary}`} disabled={!view.skin} onClick={() => go(5)} data-testid="next-step">Avanti: animazioni →</button>
+          <button className={`${ed.btn} ${ed.btnPrimary}`} disabled={!view.skin} onClick={() => go(6)} data-testid="next-step">Avanti: animazioni →</button>
         </div>
         <div className={st.canvasWrap}>
           {cut && <ZoomCanvas contentWidth={cut.img.width} contentHeight={cut.img.height} version={ver} fitKey={`${vid}${view.cutoutAssetId}`} checker testId="mesh-canvas"
@@ -148,7 +148,7 @@ export function MeshStep({ store, puppet, projectId, go }: StepProps) {
               <h4>Prova deformazione</h4>
               <Slider id="t-rot" label={`Ruota «${boneLabel(bone, vid)}»`} value={testRot} min={-120} max={120} onChange={(v) => { setTestRot(v); setShow('test'); }} fmt={(v) => `${v}°`} />
               <button className={ed.btn} onClick={() => setTestRot(0)}>Azzera</button>
-              <span className={ed.help}>Se un pezzo si strappa o trascina parti che non dovrebbe, torna a «Pesi» e correggi con il pennello.</span>
+              <span className={ed.help}>Se un pezzo si strappa o trascina parti che non dovrebbe, torna a «Pesi» e correggi con il pennello. Per i movimenti ampi prova il <b>Manichino</b> (passo 6, prototipo): parti separate che non si strappano.</span>
             </div>
           </>
         )}

@@ -1,5 +1,5 @@
 import type { CharacterState, Puppet, PuppetView, ViewId } from '@/types';
-import { advancePhase, chooseViewForState, poseAt, skinVertices } from './runtime';
+import { advancePhase, chooseViewForState, poseAt, resolveView, skinVertices } from './runtime';
 
 export interface PuppetFrame { viewId: ViewId; view: PuppetView; positions: Float32Array }
 
@@ -16,7 +16,7 @@ export class PuppetPlayer {
   frame(puppet: Puppet, state: CharacterState, dt: number, speedFigureHeights: number, hint?: string): PuppetFrame | null {
     const viewId = chooseViewForState(puppet.views, state, puppet.idleView, hint);
     if (!viewId) return null;
-    const view = puppet.views[viewId]!;
+    const view = resolveView(puppet.views[viewId]!);
     if (state !== this.lastState) { this.lastState = state; this.phase = 0; }
     if (dt > 0) this.phase = advancePhase(view, state, this.phase, dt, speedFigureHeights);
     const positions = skinVertices(view, poseAt(view, state, this.phase), this.buf.get(viewId));
