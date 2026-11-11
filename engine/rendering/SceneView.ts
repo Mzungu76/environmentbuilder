@@ -1,7 +1,7 @@
-import { Application, Container, Graphics, MeshSimple, Rectangle, Sprite, Texture } from 'pixi.js';
+import { Application, BlurFilter, ColorMatrixFilter, Container, Graphics, MeshSimple, Rectangle, Sprite, Texture } from 'pixi.js';
 import type { SpriteDraw } from '@/engine/characters/sprites';
 import type { DollShape } from '@/engine/doll/shapes';
-import type { CharacterState, InteractiveObject, NavigationGraph, SceneLayer, Vec2 } from '@/types';
+import type { CharacterLook, CharacterState, InteractiveObject, NavigationGraph, SceneLayer, Vec2 } from '@/types';
 import { objectTypeInfo } from '@/engine/interaction/objects';
 import { EDGE_COLOR } from '@/engine/movement/movementTypes';
 import { edgePolyline } from '@/engine/navigation/geometry';
@@ -86,6 +86,7 @@ export interface CharacterRenderItem {
   liveClock: boolean;
   puppet?: PuppetDraw | null;
   doll?: DollDraw | null;
+  look?: CharacterLook;
 }
 
 export interface LayerSource { layer: SceneLayer; blobLoader: () => Promise<Blob | undefined> }
@@ -200,6 +201,8 @@ export class SceneView {
           const blob = await loader();
           if (!blob) throw new Error('dati immagine mancanti nell’archivio locale');
           const tex = Texture.from(await createImageBitmap(blob));
+          // mip-mapped, trilinear sampling: big textures drawn small (characters in a wide scene) stay smooth instead of shimmering/pixelated
+          tex.source.autoGenerateMipmaps = true; tex.source.style.scaleMode = 'linear'; tex.source.style.mipmapFilter = 'linear'; tex.source.update();
           this.textures.set(assetId, tex);
           return tex;
         } catch (err) {
@@ -522,7 +525,7 @@ export class SceneView {
       const cx = c.x * W, cy = c.y * H;
       const lift = c.lift;
       // --- rigged puppet (skinned mesh) when available
-      if (c.puppet && this.drawPuppetMesh(g, c, cx, cy, h, w, lift)) { seenMesh.add(c.id); if (c.puppet.over) seenMesh.add(c.id + '#over'); continue; }
+      if (c.puppet && this.drawPuppetMesh(g, c, cx, cy, h, w, lift)) { seenMesh.add(c.id); if (c.puppet.over) seenMesh.add(c.id + '#over'); if (c.look && c.look.halo > 0.01) seenMesh.add(c.id + '#halo'); continue; }
       // --- sprite (image / sprite sheet) when available; procedural placeholder otherwise
       if (c.sprite) {
         const base = this.textures.get(c.sprite.assetId);
@@ -569,17 +572,46 @@ export class SceneView {
 
   /** Draws a skinned puppet with a Pixi mesh; false while its texture is still loading (placeholder is used meanwhile). */
   private drawPuppetMesh(g: Graphics, c: CharacterRenderItem, cx: number, cy: number, h: number, w: number, lift: number): boolean {
-    const pd = c.puppet!;
+    const pd = c.puppet!, look = c.look;
     if (!this.placeMesh(c.id, pd, pd.flip, 1, cx, cy - lift, h)) return false;
+    const main = this.puppetMeshes.get(c.id)!.mesh;
+    this.applyLook(main, look);
     const ov = pd.over && pd.over.alpha > 0.003 ? pd.over : null;
     if (ov) {
       if (this.placeMesh(c.id + '#over', ov, pd.flip, ov.alpha, cx, cy - lift, h)) {
         const m = this.puppetMeshes.get(c.id + '#over')!.mesh; this.charRoot.addChild(m);   // always above the main layer
+        this.applyLook(m, look);
       }
     }
-    if (c.shadow) g.ellipse(cx, cy, w * 0.55, Math.max(2, h * 0.05)).fill({ color: 0x000000, alpha: 0.35 });
+    // soft light halo behind the figure (separates it from busy backgrounds)
+    if (look && look.halo > 0.01 && this.placeMesh(c.id + '#halo', pd, pd.flip, Math.min(1, look.halo), cx, cy - lift, h)) {
+      const hm = this.puppetMeshes.get(c.id + '#halo')!.mesh;
+      hm.tint = parseInt(look.haloColor.replace('#', ''), 16) || 0xffffff;
+      if (!hm.filters || !(hm.filters[0] instanceof BlurFilter)) hm.filters = [new BlurFilter({ strength: 6, quality: 2 })];
+      const mi = this.charRoot.getChildIndex(main);
+      if (this.charRoot.getChildIndex(hm) > mi) this.charRoot.setChildIndex(hm, mi);
+    }
+    const sa = look ? look.shadow : 0.35;
+    if (c.shadow) g.ellipse(cx, cy, w * 0.55, Math.max(2, h * 0.05)).fill({ color: 0x000000, alpha: sa });
     if (c.selected) g.ellipse(cx, cy, w * 0.8, Math.max(3, h * 0.09)).stroke({ width: 2 / this.zoom, color: 0xffffff, alpha: 0.9 });
     return true;
+  }
+
+  /** Brightness / contrast / saturation / ambient tint as one colour-matrix filter (removed when everything is neutral). */
+  private applyLook(mesh: MeshSimple, look?: CharacterLook) {
+    const neutral = !look || (Math.abs(look.brightness - 1) < 0.01 && Math.abs(look.contrast - 1) < 0.01 && Math.abs(look.saturation - 1) < 0.01 && look.tintAmount < 0.01);
+    if (neutral) { if (mesh.filters && mesh.filters[0] instanceof ColorMatrixFilter) mesh.filters = null; return; }
+    const key = `${look.brightness}|${look.contrast}|${look.saturation}|${look.tint}|${look.tintAmount}`;
+    const holder = mesh as MeshSimple & { __lookKey?: string };
+    if (holder.__lookKey === key && mesh.filters && mesh.filters[0] instanceof ColorMatrixFilter) return;
+    const f = new ColorMatrixFilter();
+    f.brightness(look.brightness, false); f.contrast(look.contrast - 1, true); f.saturate(look.saturation - 1, true);
+    if (look.tintAmount > 0.01) {
+      const col = parseInt(look.tint.replace('#', ''), 16) || 0xffffff, r = ((col >> 16) & 255) / 255, gr = ((col >> 8) & 255) / 255, b = (col & 255) / 255, k = look.tintAmount;
+      const m = f.matrix; // multiply the RGB rows by the tint, blended by the amount
+      for (let row = 0; row < 3; row++) { const t = [r, gr, b][row], mix = 1 - k + k * t; for (let c2 = 0; c2 < 5; c2++) m[row * 5 + c2] *= mix; }
+    }
+    mesh.filters = [f]; holder.__lookKey = key;
   }
 
   private placeMesh(slot: string, pd: Omit<PuppetDraw, 'over' | 'flip'>, flip: boolean, alpha: number, x: number, y: number, h: number): boolean {

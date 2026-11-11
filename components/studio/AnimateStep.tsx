@@ -6,6 +6,8 @@ import { makePreset, PRESET_LABEL, PRESET_STATE, samplePose, type PresetKind } f
 import { apply, boneMatrices, parentRotation, restAngle, buildRig } from '@/engine/puppet/skeleton';
 import { updatePuppet } from '@/lib/studio/pipeline';
 import { uid } from '@/lib/ids';
+import { plantFeet } from '@/engine/puppet/ik';
+import { buildSequence, SEQUENCES } from '@/engine/puppet/sequences';
 import { resolveView } from '@/engine/puppet/runtime';
 import { ZoomCanvas } from './ZoomCanvas';
 import { renderPuppet } from './draw';
@@ -27,6 +29,8 @@ export function AnimateStep({ store, puppet, projectId, go }: StepProps) {
   const [kind, setKind] = useState<PresetKind>('walk');
   const [amount, setAmount] = useState(1);
   const [ver, setVer] = useState(0);
+  const [ground, setGround] = useState(true);
+  const [plant, setPlant] = useState(true);
   const drag = useRef<{ bone: BoneId; moved: boolean } | null>(null);
   const clip = view?.clips.find((c) => c.id === clipId) ?? view?.clips[0];
   const rig = useMemo(() => (view ? buildRig(view) : null), [view]);
@@ -61,6 +65,22 @@ export function AnimateStep({ store, puppet, projectId, go }: StepProps) {
     setClip({ keys: next }); const idx = next.findIndex((x) => x === k); setSelKey(idx); return idx;
   };
 
+  /** Edits the pose of the key under the playhead (creating it when needed). Optionally re-plants the feet on the ground afterwards. */
+  const editKey = (fn: (p: Pose) => Pose, replant = false) => {
+    if (!clip) return;
+    const ks = [...clip.keys];
+    let i = nearKey;
+    if (i < 0) { ks.push({ t: Math.round(phase * 1000) / 1000, pose: JSON.parse(JSON.stringify(samplePose(clip, phase))) as Pose }); ks.sort((a, b) => a.t - b.t); i = ks.findIndex((k) => k.t === Math.round(phase * 1000) / 1000); }
+    let np = fn(ks[i].pose);
+    if (replant) np = plantFeet(view, np);
+    ks[i] = { ...ks[i], pose: np }; setClip({ keys: ks }); setSelKey(i);
+  };
+  const addSequence = (id: string) => {
+    const def = SEQUENCES.find((d) => d.id === id); if (!def) return;
+    const r = buildSequence(def, view, amount);
+    setClips((cs, sc) => ({ clips: [...cs, ...r.added, r.clip], stateClips: sc })); setClipId(r.clip.id); setSelKey(null); setPhase(0);
+  };
+
   return (
     <div className={st.main}>
       <div className={`${st.stage} ${st.tall}`}>
@@ -72,6 +92,10 @@ export function AnimateStep({ store, puppet, projectId, go }: StepProps) {
         <div className={st.canvasWrap} style={{ display: 'grid', gridTemplateRows: '1fr auto', gap: 8 }}>
           {cut && <ZoomCanvas contentWidth={view.width} contentHeight={view.height} version={ver} fitKey={`${vid}${view.cutoutAssetId}`} checker testId="anim-canvas"
             draw={(ctx, v) => {
+              if (ground) {   // ground line at the feet (rest pose): shows whether the feet stay on the floor
+                const gy = view.pivot.y, x0 = -v.ox / v.zoom - 50, x1 = x0 + 4000;
+                ctx.save(); ctx.strokeStyle = 'rgba(120,200,120,.9)'; ctx.lineWidth = 2 / v.zoom; ctx.setLineDash([10 / v.zoom, 6 / v.zoom]); ctx.beginPath(); ctx.moveTo(x0, gy); ctx.lineTo(x1, gy); ctx.stroke(); ctx.restore();
+              }
               renderPuppet(ctx, cut.canvas, rv, pose);
               const mats = boneMatrices(rig, pose);
               for (const b of rig.bones) {
@@ -123,7 +147,7 @@ export function AnimateStep({ store, puppet, projectId, go }: StepProps) {
           </div>
           <div className={ed.row2} style={{ gridTemplateColumns: '1fr auto' }}>
             <select className={ed.select} value={kind} onChange={(e) => setKind(e.target.value as PresetKind)} aria-label="Preset">{KINDS.map((k) => <option key={k} value={k}>{PRESET_LABEL[k]}</option>)}</select>
-            <button className={ed.btn} onClick={() => { const c = makePreset(kind, vid, amount); setClips((cs, sc) => ({ clips: [...cs, c], stateClips: { ...sc, [PRESET_STATE[kind]]: sc[PRESET_STATE[kind]] ?? c.id } })); setClipId(c.id); }} data-testid="add-preset">Aggiungi</button>
+            <button className={ed.btn} onClick={() => { const c = makePreset(kind, vid, amount, view); setClips((cs, sc) => ({ clips: [...cs, c], stateClips: { ...sc, [PRESET_STATE[kind]]: sc[PRESET_STATE[kind]] ?? c.id } })); setClipId(c.id); }} data-testid="add-preset">Aggiungi</button>
           </div>
           <Slider id="amt" label="Ampiezza del preset" value={amount} min={0.2} max={2} step={0.1} onChange={setAmount} fmt={(v) => `×${v.toFixed(1)}`} />
         </div>
@@ -144,6 +168,22 @@ export function AnimateStep({ store, puppet, projectId, go }: StepProps) {
             <button className={`${ed.btn} ${ed.btnDanger}`} disabled={view.clips.length <= 1} onClick={() => { setClips((cs, sc) => { const rest = cs.filter((c) => c.id !== clip.id); const m = { ...sc }; for (const k of Object.keys(m) as CharacterState[]) if (m[k] === clip.id) m[k] = rest[0]?.id; return { clips: rest, stateClips: m }; }); setClipId(null); }}>Elimina clip</button>
           </div>
         )}
+        {clip && (
+          <div className={ed.section} data-testid="crouch-tools">
+            <h4>Suolo e bacino</h4>
+            <CheckField id="g-show" label="Mostra il suolo (linea verde)" checked={ground} onChange={setGround} />
+            <CheckField id="g-plant" label="Piedi a terra quando abbasso il bacino" checked={plant} onChange={setPlant} />
+            <span className={ed.help}>Le gambe si piegano da sole (cinematica inversa) per tenere i piedi sul suolo.</span>
+            <Slider id="pelvis-h" label="Abbassa il bacino (accucciati)" value={Math.max(0, pose.dy)} min={0} max={0.35} step={0.005} onChange={(v) => editKey((p) => ({ ...p, dy: v }), plant)} fmt={(v) => `${Math.round(v * 100)}% dell’altezza`} />
+            <button className={ed.btn} onClick={() => editKey((p) => p, true)} data-testid="plant-feet">Pianta i piedi a terra (chiave corrente)</button>
+            <span className={ed.help}>Posizionati sull’istante voluto e muovi lo slider: viene creata o aggiornata una chiave con le gambe già risolte.</span>
+          </div>
+        )}
+        <div className={ed.section} data-testid="sequences">
+          <h4>Sequenze predefinite</h4>
+          <span className={ed.help}>Catene di movimenti già pronte (usano le animazioni esistenti, creando quelle che mancano). Il risultato è una normale animazione che puoi assegnare a uno stato o modificare.</span>
+          {SEQUENCES.map((d) => <div key={d.id} className={ed.row2} style={{ gridTemplateColumns: '1fr auto', alignItems: 'center' }}><span><strong>{d.label}</strong><br /><span className={ed.help}>{d.help}</span></span><button className={ed.btn} onClick={() => addSequence(d.id)} data-testid={`seq-${d.id}`}>Aggiungi</button></div>)}
+        </div>
         <div className={ed.section}>
           <h4>Quale animazione per quale stato</h4>
           {STATES.map((s) => (

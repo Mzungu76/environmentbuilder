@@ -9,6 +9,8 @@ import posesPrompt from '@/docs/guida-di-prova/prompt-pose-extra.txt';
 import paperCleanMod from '@/docs/guida-di-prova/guida-burattino-pulita.png';
 import paperMeasuresMod from '@/docs/guida-di-prova/guida-burattino.png';
 import paperPrompt from '@/docs/guida-di-prova/prompt-burattino.txt';
+import paper34Mod from '@/docs/guida-di-prova/guida-burattino-34-pulita.png';
+import paper34Prompt from '@/docs/guida-di-prova/prompt-burattino-34.txt';
 import { readImageFile, ACCEPTED_IMAGE_TYPES } from '@/lib/import-export/image';
 import { putAsset } from '@/lib/persistence/db';
 import { updatePuppet, pruneAssets } from '@/lib/studio/pipeline';
@@ -29,6 +31,7 @@ export function ImportStep({ store, puppet, projectId, go }: StepProps) {
   const [busy, setBusy] = useState(false);
   const src = useAssetImage(projectId, puppet.source?.assetId);
   const hasViews = Object.keys(puppet.views).length > 0;
+  const legacy = !puppet.paper && !!puppet.source;      // made with the older turnaround-sheet pipeline
 
   const load = async (f: File) => {
     setErr(null);
@@ -54,16 +57,17 @@ export function ImportStep({ store, puppet, projectId, go }: StepProps) {
     <div className={st.main}>
       <div className={st.stage}>
         <div className={st.toolbar}>
-          <button className={`${ed.btn} ${ed.btnPrimary}`} onClick={() => file.current?.click()} data-testid="sheet-import">{puppet.source ? 'Sostituisci foglio…' : 'Importa foglio di rotazione…'}</button>
-          <button className={ed.btn} disabled={busy} onClick={() => paperFile.current?.click()} data-testid="paper-import">Importa foglio pezzi (burattino di carta)…</button>
-          {puppet.source && <button className={ed.btn} onClick={() => go(1)} data-testid="next-step">Avanti: rimuovi lo sfondo →</button>}
+          {legacy && <button className={ed.btn} onClick={() => file.current?.click()} data-testid="sheet-import">Sostituisci foglio di rotazione…</button>}
+          <button className={`${ed.btn} ${ed.btnPrimary}`} disabled={busy} onClick={() => paperFile.current?.click()} data-testid="paper-import">{puppet.paper ? 'Sostituisci il foglio dei pezzi…' : 'Importa foglio dei pezzi (burattino)…'}</button>
+          {legacy && <button className={ed.btn} onClick={() => go(1)} data-testid="next-step">Avanti: rimuovi lo sfondo →</button>}
+          {puppet.paper && <button className={ed.btn} onClick={() => go(2)} data-testid="next-step">Avanti: montaggio →</button>}
           {puppet.source && <span className={ed.help}>{puppet.source.width} × {puppet.source.height}px</span>}
         </div>
         <div className={st.canvasWrap}
-          onDragOver={(e) => e.preventDefault()} onDrop={(e) => { e.preventDefault(); pick(e.dataTransfer.files[0]); }}>
+          onDragOver={(e) => e.preventDefault()} onDrop={(e) => { e.preventDefault(); if (legacy) pick(e.dataTransfer.files[0]); else if (e.dataTransfer.files[0]) void loadPaper(e.dataTransfer.files[0]); }}>
           {src ? <ZoomCanvas contentWidth={src.img.width} contentHeight={src.img.height} version={1} fitKey={puppet.source?.assetId} checker
             draw={(ctx) => ctx.drawImage(src.canvas, 0, 0)} />
-            : <div className={st.empty}><div><h2 style={{ margin: '0 0 6px', color: 'var(--text)' }}>Importa il foglio di rotazione</h2><p style={{ margin: 0 }}>Trascina qui un’immagine (PNG, JPG, WebP) con le tre viste del personaggio — fronte, profilo verso destra, retro — oppure usa la guida a destra per farla generare.</p></div></div>}
+            : <div className={st.empty}><div><h2 style={{ margin: '0 0 6px', color: 'var(--text)' }}>Importa il foglio dei pezzi</h2><p style={{ margin: 0 }}>Il personaggio come burattino di carta: un’immagine con i pezzi separati (testa, busto, bacino, braccio, avambraccio, mano, coscia, gamba, piede e accessori). Usa la guida a destra per farla generare e poi importala qui sopra.</p></div></div>}
         </div>
         {confirm && <div className={ed.banner} style={{ position: 'static' }} role="alert">Sostituendo il foglio si perdono viste, scheletro e pesi già creati. <button onClick={() => { void load(confirm); setConfirm(null); }}>Sostituisci</button><button onClick={() => setConfirm(null)}>Annulla</button></div>}
         {busy && <span className={ed.help}>Elaborazione dei pezzi…</span>}
@@ -73,7 +77,19 @@ export function ImportStep({ store, puppet, projectId, go }: StepProps) {
         <input ref={file} type="file" accept={ACCEPTED_IMAGE_TYPES.join(',')} hidden data-testid="sheet-file" onChange={(e) => { pick(e.target.files?.[0]); e.target.value = ''; }} />
       </div>
       <aside className={st.panel} aria-label="Guida per l’AI">
-        <div className={ed.section}>
+        <div className={ed.section} data-testid="paper-guide">
+          <h4>Burattino di carta (pezzi separati)</h4>
+          <span className={ed.help}>Il personaggio come pezzi di carta snodati: l’AI disegna testa, busto, bacino, braccio, avambraccio, mano, coscia, gamba e piede in un unico foglio e il programma li rimonta. Movimenti ampi (arrampicata, salto) senza deformare il disegno. Vista di profilo verso destra, specchiabile. Dai all’AI la guida «pulita» insieme all’immagine del personaggio. Il busto va senza braccia; zaino e bretella sono pezzi a parte.</span>
+          <img className={st.guideImg} src={url(paperCleanMod)} alt="Guida del burattino: sagome dei pezzi" />
+          <a className={ed.btn} href={url(paperCleanMod)} download="guida-burattino-pulita.png">Scarica la guida pulita (per l’AI)</a>
+          <a className={ed.btn} href={url(paperMeasuresMod)} download="guida-burattino.png">Scarica la guida con le misure</a>
+          <div className={st.promptBox} data-testid="prompt-paper">{paperPrompt}</div>
+          <button className={ed.btn} onClick={async () => { try { await navigator.clipboard.writeText(paperPrompt); } catch { setErr('Copia non riuscita: seleziona il testo a mano.'); } }}>Copia il prompt del burattino</button>
+          <span className={ed.help}>Variante 3/4 (busto e bacino più larghi, testa in 3/4):</span>
+          <a className={ed.btn} href={url(paper34Mod)} download="guida-burattino-34-pulita.png">Scarica la guida 3/4 (per l’AI)</a>
+          <button className={ed.btn} onClick={async () => { try { await navigator.clipboard.writeText(paper34Prompt); } catch { setErr('Copia non riuscita: seleziona il testo a mano.'); } }}>Copia il prompt 3/4</button>
+        </div>
+        {legacy && <><div className={ed.section}>
           <h4>Come ottenere il foglio</h4>
           <span className={ed.help}>Il builder non genera immagini: prepara una guida da dare al tuo generatore AI e poi importa il risultato. Le tolleranze (sfondo, proporzioni, allineamento) si correggono nei passi successivi.</span>
         </div>
@@ -89,15 +105,6 @@ export function ImportStep({ store, puppet, projectId, go }: StepProps) {
           <button className={ed.btn} onClick={async () => { try { await navigator.clipboard.writeText(promptText); setCopied(true); setTimeout(() => setCopied(false), 1500); } catch { setErr('Copia non riuscita: seleziona il testo a mano.'); } }}>{copied ? 'Copiato ✓' : 'Copia il prompt'}</button>
           <span className={ed.help}>Compila i parametri tra {'{{ }}'} (personaggio, vestiti, palette, stile, sfondo).</span>
         </div>
-        <div className={ed.section} data-testid="paper-guide">
-          <h4>Alternativa · Burattino di carta (pezzi separati)</h4>
-          <span className={ed.help}>Il personaggio come pezzi di carta snodati: l’AI disegna testa, busto, bacino, braccio, avambraccio, mano, coscia, gamba e piede in un unico foglio e il programma li rimonta. Movimenti ampi (arrampicata, salto) senza deformare il disegno. Vista di profilo verso destra, specchiabile. Dai all’AI la guida «pulita» insieme all’immagine del personaggio.</span>
-          <img className={st.guideImg} src={url(paperCleanMod)} alt="Guida del burattino: sagome dei pezzi" />
-          <a className={ed.btn} href={url(paperCleanMod)} download="guida-burattino-pulita.png">Scarica la guida pulita (per l’AI)</a>
-          <a className={ed.btn} href={url(paperMeasuresMod)} download="guida-burattino.png">Scarica la guida con le misure</a>
-          <div className={st.promptBox} data-testid="prompt-paper">{paperPrompt}</div>
-          <button className={ed.btn} onClick={async () => { try { await navigator.clipboard.writeText(paperPrompt); } catch { setErr('Copia non riuscita: seleziona il testo a mano.'); } }}>Copia il prompt del burattino</button>
-        </div>
         <div className={ed.section}>
           <h4>3 · Pose aggiuntive: arrampicata e salto (opzionale)</h4>
           <span className={ed.help}>Si generano dopo il foglio, usando come riferimento il personaggio già approvato. Si importano nel passo 3 («Pose aggiuntive»).</span>
@@ -105,7 +112,7 @@ export function ImportStep({ store, puppet, projectId, go }: StepProps) {
           <a className={ed.btn} href={url(posesMod)} download="guida-pose-extra.png">Scarica la sagoma delle pose</a>
           <div className={st.promptBox} data-testid="prompt-poses">{posesPrompt}</div>
           <button className={ed.btn} onClick={async () => { try { await navigator.clipboard.writeText(posesPrompt); } catch { setErr('Copia non riuscita: seleziona il testo a mano.'); } }}>Copia il prompt delle pose</button>
-        </div>
+        </div></>}
       </aside>
     </div>
   );

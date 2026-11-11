@@ -63,7 +63,7 @@ export class NavigationEditor {
       for (const c of env.characters) {
         const n = env.navigation.nodes.find((x) => x.id === c.startNodeId);
         if (!n) continue;
-        items.push({ id: c.id, x: n.x, y: n.y, width: c.width, height: c.height, color: c.color, facing: 1, state: 'IDLE', shadow: c.shadow, selected: s.selection?.kind === 'character' && s.selection.id === c.id, lift: 0, sprite: spriteFor(c, 'IDLE'), stateTime: 0, liveClock: true, puppet: this.puppetDraw(c), doll: this.dollDraw(c) });
+        items.push({ id: c.id, x: n.x, y: n.y, width: c.width, height: c.height, color: c.color, facing: 1, state: 'IDLE', shadow: c.shadow, selected: s.selection?.kind === 'character' && s.selection.id === c.id, lift: 0, sprite: spriteFor(c, 'IDLE'), stateTime: 0, liveClock: true, puppet: this.puppetDraw(c), doll: this.dollDraw(c), look: c.look });
       }
       this.view.setCharacters(items);
     }

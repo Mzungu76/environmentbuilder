@@ -1,5 +1,7 @@
 import type { BoneId, CharacterState, Clip, Pose, ViewId } from '@/types';
 import { uid } from '@/lib/ids';
+import type { PuppetView } from '@/types';
+import { EXTRA_KINDS, EXTRA_LABEL, isExtra, makeExtraPreset, type ExtraKind } from './presets';
 
 export const EMPTY_POSE: Pose = { rot: {}, dx: 0, dy: 0 };
 const smooth = (u: number) => (1 - Math.cos(Math.PI * u)) / 2;
@@ -22,6 +24,13 @@ export function samplePose(clip: Clip, phase: number): Pose {
   return { rot, dx: a.pose.dx * (1 - u) + b.pose.dx * u, dy: a.pose.dy * (1 - u) + b.pose.dy * u };
 }
 
+/** Linear blend of two poses (u = 0 → a, 1 → b). */
+export function blendPoses(a: Pose, b: Pose, u: number): Pose {
+  const rot: Partial<Record<BoneId, number>> = {};
+  for (const k of new Set([...Object.keys(a.rot), ...Object.keys(b.rot)]) as Set<BoneId>) rot[k] = (a.rot[k] ?? 0) * (1 - u) + (b.rot[k] ?? 0) * u;
+  return { rot, dx: a.dx * (1 - u) + b.dx * u, dy: a.dy * (1 - u) + b.dy * u };
+}
+
 /** Playback phase advance per second. Walk-like clips sync to the travel speed (no foot sliding). */
 export function phaseRate(clip: Clip, speedInFigureHeights = 0): number {
   if (clip.cycleLength && clip.cycleLength > 0 && speedInFigureHeights > 0) return speedInFigureHeights / clip.cycleLength;
@@ -31,15 +40,16 @@ export function phaseRate(clip: Clip, speedInFigureHeights = 0): number {
 // ---- presets ----------------------------------------------------------------------------------------------------------------
 // Rotation convention: positive = clockwise on screen. Facing right, a limb hanging down swings FORWARD with negative angles.
 
-export type PresetKind = 'idle' | 'walk' | 'climb' | 'jump' | 'fall' | 'interact' | 'collect';
-export const PRESET_STATE: Record<PresetKind, CharacterState> = { idle: 'IDLE', walk: 'WALK', climb: 'CLIMB', jump: 'JUMP', fall: 'FALL', interact: 'INTERACT', collect: 'COLLECT' };
-export const PRESET_LABEL: Record<PresetKind, string> = { idle: 'Riposo', walk: 'Camminata', climb: 'Arrampicata', jump: 'Salto', fall: 'Caduta', interact: 'Interazione', collect: 'Raccolta' };
+export type PresetKind = 'idle' | 'walk' | 'climb' | 'jump' | 'fall' | 'interact' | 'collect' | ExtraKind;
+export const PRESET_STATE: Record<PresetKind, CharacterState> = { idle: 'IDLE', walk: 'WALK', climb: 'CLIMB', jump: 'JUMP', fall: 'FALL', interact: 'INTERACT', collect: 'COLLECT', ...(Object.fromEntries(EXTRA_KINDS.map((k) => [k, 'CUSTOM'])) as Record<ExtraKind, CharacterState>) };
+export const PRESET_LABEL: Record<PresetKind, string> = { idle: 'Riposo', walk: 'Camminata', climb: 'Arrampicata', jump: 'Salto', fall: 'Caduta', interact: 'Interazione', collect: 'Raccolta', ...EXTRA_LABEL };
 
 const pose = (rot: Partial<Record<BoneId, number>>, dx = 0, dy = 0): Pose => ({ rot, dx, dy });
 
 /** Parametric starting clips (sampled into keyframes the user can edit). `amount` scales the motion (0.2 … 2). */
-export function makePreset(kind: PresetKind, view: ViewId, amount = 1): Clip {
+export function makePreset(kind: PresetKind, view: ViewId, amount = 1, pv?: PuppetView): Clip {
   if (view === 'climb' || view === 'jump') return makePosePreset(kind, view, amount);
+  if (isExtra(kind)) return makeExtraPreset(kind, pv, amount);
   const keys: { t: number; pose: Pose }[] = [];
   const N = kind === 'walk' ? 8 : kind === 'idle' ? 6 : 0;
   const a = amount;

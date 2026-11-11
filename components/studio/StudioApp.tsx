@@ -55,6 +55,10 @@ function Studio({ store, initialPuppet }: { store: EditorStore; initialPuppet: s
   const [did, setDid] = useState<string | null>(dolls[0]?.id ?? null);
   const [confirmDel, setConfirmDel] = useState(false);
   const puppet = puppets.find((p) => p.id === pid) ?? null;
+  // New characters use the paper-puppet pipeline only (import → assembly → skeleton → animations → export). The older single-image
+  // steps (background, views, mesh, manikin) stay available for characters that were made with them.
+  const legacy = !!puppet && !puppet.paper && (!!puppet.source || Object.keys(puppet.views).length > 0);
+  const visible = (i: number) => legacy || [0, 2, 3, 6, 7].includes(i);
   const stepsRef = useRef<HTMLElement>(null);
   useEffect(() => { stepsRef.current?.querySelector('[aria-current="true"]')?.scrollIntoView({ inline: 'center', block: 'nearest' }); }, [step]);
 
@@ -108,7 +112,7 @@ function Studio({ store, initialPuppet }: { store: EditorStore; initialPuppet: s
         <Link href="/manuale" target="_blank" className={`${ed.btn} ${ed.iconBtn} ${st.hideSm}`} aria-label="Manuale" title="Manuale">{Icon.help}</Link>
       </header>
       {mode === 'doll' ? <div /> : <nav className={st.steps} aria-label="Passi" ref={stepsRef}>
-        {STEPS.map((s0, i) => { const s = i === 2 && puppet?.paper ? 'Montaggio' : s0; return (
+        {STEPS.map((s0, i) => { if (!visible(i)) return null; const s = i === 2 && !legacy ? 'Montaggio' : s0; return (
           <button key={s0} className={st.step} aria-current={step === i} onClick={() => setStep(i)} data-testid={`step-${i}`}>
             <span className={st.num}>{i + 1}</span>{s}{puppet && done[i] ? <span className={st.ok} /> : null}
           </button>

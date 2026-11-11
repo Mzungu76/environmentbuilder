@@ -251,7 +251,7 @@ export class PlaytestController {
     const items: CharacterRenderItem[] = [];
     for (const [id, a] of this.agents) {
       const c = a.config, s = a.snapshot();
-      items.push({ id, x: s.x, y: s.y, width: c.width, height: c.height, color: c.color, facing: s.facing, state: s.state, shadow: c.shadow, selected: false, lift: s.lift, sprite: spriteFor(c, s.state), stateTime: s.stateTime, liveClock: false, puppet: this.puppetFor(c, s, dt), doll: this.dollFor(c, s, dt) });
+      items.push({ id, x: s.x, y: s.y, width: c.width, height: c.height, color: c.color, facing: s.facing, state: s.state, shadow: c.shadow, selected: false, lift: s.lift, sprite: spriteFor(c, s.state), stateTime: s.stateTime, liveClock: false, puppet: this.puppetFor(c, s, dt), doll: this.dollFor(c, s, dt), look: c.look });
     }
     this.view.setCharacters(items);
   }
