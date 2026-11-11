@@ -20,8 +20,15 @@ its grey fill, any numbers, labels, crosses or boxes.
 The sheet is a cut-out kit that will be re-assembled as a jointed puppet, seen from the SIDE, facing RIGHT. The parts are:
 head (with hat/hair, profile facing right), torso (chest, profile), pelvis (hips, profile), upper arm, forearm, hand,
 thigh, lower leg (shin), foot (toes pointing right). Only ONE arm and ONE leg are needed (the near ones): they will be duplicated
-for the far side. The two optional boxes may hold carried items (backpack, tool, hat...) drawn alone, in side view: leave them
-EMPTY if the character has no such item.
+for the far side.
+The last two boxes are for carried gear, each drawn ALONE as a separate piece, in side view:
+- BACKPACK box: only the backpack body (with its tool/pickaxe if attached), seen from the side, WITHOUT its shoulder strap.
+- STRAP box: only the shoulder strap(s) as they lie over the chest and shoulder of the torso (a long band, as if peeled off the torso).
+Leave a gear box EMPTY if the character has no such item.
+
+THE TORSO IS DRAWN WITHOUT ARMS: only the shirt body (chest, back, collar/neck opening, the empty round armhole at the
+shoulder, the hem). NO sleeve, NO arm, NO hand, NO strap, NO backpack on the torso piece: those are separate pieces.
+The upper arm piece carries the sleeve on its own.
 
 RULES FOR EVERY PART
 - Each part is drawn straight (limbs vertical, not bent, not rotated), isolated, fully inside its silhouette area, never touching
@@ -37,7 +44,7 @@ RULES FOR EVERY PART
 - Clean, crisp edges on a transparent-looking flat background.
 - Background: solid flat uniform {{SFONDO}} everywhere between and around the parts. No ground, no scenery, no text.
 
-NEGATIVE: bent or rotated limbs, parts overlapping each other, parts cut off by the canvas, a whole assembled body, perspective,
+NEGATIVE: arms or sleeves painted on the torso, straps or backpack painted on the torso, bent or rotated limbs, parts overlapping each other, parts cut off by the canvas, a whole assembled body, perspective,
 3/4 view, front view, different outfit, different face, different colors between parts, drop shadows, text, labels, numbers,
 grey silhouettes visible, guide outlines visible, extra parts, background gradient.
 
@@ -53,4 +60,5 @@ grey silhouettes visible, guide outlines visible, extra parts, background gradie
     B) chiedi di rigenerare solo i pezzi sbagliati e sostituiscili a mano.
 - Arti lontani: per ora si duplicano e si scuriscono nell'app. Se vuoi arti lontani disegnati a parte, genera un secondo foglio
   con lo stesso prompt (cambia solo "near" in "far", colori un po' più scuri).
-- Gli accessori (zaino, piccone) vanno nelle due caselle facoltative; si agganciano a un osso nell'app.
+- Zaino (con il piccone) e bretella vanno nelle due ultime caselle: lo zaino sta DIETRO al busto, la bretella SOPRA il busto.
+  Il busto deve essere senza braccia, senza maniche e senza bretelle (nel foglio precedente erano dipinte sopra).

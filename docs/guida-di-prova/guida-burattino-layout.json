@@ -32,7 +32,7 @@
    }
   },
   "torso": {
-   "label": "BUSTO",
+   "label": "BUSTO (senza braccia)",
    "bone": "torso",
    "shape": "torso",
    "slot": {
@@ -82,7 +82,7 @@
    }
   },
   "accA": {
-   "label": "ACCESSORIO A (facoltativo)",
+   "label": "ZAINO (dietro al busto)",
    "bone": null,
    "shape": "free",
    "slot": {
@@ -101,20 +101,20 @@
    "distal": null
   },
   "accB": {
-   "label": "ACCESSORIO B (facoltativo)",
+   "label": "BRETELLA (sul busto)",
    "bone": null,
    "shape": "free",
    "slot": {
     "x": 1361,
     "y": 110,
-    "w": 320,
-    "h": 466
+    "w": 203,
+    "h": 518
    },
    "piece": {
     "x": 1391,
     "y": 174,
-    "w": 260,
-    "h": 338
+    "w": 143,
+    "h": 390
    },
    "proximal": null,
    "distal": null

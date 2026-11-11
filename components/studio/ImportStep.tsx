@@ -43,8 +43,8 @@ export function ImportStep({ store, puppet, projectId, go }: StepProps) {
     setErr(null); setPaperMsg(null); setBusy(true);
     try {
       const r = await importPaperSheet(store, puppet, f);
-      setPaperMsg(`Burattino montato: ${r.parts} pezzi.${r.warnings.length ? ' ' + r.warnings.join(' ') : ''} Controlla il risultato nel passo «Animazioni».`);
-      go(6);
+      setPaperMsg(`Burattino montato: ${r.parts} pezzi.${r.warnings.length ? ' ' + r.warnings.join(' ') : ''} Ritocca il montaggio qui, poi passa alle animazioni.`);
+      go(2);
     } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
     setBusy(false);
   };

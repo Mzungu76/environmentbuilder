@@ -1,39 +1,54 @@
 import type { EditorStore } from '@/lib/store/editorStore';
-import type { Puppet, PuppetView } from '@/types';
+import type { PaperSetup, Puppet, PuppetView } from '@/types';
 import { keyBackground } from '@/engine/puppet/imageProc';
-import { assemble, buildPaperMesh, extractPieces, DEFAULT_PAPER } from '@/engine/puppet/paperpuppet';
+import { assemble, buildPaperMesh, extractPieces, DEFAULT_PAPER, type Pieces } from '@/engine/puppet/paperpuppet';
 import { DEFAULT_MANIKIN } from '@/engine/puppet/manikin';
 import { DEFAULT_WEIGHT_PARAMS } from '@/engine/puppet/mesh';
 import { defaultClips } from '@/engine/puppet/animation';
 import { readImageFile } from '@/lib/import-export/image';
 import { putAsset } from '@/lib/persistence/db';
-import { blobToImg, imgToBlob, pruneAssets, storePuppetImage, updatePuppet } from './pipeline';
+import { blobToImg, imgToBlob, loadAssetImg, pruneAssets, storePuppetImage, updatePuppet } from './pipeline';
 
 /**
  * "Burattino di carta": sheet of separate parts → assembled side view whose drawn mesh is the set of rigid parts
  * (the view's manikin), so every existing step, clip, Playtest and export works on it.
  */
+export const defaultSetup = (sheetAssetId: string): PaperSetup => ({ sheetAssetId, adjust: {}, farShade: DEFAULT_PAPER.farShade });
+
+export const assembleSetup = (pieces: Pieces, setup: PaperSetup) => assemble(pieces, { farShade: setup.farShade, adjust: setup.adjust });
+
+/** Parts of a stored sheet (background removed with the puppet's keying; colour auto-detected). */
+export async function loadPieces(projectId: string, puppet: Puppet): Promise<{ pieces: Pieces; warnings: string[] } | null> {
+  const id = puppet.paper?.sheetAssetId; if (!id) return null;
+  const raw = await loadAssetImg(projectId, id); if (!raw) return null;
+  return extractPieces(keyBackground(raw, { ...puppet.keying, color: null }));
+}
+
+/** Builds the view for a setup and writes it (images as new assets) into the puppet, keeping the clips and weight settings. */
+export async function commitPaper(store: EditorStore, puppetId: string, pieces: Pieces, setup: PaperSetup): Promise<void> {
+  const puppet = store.project.puppets.find((p) => p.id === puppetId); if (!puppet) return;
+  const asm = assembleSetup(pieces, setup), built = buildPaperMesh(asm);
+  const cut = await storePuppetImage(store, await imgToBlob(asm.cutout), `${puppet.name}-burattino.png`, asm.cutout.width, asm.cutout.height);
+  const atlas = await storePuppetImage(store, await imgToBlob(built.atlas), `${puppet.name}-burattino-atlante.png`, built.atlas.width, built.atlas.height);
+  updatePuppet(store, puppetId, (p) => {
+    const old = p.views.side;
+    const view: PuppetView = {
+      id: 'side', crop: { x: 0, y: 0, w: asm.cutout.width, h: asm.cutout.height }, sourceAssetId: setup.sheetAssetId, cutoutAssetId: cut.id,
+      width: asm.cutout.width, height: asm.cutout.height, figureHeight: asm.figureHeight, pivot: asm.pivot, landmarks: asm.landmarks, mesh: null, skin: null,
+      manikin: { enabled: true, atlasAssetId: atlas.id, width: built.atlas.width, height: built.atlas.height, mesh: built.mesh, skin: built.skin, params: { ...DEFAULT_MANIKIN } },
+      weightParams: old?.weightParams ?? { ...DEFAULT_WEIGHT_PARAMS }, ...(old?.clips?.length ? { clips: old.clips, stateClips: old.stateClips } : defaultClips('side')),
+    };
+    return { ...p, assets: [...p.assets, cut, atlas], views: { side: view }, idleView: 'side', paper: setup };
+  });
+  await pruneAssets(store, puppetId);
+}
+
 export async function importPaperSheet(store: EditorStore, puppet: Puppet, file: File): Promise<{ warnings: string[]; parts: number }> {
   const { meta, blob } = await readImageFile(file);
   const raw = await blobToImg(blob);
-  const keyed = keyBackground(raw, { ...puppet.keying, color: null });
-  const ex = extractPieces(keyed);                       // throws readable errors
-  const asm = assemble(ex.pieces, DEFAULT_PAPER);
-  const built = buildPaperMesh(asm);
+  const ex = extractPieces(keyBackground(raw, { ...puppet.keying, color: null }));   // throws readable errors
   await putAsset(store.project.id, meta.id, blob);
-  const cut = await storePuppetImage(store, await imgToBlob(asm.cutout), `${puppet.name}-burattino.png`, asm.cutout.width, asm.cutout.height);
-  const atlas = await storePuppetImage(store, await imgToBlob(built.atlas), `${puppet.name}-burattino-atlante.png`, built.atlas.width, built.atlas.height);
-  const view: PuppetView = {
-    id: 'side', crop: { x: 0, y: 0, w: asm.cutout.width, h: asm.cutout.height }, sourceAssetId: meta.id, cutoutAssetId: cut.id,
-    width: asm.cutout.width, height: asm.cutout.height, figureHeight: asm.figureHeight, pivot: asm.pivot, landmarks: asm.landmarks,
-    mesh: null, skin: null,
-    manikin: { enabled: true, atlasAssetId: atlas.id, width: built.atlas.width, height: built.atlas.height, mesh: built.mesh, skin: built.skin, params: { ...DEFAULT_MANIKIN } },
-    weightParams: { ...DEFAULT_WEIGHT_PARAMS }, ...defaultClips('side'),
-  };
-  updatePuppet(store, puppet.id, (p) => ({
-    ...p, source: { assetId: meta.id, width: meta.width, height: meta.height }, assets: [...p.assets, meta, cut, atlas],
-    views: { side: view }, idleView: 'side', poseSets: undefined,
-  }));
-  await pruneAssets(store, puppet.id);
-  return { warnings: ex.warnings, parts: built.parts.length };
+  updatePuppet(store, puppet.id, (p) => ({ ...p, source: { assetId: meta.id, width: meta.width, height: meta.height }, assets: [...p.assets, meta], views: {}, poseSets: undefined, paper: defaultSetup(meta.id) }));
+  await commitPaper(store, puppet.id, ex.pieces, defaultSetup(meta.id));
+  return { warnings: ex.warnings, parts: Object.keys(ex.pieces).length };
 }

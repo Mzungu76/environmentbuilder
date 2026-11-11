@@ -12,6 +12,7 @@ import { validatePuppet } from '@/lib/import-export/puppetPackage';
 import { ImportStep } from './ImportStep';
 import { BackgroundStep } from './BackgroundStep';
 import { ViewsStep } from './ViewsStep';
+import { PaperStep } from './PaperStep';
 import { SkeletonStep } from './SkeletonStep';
 import { MeshStep } from './MeshStep';
 import { ManikinStep } from './ManikinStep';
@@ -107,11 +108,11 @@ function Studio({ store, initialPuppet }: { store: EditorStore; initialPuppet: s
         <Link href="/manuale" target="_blank" className={`${ed.btn} ${ed.iconBtn} ${st.hideSm}`} aria-label="Manuale" title="Manuale">{Icon.help}</Link>
       </header>
       {mode === 'doll' ? <div /> : <nav className={st.steps} aria-label="Passi" ref={stepsRef}>
-        {STEPS.map((s, i) => (
-          <button key={s} className={st.step} aria-current={step === i} onClick={() => setStep(i)} data-testid={`step-${i}`}>
+        {STEPS.map((s0, i) => { const s = i === 2 && puppet?.paper ? 'Montaggio' : s0; return (
+          <button key={s0} className={st.step} aria-current={step === i} onClick={() => setStep(i)} data-testid={`step-${i}`}>
             <span className={st.num}>{i + 1}</span>{s}{puppet && done[i] ? <span className={st.ok} /> : null}
           </button>
-        ))}
+        ); })}
       </nav>}
       {mode === 'doll' ? <DollStudio store={store} dolls={dolls} selectedId={did} onSelect={setDid} /> : !puppet ? (
         <div className={st.stage} style={{ gridTemplateRows: '1fr' }}>
@@ -121,7 +122,7 @@ function Studio({ store, initialPuppet }: { store: EditorStore; initialPuppet: s
         <>
           {step === 0 && <ImportStep {...props} />}
           {step === 1 && <BackgroundStep {...props} />}
-          {step === 2 && <ViewsStep {...props} />}
+          {step === 2 && (puppet.paper ? <PaperStep {...props} /> : <ViewsStep {...props} />)}
           {step === 3 && <SkeletonStep {...props} />}
           {step === 4 && <MeshStep {...props} />}
           {step === 5 && <ManikinStep {...props} />}

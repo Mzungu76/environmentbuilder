@@ -49,4 +49,23 @@ describe('paper puppet', () => {
     expect(new Set(b.parts.map((p) => p.bone)).size).toBe(15);                           // all bones have a part
     expect(b.atlas.width).toBeLessThanOrEqual(1100);
   });
+  it('manual adjustments: moving a piece moves its children (not its parent); z bias reorders; far limbs follow', () => {
+    const pieces = extractPieces(sheet()).pieces, base = assemble(pieces), moved = assemble(pieces, { farShade: 0.3, adjust: { uarm: { dx: 20, dy: 10, z: 0 }, head: { dx: -8, dy: 0, z: 0 } } });
+    expect(moved.landmarks.elbowR!.x - base.landmarks.elbowR!.x).toBeCloseTo(20, 3);     // the forearm hangs from the moved arm…
+    expect(moved.landmarks.wristR!.y - base.landmarks.wristR!.y).toBeCloseTo(10, 3);
+    expect(moved.landmarks.shoulderR).toEqual(base.landmarks.shoulderR);                  // …but the shoulder (parent joint) stays
+    expect(moved.landmarks.headTop!.x - base.landmarks.headTop!.x).toBeCloseTo(-8, 3);
+    expect(moved.landmarks.hipR).toEqual(base.landmarks.hipR);
+    const farBase = base.placed.find((p) => p.far && p.id === 'uarm')!, farMoved = moved.placed.find((p) => p.far && p.id === 'uarm')!;
+    expect(farMoved.x - farBase.x).toBeCloseTo(20, 3);
+    const idx = (a: typeof base, id: string) => a.placed.findIndex((p) => !p.far && p.id === id);
+    const back = assemble(pieces, { farShade: 0.3, adjust: { uarm: { dx: 0, dy: 0, z: -8 } } });
+    expect(idx(back, 'uarm')).toBeLessThan(idx(back, 'torso'));                           // pushed behind the torso
+    expect(idx(base, 'uarm')).toBeGreaterThan(idx(base, 'torso'));
+  });
+  it('accessories: the backpack sticks out behind the torso, the strap lies on it', () => {
+    const a = assemble(extractPieces(sheet()).pieces), tor = a.placed.find((p) => p.id === 'torso')!, pack = a.placed.find((p) => p.id === 'accA')!;
+    expect(pack.x).toBeLessThan(tor.x);                                                   // starts behind (left of) the torso
+    expect(pack.x + pack.img.width).toBeLessThan(tor.x + tor.img.width * 0.6);            // and only overlaps it a little
+  });
 });

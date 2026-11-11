@@ -144,6 +144,10 @@ export interface PoseSet {
 }
 export type PoseSetKey = 'climb' | 'jump';
 
+/** Paper puppet: hand corrections of the automatic assembly. Keys are piece ids (head, torso, pelvis, uarm, farm, hand, thigh, shin, foot, accA, accB). */
+export interface PaperAdjust { dx: number; dy: number; /** > 0 draws the piece in front of its default place, < 0 behind */ z: number }
+export interface PaperSetup { sheetAssetId: string; adjust: Record<string, PaperAdjust>; farShade: number }
+
 export interface Puppet {
   id: string;
   name: string;
@@ -152,6 +156,8 @@ export interface Puppet {
   views: Partial<Record<ViewId, PuppetView>>;
   /** Key-pose sequences (override the single climb/jump view when they have 2+ frames). */
   poseSets?: Partial<Record<PoseSetKey, PoseSet>>;
+  /** Present when the character was assembled from a sheet of separate parts (paper puppet). */
+  paper?: PaperSetup;
   /** View used when standing still. */
   idleView: ViewId;
   /** Asset metadata for every image of this puppet (source + cut-outs), exported with the project. */

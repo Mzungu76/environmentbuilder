@@ -147,7 +147,7 @@ export interface PaperAssembly {
   pivot: Vec2;
 }
 
-export interface PaperOptions { farShade: number; /** manual joint corrections: piece id → joints in the piece's pixels */ joints?: Partial<Record<PieceId, Partial<Joints>>> }
+export interface PaperOptions { farShade: number; /** per piece: offset from its default place (px) and depth bias */ adjust?: Record<string, { dx: number; dy: number; z: number }>; /** manual joint corrections: piece id → joints in the piece's pixels */ joints?: Partial<Record<PieceId, Partial<Joints>>> }
 export const DEFAULT_PAPER: PaperOptions = { farShade: 0.32 };
 
 function darkened(img: Img, shade: number): Img {
@@ -162,26 +162,34 @@ export function assemble(pieces: Pieces, opt: PaperOptions = DEFAULT_PAPER): Pap
   const jp = Object.fromEntries((PART_IDS as readonly PieceId[]).map((id) => [id, J(id)])) as Record<PartId, Joints>;
   const pos: Partial<Record<PieceId, Vec2>> = {};
   const sub = (a: Vec2, b: Vec2) => ({ x: a.x - b.x, y: a.y - b.y }), add = (a: Vec2, b: Vec2) => ({ x: a.x + b.x, y: a.y + b.y });
+  const off = (id: PieceId): Vec2 => { const a = opt.adjust?.[id]; return a ? { x: a.dx, y: a.dy } : { x: 0, y: 0 }; };
   pos.pelvis = { x: 0, y: 0 };
   const waist = add(pos.pelvis, jp.pelvis.prox), hip = add(pos.pelvis, jp.pelvis.dist);
-  pos.torso = sub(waist, jp.torso.prox);
+  pos.torso = add(sub(waist, jp.torso.prox), off('torso'));
   const neck = add(pos.torso, jp.torso.dist), shoulder = add(pos.torso, jp.torso.extra ?? jp.torso.dist);
-  pos.head = sub(neck, jp.head.prox);
+  pos.head = add(sub(neck, jp.head.prox), off('head'));
   const headTop = add(pos.head, jp.head.top ?? jp.head.dist);
-  pos.uarm = sub(shoulder, jp.uarm.prox); const elbow = add(pos.uarm, jp.uarm.dist);
-  pos.farm = sub(elbow, jp.farm.prox); const wrist = add(pos.farm, jp.farm.dist);
-  pos.hand = sub(wrist, jp.hand.prox); const handTip = add(pos.hand, jp.hand.dist);
-  pos.thigh = sub(hip, jp.thigh.prox); const knee = add(pos.thigh, jp.thigh.dist);
-  pos.shin = sub(knee, jp.shin.prox); const ankle = add(pos.shin, jp.shin.dist);
-  pos.foot = sub(ankle, jp.foot.prox); const toe = add(pos.foot, jp.foot.dist);
+  pos.uarm = add(sub(shoulder, jp.uarm.prox), off('uarm')); const elbow = add(pos.uarm, jp.uarm.dist);
+  pos.farm = add(sub(elbow, jp.farm.prox), off('farm')); const wrist = add(pos.farm, jp.farm.dist);
+  pos.hand = add(sub(wrist, jp.hand.prox), off('hand')); const handTip = add(pos.hand, jp.hand.dist);
+  pos.thigh = add(sub(hip, jp.thigh.prox), off('thigh')); const knee = add(pos.thigh, jp.thigh.dist);
+  pos.shin = add(sub(knee, jp.shin.prox), off('shin')); const ankle = add(pos.shin, jp.shin.dist);
+  pos.foot = add(sub(ankle, jp.foot.prox), off('foot')); const toe = add(pos.foot, jp.foot.dist);
   const footImg = pieces.foot!, footBottom = pos.foot.y + opaqueBox(footImg).y1;
   const H = Math.max(10, footBottom - headTop.y), dx = FAR_DX * H;
   // accessories ride on the torso: A behind (backpack), B in front
   const tI = pieces.torso!, tb = opaqueBox(tI);
-  if (pieces.accA) { const ab = opaqueBox(pieces.accA); pos.accA = { x: pos.torso.x + tb.x0 - ab.w * 0.45 - ab.x0 + tb.w * 0.1, y: pos.torso.y + tb.y0 + tb.h * 0.5 - (ab.y0 + ab.h * 0.5) }; }
-  if (pieces.accB) { const ab = opaqueBox(pieces.accB); pos.accB = { x: pos.torso.x + tb.x1 - ab.w * 0.4 - ab.x0, y: pos.torso.y + tb.y0 + tb.h * 0.5 - (ab.y0 + ab.h * 0.5) }; }
+  if (pieces.accA) {   // backpack: sticks out behind the back (25% of its width overlaps the torso)
+    const ab = opaqueBox(pieces.accA), o = off('accA');
+    pos.accA = { x: pos.torso.x + tb.x0 + 0.25 * ab.w - (ab.x0 + ab.w) + o.x, y: pos.torso.y + tb.y0 + tb.h * 0.45 - (ab.y0 + ab.h * 0.5) + o.y };
+  }
+  if (pieces.accB) {   // strap: over the chest, from the shoulder down
+    const ab = opaqueBox(pieces.accB), o = off('accB');
+    pos.accB = { x: pos.torso.x + tb.x0 + tb.w * 0.45 - (ab.x0 + ab.w / 2) + o.x, y: pos.torso.y + tb.y0 + tb.h * 0.04 - ab.y0 + o.y };
+  }
   const placed: Placed[] = [];
-  for (const z of Z_ORDER) {
+  const zs = Z_ORDER.map((z, i) => ({ z, key: i + (z.far ? 0 : (opt.adjust?.[z.id]?.z ?? 0) * 1.5) })).sort((a, b) => a.key - b.key).map((e) => e.z);
+  for (const z of zs) {
     if (!pieces[z.id]) continue;
     const base = pos[z.id]!, far = !!z.far;
     placed.push({ id: z.id, far, bone: BONE_OF(z.id, far), img: far ? darkened(pieces[z.id]!, opt.farShade) : pieces[z.id]!, x: base.x + (far ? dx : 0), y: base.y });
