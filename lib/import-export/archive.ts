@@ -41,11 +41,11 @@ export function exportProjectJson(project: Project): Blob {
 /** Imports a ZIP as a NEW project (fresh project id, so it never overwrites an existing one). */
 export async function importProjectZip(file: Blob): Promise<Project> {
   let zip: JSZip;
-  try { zip = await JSZip.loadAsync(file); } catch { throw new Error('The file is not a valid ZIP archive'); }
+  try { zip = await JSZip.loadAsync(file); } catch { throw new Error('Il file non è un archivio ZIP valido'); }
   const entry = zip.file('project.json');
-  if (!entry) throw new Error('Archive does not contain project.json');
+  if (!entry) throw new Error('L’archivio non contiene project.json');
   let raw: unknown;
-  try { raw = JSON.parse(await entry.async('string')); } catch { throw new Error('project.json is not valid JSON'); }
+  try { raw = JSON.parse(await entry.async('string')); } catch { throw new Error('project.json non è un JSON valido'); }
   const project = migrateProject(raw);
   project.id = uid('proj');
   project.updatedAt = Date.now();

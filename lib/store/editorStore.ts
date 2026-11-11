@@ -1,8 +1,9 @@
 import type { Environment, Project } from '@/types';
 import { saveProject } from '@/lib/persistence/db';
 
-export type ToolId = 'select' | 'pan' | 'node' | 'connect' | 'path';
-export type Selection = { kind: 'node' | 'edge'; id: string } | null;
+export type ToolId = 'select' | 'pan' | 'node' | 'connect' | 'path' | 'character';
+export type EditorMode = 'editor' | 'playtest';
+export type Selection = { kind: 'node' | 'edge' | 'character'; id: string } | null;
 export type SaveStatus = 'saved' | 'dirty' | 'saving' | 'error';
 
 export interface EditorState {
@@ -10,6 +11,9 @@ export interface EditorState {
   tool: ToolId;
   selection: Selection;
   preview: boolean;
+  mode: EditorMode;
+  /** Playtest only: draw the design paths/nodes over the scene. */
+  showPaths: boolean;
   saveStatus: SaveStatus;
   saveError: string | null;
   canUndo: boolean;
@@ -37,7 +41,7 @@ export class EditorStore {
 
   constructor(project: Project) {
     this.state = {
-      project, tool: 'select', selection: null, preview: false,
+      project, tool: 'select', selection: null, preview: false, mode: 'editor', showPaths: false,
       saveStatus: 'saved', saveError: null, canUndo: false, canRedo: false, revision: 0,
     };
   }
@@ -58,6 +62,9 @@ export class EditorStore {
   setTool(tool: ToolId) { this.set({ tool }); }
   setSelection(selection: Selection) { this.set({ selection }); }
   setPreview(preview: boolean) { this.set({ preview }); }
+  setShowPaths(showPaths: boolean) { this.set({ showPaths }); }
+  /** Switching mode never touches the document: edits made before a playtest are kept. */
+  setMode(mode: EditorMode) { this.set({ mode, selection: mode === 'playtest' ? null : this.state.selection, preview: false }); }
 
   // --- document mutation ------------------------------------------------------------------
   checkpoint() {
@@ -97,7 +104,8 @@ export class EditorStore {
   private restore(p: Project) {
     const env = p.environments.find((e) => e.id === p.activeEnvironmentId) ?? p.environments[0];
     const sel = this.state.selection;
-    const stillValid = sel && (sel.kind === 'node' ? env.navigation.nodes.some((n) => n.id === sel.id) : env.navigation.edges.some((e) => e.id === sel.id));
+    const stillValid = sel && (sel.kind === 'node' ? env.navigation.nodes.some((n) => n.id === sel.id)
+      : sel.kind === 'edge' ? env.navigation.edges.some((e) => e.id === sel.id) : env.characters.some((c) => c.id === sel.id));
     this.set({
       project: { ...p, updatedAt: Date.now() }, selection: stillValid ? sel : null, saveStatus: 'dirty',
       canUndo: this.undoStack.length > 0, canRedo: this.redoStack.length > 0, revision: this.state.revision + 1,

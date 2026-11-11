@@ -54,7 +54,7 @@ export function SceneCanvas({ store, onReady, onZoom, onAssetError }: Props) {
         sync();
         cbs.current.onReady({ view: v, editor });
       })
-      .catch((err) => cbs.current.onAssetError('renderer', `Cannot start the renderer: ${err instanceof Error ? err.message : err}`));
+      .catch((err) => cbs.current.onAssetError('renderer', `Impossibile avviare il renderer: ${err instanceof Error ? err.message : err}`));
 
     return () => {
       cancelled = true;

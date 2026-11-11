@@ -3,13 +3,13 @@ import './globals.css';
 
 export const metadata: Metadata = {
   title: 'Environment Builder',
-  description: 'Universal 2D environment editor and exploration engine',
+  description: 'Editor universale di ambienti 2D e motore di esplorazione',
 };
 export const viewport: Viewport = { width: 'device-width', initialScale: 1, maximumScale: 1 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="it">
       <body>{children}</body>
     </html>
   );

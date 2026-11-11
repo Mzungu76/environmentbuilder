@@ -20,7 +20,7 @@ export interface ProjectSummary { id: string; name: string; updatedAt: number; e
 let dbPromise: Promise<IDBDatabase> | null = null;
 
 function openDb(): Promise<IDBDatabase> {
-  if (typeof indexedDB === 'undefined') return Promise.reject(new Error('IndexedDB is not available in this browser'));
+  if (typeof indexedDB === 'undefined') return Promise.reject(new Error('IndexedDB non è disponibile in questo browser'));
   if (!dbPromise) {
     dbPromise = new Promise((resolve, reject) => {
       const req = indexedDB.open(DB_NAME, DB_VERSION);

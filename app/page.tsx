@@ -31,7 +31,7 @@ export default function LibraryPage() {
   useEffect(() => { void refresh(); }, [refresh]);
 
   const create = async () => {
-    try { const p = createProject(name.trim() || 'Untitled project'); await saveProject(p); router.push(`/editor?id=${p.id}`); }
+    try { const p = createProject(name.trim() || 'Progetto senza titolo'); await saveProject(p); router.push(`/editor?id=${p.id}`); }
     catch (e) { setError(e instanceof Error ? e.message : String(e)); }
   };
 
@@ -44,35 +44,35 @@ export default function LibraryPage() {
         p.id = createProject().id; p.updatedAt = Date.now();
         await saveProject(p); router.push(`/editor?id=${p.id}`);
       } else { const p = await importProjectZip(file); router.push(`/editor?id=${p.id}`); }
-    } catch (e) { setError(`Import failed: ${e instanceof Error ? e.message : e}`); }
+    } catch (e) { setError(`Importazione non riuscita: ${e instanceof Error ? e.message : e}`); }
   };
 
   return (
     <main className={styles.page}>
       <div className={styles.head}>
-        <div><h1>Environment Builder</h1><p>Turn 2D illustrations into explorable, configurable environments.</p></div>
+        <div><h1>Environment Builder</h1><p>Trasforma illustrazioni 2D in ambienti esplorabili e configurabili.</p></div>
         <div className={styles.actions}>
-          <button className={styles.btn} onClick={() => importRef.current?.click()} data-testid="import-project">{Icon.folder}Import project…</button>
+          <button className={styles.btn} onClick={() => importRef.current?.click()} data-testid="import-project">{Icon.folder}Importa progetto…</button>
         </div>
       </div>
       {error && <div className={styles.error} role="alert">{error}</div>}
       <form className={styles.create} onSubmit={(e) => { e.preventDefault(); void create(); }}>
-        <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Project name (e.g. Cavern level 1)" aria-label="New project name" data-testid="new-project-name" />
-        <button className={`${styles.btn} ${styles.primary}`} type="submit" data-testid="create-project">{Icon.plus}New project</button>
+        <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Nome progetto (es. Caverna livello 1)" aria-label="Nome del nuovo progetto" data-testid="new-project-name" />
+        <button className={`${styles.btn} ${styles.primary}`} type="submit" data-testid="create-project">{Icon.plus}Nuovo progetto</button>
       </form>
-      {projects === null ? <p>Loading…</p> : projects.length === 0 ? (
-        <div className={styles.empty}><h2>No projects yet</h2><p>Create a project, then import an illustration to start drawing paths.</p></div>
+      {projects === null ? <p>Caricamento…</p> : projects.length === 0 ? (
+        <div className={styles.empty}><h2>Nessun progetto</h2><p>Crea un progetto, poi importa un’illustrazione per iniziare a disegnare i percorsi.</p></div>
       ) : (
         <div className={styles.grid}>
           {projects.map((p) => (
             <article key={p.id} className={styles.card} data-testid="project-card">
               <Thumb projectId={p.id} assetId={p.thumbAssetId} />
-              <div className={styles.body}><span className={styles.name}>{p.name}</span><span className={styles.meta}>{p.environmentCount} environment{p.environmentCount === 1 ? '' : 's'} · {new Date(p.updatedAt).toLocaleString()}</span></div>
+              <div className={styles.body}><span className={styles.name}>{p.name}</span><span className={styles.meta}>{p.environmentCount} {p.environmentCount === 1 ? 'ambiente' : 'ambienti'} · {new Date(p.updatedAt).toLocaleString('it-IT')}</span></div>
               <div className={styles.foot}>
-                <button className={`${styles.btn} ${styles.primary}`} onClick={() => router.push(`/editor?id=${p.id}`)}>Open</button>
+                <button className={`${styles.btn} ${styles.primary}`} onClick={() => router.push(`/editor?id=${p.id}`)}>Apri</button>
                 {confirmId === p.id
-                  ? <button className={`${styles.btn} ${styles.danger}`} onClick={async () => { await deleteProject(p.id); setConfirmId(null); void refresh(); }}>Delete “{p.name}”?</button>
-                  : <button className={`${styles.btn} ${styles.danger}`} aria-label={`Delete ${p.name}`} onClick={() => setConfirmId(p.id)}>{Icon.trash}</button>}
+                  ? <button className={`${styles.btn} ${styles.danger}`} onClick={async () => { await deleteProject(p.id); setConfirmId(null); void refresh(); }}>Eliminare “{p.name}”?</button>
+                  : <button className={`${styles.btn} ${styles.danger}`} aria-label={`Elimina ${p.name}`} onClick={() => setConfirmId(p.id)}>{Icon.trash}</button>}
               </div>
             </article>
           ))}

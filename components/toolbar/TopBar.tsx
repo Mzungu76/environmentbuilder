@@ -18,6 +18,8 @@ interface Props {
   onExportZip: () => void;
   onExportJson: () => void;
   onToggleInspector: () => void;
+  onMode: (m: 'editor' | 'playtest') => void;
+  canPlaytest: boolean;
 }
 
 function NameField({ value, onCommit, label, className }: { value: string; onCommit: (v: string) => void; label: string; className?: string }) {
@@ -43,38 +45,38 @@ export function TopBar(p: Props) {
   }, [menu]);
 
   const st = state.saveStatus;
-  const statusText = st === 'saved' ? 'Saved' : st === 'dirty' ? 'Unsaved changes' : st === 'saving' ? 'Saving…' : 'Save failed';
+  const statusText = st === 'saved' ? 'Salvato' : st === 'dirty' ? 'Modifiche non salvate' : st === 'saving' ? 'Salvataggio…' : 'Salvataggio non riuscito';
   const dotCls = st === 'dirty' ? styles.dotDirty : st === 'error' ? styles.dotError : st === 'saving' ? styles.dotSaving : '';
 
   return (
     <header className={styles.top}>
       <span className={styles.brand}>Environment Builder</span>
-      <NameField className={styles.projectName} value={state.project.name} onCommit={p.onProjectName} label="Project name" />
+      <NameField className={styles.projectName} value={state.project.name} onCommit={p.onProjectName} label="Nome progetto" />
       <span className={styles.hideSm} aria-hidden>/</span>
-      <NameField value={p.envName} onCommit={p.onEnvName} label="Environment name" />
+      <NameField value={p.envName} onCommit={p.onEnvName} label="Nome ambiente" />
       <span className={`${styles.sep} ${styles.hideXs}`} />
-      <Link href="/" className={`${styles.btn} ${styles.hideXs}`} title="Open project (library)"><span className={styles.hideSm}>Open</span>{Icon.folder}</Link>
-      <button className={`${styles.btn} ${styles.hideSm}`} onClick={p.onNew} title="New project">{Icon.plus}New</button>
+      <Link href="/" className={`${styles.btn} ${styles.hideXs}`} title="Apri progetto (libreria)"><span className={styles.hideSm}>Apri</span>{Icon.folder}</Link>
+      <button className={`${styles.btn} ${styles.hideSm}`} onClick={p.onNew} title="Nuovo progetto">{Icon.plus}Nuovo</button>
       <span className={styles.spacer} />
       <span className={`${styles.status} ${styles.hideXs}`} role="status" title={state.saveError ?? undefined}><span className={`${styles.dot} ${dotCls}`} />{statusText}</span>
-      <button className={`${styles.btn} ${styles.iconBtn}`} onClick={p.onUndo} disabled={!state.canUndo} title="Undo (Ctrl+Z)" aria-label="Undo" data-testid="undo">{Icon.undo}</button>
-      <button className={`${styles.btn} ${styles.iconBtn}`} onClick={p.onRedo} disabled={!state.canRedo} title="Redo (Ctrl+Shift+Z)" aria-label="Redo" data-testid="redo">{Icon.redo}</button>
-      <button className={styles.btn} onClick={p.onSave} title="Save (Ctrl+S)" data-testid="save">{Icon.save}<span className={styles.hideSm}>Save</span></button>
+      <button className={`${styles.btn} ${styles.iconBtn}`} onClick={p.onUndo} disabled={!state.canUndo} title="Annulla (Ctrl+Z)" aria-label="Annulla" data-testid="undo">{Icon.undo}</button>
+      <button className={`${styles.btn} ${styles.iconBtn}`} onClick={p.onRedo} disabled={!state.canRedo} title="Ripeti (Ctrl+Shift+Z)" aria-label="Ripeti" data-testid="redo">{Icon.redo}</button>
+      <button className={styles.btn} onClick={p.onSave} title="Salva (Ctrl+S)" data-testid="save">{Icon.save}<span className={styles.hideSm}>Salva</span></button>
       <span className={`${styles.sep} ${styles.hideSm}`} />
-      <div className={`${styles.seg} ${styles.hideSm}`} role="group" aria-label="Mode">
-        <button aria-pressed="true">Editor</button>
-        <button disabled title="Playtest arrives with Milestone 2">Playtest</button>
+      <div className={`${styles.seg} ${styles.hideSm}`} role="group" aria-label="Modalità">
+        <button aria-pressed={state.mode === 'editor'} onClick={() => p.onMode('editor')} data-testid="mode-editor">Editor</button>
+        <button aria-pressed={state.mode === 'playtest'} onClick={() => p.onMode('playtest')} disabled={!p.canPlaytest} title={p.canPlaytest ? 'Prova la simulazione' : 'Importa prima un’immagine'} data-testid="mode-playtest">Playtest</button>
       </div>
       <div className={styles.menuWrap} ref={wrap}>
-        <button className={styles.btn} onClick={() => setMenu((m) => !m)} aria-haspopup="menu" aria-expanded={menu} data-testid="export-menu">{Icon.export}<span className={styles.hideSm}>Export</span></button>
+        <button className={styles.btn} onClick={() => setMenu((m) => !m)} aria-haspopup="menu" aria-expanded={menu} data-testid="export-menu">{Icon.export}<span className={styles.hideSm}>Esporta</span></button>
         {menu && (
           <div className={styles.menu} role="menu">
-            <button role="menuitem" onClick={() => { setMenu(false); p.onExportZip(); }} data-testid="export-zip">Export ZIP package<small>project.json + images, re-importable</small></button>
-            <button role="menuitem" onClick={() => { setMenu(false); p.onExportJson(); }} data-testid="export-json">Export JSON only<small>configuration without images</small></button>
+            <button role="menuitem" onClick={() => { setMenu(false); p.onExportZip(); }} data-testid="export-zip">Esporta pacchetto ZIP<small>project.json + immagini, re-importabile</small></button>
+            <button role="menuitem" onClick={() => { setMenu(false); p.onExportJson(); }} data-testid="export-json">Esporta solo JSON<small>configurazione senza immagini</small></button>
           </div>
         )}
       </div>
-      <button className={`${styles.btn} ${styles.iconBtn} ${styles.inspToggle}`} onClick={p.onToggleInspector} aria-label="Toggle inspector" title="Inspector">{Icon.panel}</button>
+      <button className={`${styles.btn} ${styles.iconBtn} ${styles.inspToggle}`} onClick={p.onToggleInspector} aria-label="Mostra/nascondi inspector" title="Inspector">{Icon.panel}</button>
     </header>
   );
 }

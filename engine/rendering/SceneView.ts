@@ -1,5 +1,5 @@
 import { Application, Container, Graphics, Sprite, Texture } from 'pixi.js';
-import type { NavigationGraph, SceneLayer, Vec2 } from '@/types';
+import type { CharacterState, NavigationGraph, SceneLayer, Vec2 } from '@/types';
 import { edgePolyline } from '@/engine/navigation/geometry';
 
 /**
@@ -30,6 +30,28 @@ export interface OverlayModel {
   /** Cursor position (normalized) used for the rubber-band line. */
   cursor: Vec2 | null;
   hoverNodeId: string | null;
+  markers?: PlaytestMarkers | null;
+}
+
+/** Destination markers / route highlight used by the playtest (drawn even when the editor overlay is hidden). */
+export interface PlaytestMarkers {
+  nodeIds: string[];
+  hoverId: string | null;
+  targetId: string | null;
+  routeEdgeIds: string[];
+}
+
+export interface CharacterRenderItem {
+  id: string;
+  /** Feet position, normalized. */
+  x: number; y: number;
+  /** Size as fractions of the environment height. */
+  width: number; height: number;
+  color: string;
+  facing: 1 | -1;
+  state: CharacterState;
+  shadow: boolean;
+  selected: boolean;
 }
 
 export interface LayerSource { layer: SceneLayer; blobLoader: () => Promise<Blob | undefined> }
@@ -59,12 +81,16 @@ export class SceneView {
   private layerVersion = 0;
   private destroyed = false;
   private resizeObs?: ResizeObserver;
+  private charGfx = new Graphics();
+  private chars: CharacterRenderItem[] = [];
 
   /** When true, single-pointer drag pans the camera (pan tool / space held). */
   panMode = false;
   onPointer: (e: ViewPointerEvent) => void = () => {};
   onCamera: (zoom: number) => void = () => {};
   onAssetError: (assetId: string, message: string) => void = () => {};
+  /** Called every frame with the elapsed seconds (drives the simulation in playtest). */
+  onTick: (dt: number) => void = () => {};
 
   static async create(host: HTMLElement): Promise<SceneView> {
     const v = new SceneView();
@@ -84,11 +110,21 @@ export class SceneView {
     host.appendChild(app.canvas);
     app.canvas.style.touchAction = 'none';
     app.canvas.style.display = 'block';
-    this.world.addChild(this.layerRoot, this.overlay);
+    this.world.addChild(this.layerRoot, this.overlay, this.charGfx);
     app.stage.addChild(this.world);
-    app.ticker.add(() => { if (this.dirty) { this.dirty = false; this.drawOverlay(); } });
+    app.ticker.add((t) => {
+      this.onTick(Math.min(0.1, t.deltaMS / 1000));
+      if (this.dirty) { this.dirty = false; this.drawOverlay(); }
+      this.drawCharacters();
+    });
     this.bindInput(app.canvas);
-    this.resizeObs = new ResizeObserver(() => { this.dirty = true; });
+    let lastW = host.clientWidth, lastH = host.clientHeight;
+    this.resizeObs = new ResizeObserver(() => {
+      // keep the view centred on the same point when the viewport changes size
+      const w = host.clientWidth, h = host.clientHeight;
+      if (lastW && lastH) this.world.position.set(this.world.x + (w - lastW) / 2, this.world.y + (h - lastH) / 2);
+      lastW = w; lastH = h; this.dirty = true;
+    });
     this.resizeObs.observe(host);
   }
 
@@ -150,6 +186,11 @@ export class SceneView {
     }
     this.dirty = true;
   }
+
+  setCharacters(items: CharacterRenderItem[]) { this.chars = items; }
+
+  /** Screen-independent hit test of the node nearest to a normalized point (used by playtest). */
+  get envSize() { return { w: this.envW, h: this.envH }; }
 
   // --- model ------------------------------------------------------------------------------
   setModel(model: OverlayModel) { this.model = model; this.dirty = true; }
@@ -261,10 +302,12 @@ export class SceneView {
     const g = this.overlay;
     g.clear();
     const m = this.model;
-    if (!m || m.preview) return;
+    if (!m) return;
     const px = 1 / this.zoom; // one screen pixel in world units
     const W = this.envW, H = this.envH;
     const P = (p: Vec2): [number, number] => [p.x * W, p.y * H];
+    if (m.markers) this.drawMarkers(g, m, px, P);
+    if (m.preview) return;
     const selEdge = m.selection?.kind === 'edge' ? m.selection.id : null;
     const selNode = m.selection?.kind === 'node' ? m.selection.id : null;
 
@@ -274,6 +317,11 @@ export class SceneView {
       if (!pts) continue;
       const color = EDGE_COLORS[e.type] ?? 0xa3a3a3;
       const selected = e.id === selEdge;
+      if (m.markers?.routeEdgeIds.includes(e.id)) {
+        g.moveTo(...P(pts[0]));
+        for (let i = 1; i < pts.length; i++) g.lineTo(...P(pts[i]));
+        g.stroke({ width: 9 * px, color: 0xfde047, alpha: 0.35 });
+      }
       g.moveTo(...P(pts[0]));
       for (let i = 1; i < pts.length; i++) g.lineTo(...P(pts[i]));
       if (selected) g.stroke({ width: 7 * px, color: SELECT_COLOR, alpha: 0.35 });
@@ -318,6 +366,52 @@ export class SceneView {
       const r = (sel || hov || pend ? 8 : 6.5) * px;
       if (sel || pend) g.circle(x, y, r + 5 * px).fill({ color: pend ? 0xfacc15 : SELECT_COLOR, alpha: 0.3 });
       g.circle(x, y, r).fill({ color: NODE_COLORS[n.type] ?? 0xd4d4d4 }).stroke({ width: (sel ? 2.5 : 1.8) * px, color: sel ? 0x2563eb : 0x111827 });
+    }
+  }
+
+  private drawMarkers(g: Graphics, m: OverlayModel, px: number, P: (p: Vec2) => [number, number]) {
+    const mk = m.markers!;
+    for (const id of mk.nodeIds) {
+      const n = m.graph.nodes.find((x) => x.id === id);
+      if (!n) continue;
+      const [x, y] = P(n);
+      const hov = id === mk.hoverId, tgt = id === mk.targetId;
+      if (!m.preview && !hov && !tgt) continue; // full overlay already draws every node
+      g.circle(x, y, (hov ? 11 : tgt ? 10 : 6) * px).fill({ color: tgt ? 0xfde047 : 0xffffff, alpha: hov || tgt ? 0.35 : 0.0 })
+        .stroke({ width: (hov || tgt ? 2.5 : 1.5) * px, color: tgt ? 0xfde047 : 0xffffff, alpha: hov || tgt ? 1 : 0.55 });
+    }
+  }
+
+  // --- characters (procedural placeholder: no asset required) ---------------------------------
+  private drawCharacters() {
+    const g = this.charGfx;
+    g.clear();
+    if (!this.chars.length) return;
+    const t = performance.now() / 1000;
+    const H = this.envH, W = this.envW;
+    for (const c of this.chars) {
+      const h = c.height * H, w = c.width * H;
+      const cx = c.x * W, cy = c.y * H;
+      const col = parseInt(c.color.replace('#', ''), 16) || 0x4f8cff;
+      const f = c.facing;
+      const walk = c.state === 'WALK', climb = c.state === 'CLIMB';
+      const phase = Math.sin(t * (walk ? 11 : 7));
+      const bob = walk ? Math.abs(phase) * h * 0.035 : c.state === 'IDLE' ? Math.sin(t * 2) * h * 0.01 : phase * h * 0.015;
+      const sway = climb ? phase * w * 0.12 : 0;
+
+      if (c.shadow) g.ellipse(cx, cy, w * 0.55, Math.max(2, h * 0.05)).fill({ color: 0x000000, alpha: 0.35 });
+      const hipY = cy - h * 0.34 - bob * 0.3;
+      // legs
+      const stride = walk ? phase * w * 0.3 : climb ? phase * w * 0.18 : 0;
+      g.moveTo(cx - w * 0.15 + sway, hipY).lineTo(cx - w * 0.15 + stride * f, cy - (climb ? Math.max(0, -phase) * h * 0.08 : 0))
+        .stroke({ width: Math.max(2, w * 0.16), color: 0x111827, cap: 'round' });
+      g.moveTo(cx + w * 0.15 + sway, hipY).lineTo(cx + w * 0.15 - stride * f, cy - (climb ? Math.max(0, phase) * h * 0.08 : 0))
+        .stroke({ width: Math.max(2, w * 0.16), color: 0x111827, cap: 'round' });
+      // body + head
+      g.roundRect(cx - w * 0.32 + sway, cy - h * 0.78 - bob, w * 0.64, h * 0.46, w * 0.2).fill({ color: col }).stroke({ width: Math.max(1.5, w * 0.05), color: 0x0b0f19, alpha: 0.85 });
+      g.circle(cx + sway, cy - h * 0.87 - bob, h * 0.13).fill({ color: 0xf3d3b5 }).stroke({ width: Math.max(1.5, w * 0.05), color: 0x0b0f19, alpha: 0.85 });
+      g.circle(cx + sway + f * h * 0.06, cy - h * 0.88 - bob, Math.max(1.2, h * 0.02)).fill({ color: 0x111827 });
+      if (c.selected) g.ellipse(cx, cy, w * 0.8, Math.max(3, h * 0.09)).stroke({ width: 2 / this.zoom, color: 0xffffff, alpha: 0.9 });
     }
   }
 }

@@ -11,7 +11,7 @@ export const emptyGraph = (): NavigationGraph => ({ nodes: [], edges: [] });
 
 export function createNode(x: number, y: number, type: NodeType = 'waypoint', graph?: NavigationGraph): NavigationNode {
   const n = (graph?.nodes.length ?? 0) + 1;
-  return { id: uid('node'), name: `Node ${n}`, x: clamp01(x), y: clamp01(y), type, props: {} };
+  return { id: uid('node'), name: `Nodo ${n}`, x: clamp01(x), y: clamp01(y), type, props: {} };
 }
 
 export function addNode(g: NavigationGraph, node: NavigationNode): NavigationGraph {
@@ -111,10 +111,10 @@ export function validateGraph(g: NavigationGraph): GraphIssue[] {
   const ids = new Set(g.nodes.map((n) => n.id));
   const linked = new Set<string>();
   for (const e of g.edges) {
-    if (!ids.has(e.from) || !ids.has(e.to)) issues.push({ severity: 'error', message: `Edge ${e.id} references a missing node`, id: e.id });
-    if (e.from === e.to) issues.push({ severity: 'error', message: `Edge ${e.id} is a self-loop`, id: e.id });
+    if (!ids.has(e.from) || !ids.has(e.to)) issues.push({ severity: 'error', message: `Il collegamento ${e.id} punta a un nodo inesistente`, id: e.id });
+    if (e.from === e.to) issues.push({ severity: 'error', message: `Il collegamento ${e.id} collega un nodo a se stesso`, id: e.id });
     linked.add(e.from); linked.add(e.to);
   }
-  for (const n of g.nodes) if (!linked.has(n.id)) issues.push({ severity: 'warning', message: `Node "${n.name}" is not connected`, id: n.id });
+  for (const n of g.nodes) if (!linked.has(n.id)) issues.push({ severity: 'warning', message: `Il nodo “${n.name}” non è collegato`, id: n.id });
   return issues;
 }

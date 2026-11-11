@@ -1,4 +1,6 @@
 import type { Vec2 } from '@/types';
+import type { CharacterRenderItem, PlaytestMarkers } from '@/engine/rendering/SceneView';
+import { createCharacter } from '@/engine/characters/factory';
 import type { EditorStore } from '@/lib/store/editorStore';
 import type { SceneView, ViewPointerEvent } from '@/engine/rendering/SceneView';
 import { addEdge, addNode, createEdge, createNode, findEdgeBetween, moveNode, removeEdge, removeNode, updateEdge } from './graph';
@@ -22,11 +24,17 @@ export class NavigationEditor {
   private lastTool = '';
   private unsub: () => void;
 
+  /** Set by the playtest controller (destination markers); null in the editor. */
+  markers: PlaytestMarkers | null = null;
+
   constructor(private store: EditorStore, private view: SceneView) {
-    view.onPointer = (e) => this.handle(e);
+    this.attach();
     this.unsub = store.subscribe(() => this.refresh());
     this.refresh();
   }
+
+  /** (Re)claims pointer input for the editor tools. */
+  attach() { this.view.onPointer = (e) => this.handle(e); }
 
   dispose() { this.unsub(); }
 
@@ -39,10 +47,23 @@ export class NavigationEditor {
       this.view.setCursor(s.tool === 'pan' ? 'grab' : s.tool === 'select' ? 'default' : 'crosshair');
     }
     const env = this.store.env;
+    const play = s.mode === 'playtest';
     this.view.setModel({
-      graph: env.navigation, selection: s.selection, preview: s.preview,
-      pendingFrom: this.pendingFrom, cursor: this.cursor, hoverNodeId: this.hover,
+      graph: env.navigation, selection: s.selection?.kind === 'node' || s.selection?.kind === 'edge' ? { kind: s.selection.kind, id: s.selection.id } : null,
+      preview: play ? !s.showPaths : s.preview,
+      pendingFrom: play ? null : this.pendingFrom, cursor: this.cursor, hoverNodeId: play ? null : this.hover,
+      markers: play ? this.markers : null,
     });
+    if (!play) {
+      // editor mode: characters stand on their start node
+      const items: CharacterRenderItem[] = [];
+      for (const c of env.characters) {
+        const n = env.navigation.nodes.find((x) => x.id === c.startNodeId);
+        if (!n) continue;
+        items.push({ id: c.id, x: n.x, y: n.y, width: c.width, height: c.height, color: c.color, facing: 1, state: 'IDLE', shadow: c.shadow, selected: s.selection?.kind === 'character' && s.selection.id === c.id });
+      }
+      this.view.setCharacters(items);
+    }
   }
 
   cancelPending() { this.pendingFrom = null; this.refresh(); }
@@ -50,9 +71,13 @@ export class NavigationEditor {
   deleteSelection() {
     const sel = this.store.getState().selection;
     if (!sel) return;
-    this.store.commitEnv((env) => ({
-      ...env, navigation: sel.kind === 'node' ? removeNode(env.navigation, sel.id) : removeEdge(env.navigation, sel.id),
-    }));
+    this.store.commitEnv((env) => {
+      if (sel.kind === 'character') return { ...env, characters: env.characters.filter((c) => c.id !== sel.id) };
+      const navigation = sel.kind === 'node' ? removeNode(env.navigation, sel.id) : removeEdge(env.navigation, sel.id);
+      // characters starting on a deleted node lose their start (never dangle)
+      const ids = new Set(navigation.nodes.map((n) => n.id));
+      return { ...env, navigation, characters: env.characters.map((c) => (c.startNodeId && !ids.has(c.startNodeId) ? { ...c, startNodeId: null } : c)) };
+    });
     this.store.setSelection(null);
     this.pendingFrom = null;
     this.refresh();
@@ -84,7 +109,7 @@ export class NavigationEditor {
     const env = this.store.env;
     if (!env.width || !env.height) return; // nothing imported yet
     const tool = this.store.getState().tool;
-    if (this.store.getState().preview) return;
+    if (this.store.getState().preview || this.store.getState().mode === 'playtest') return;
 
     if (e.type === 'cancel') { this.drag = null; this.refresh(); return; }
 
@@ -133,6 +158,12 @@ export class NavigationEditor {
         }
         break;
 
+      case 'character': {
+        const target = h?.kind === 'node' ? h.id : this.nearestNode(e.pos, 48 * this.view.pxPerScreenPx);
+        if (target) this.placeCharacter(target);
+        break;
+      }
+
       case 'connect':
         if (h?.kind === 'node') {
           if (!this.pendingFrom) { this.pendingFrom = h.id; this.store.setSelection({ kind: 'node', id: h.id }); }
@@ -158,6 +189,30 @@ export class NavigationEditor {
         break;
     }
     this.refresh();
+  }
+
+  private nearestNode(p: Vec2, maxPx: number): string | null {
+    const env = this.store.env;
+    let best: string | null = null, bd = maxPx;
+    for (const n of env.navigation.nodes) {
+      const d = Math.hypot((n.x - p.x) * env.width, (n.y - p.y) * env.height);
+      if (d <= bd) { bd = d; best = n.id; }
+    }
+    return best;
+  }
+
+  /** Places the selected character (or a new one) on a node. */
+  private placeCharacter(nodeId: string) {
+    const sel = this.store.getState().selection;
+    const env = this.store.env;
+    const existing = sel?.kind === 'character' ? env.characters.find((c) => c.id === sel.id) : undefined;
+    if (existing) {
+      this.store.commitEnv((en) => ({ ...en, characters: en.characters.map((c) => (c.id === existing.id ? { ...c, startNodeId: nodeId } : c)) }));
+    } else {
+      const c = createCharacter(env.characters.length, nodeId);
+      this.store.commitEnv((en) => ({ ...en, characters: [...en.characters, c] }));
+      this.store.setSelection({ kind: 'character', id: c.id });
+    }
   }
 
   private link(a: string, b: string) {

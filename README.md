@@ -4,7 +4,9 @@ Editor 2D universale per trasformare illustrazioni (prodotte esternamente, es. c
 
 Tutto gira nel browser: nessun backend, nessun database remoto, nessun servizio a pagamento. I dati sono salvati in **IndexedDB**.
 
-## Stato: Milestone 1 – Editor base ✅
+## Stato: Milestone 1 (Editor base) ✅ · Milestone 2 (Simulazione) ✅
+
+L’interfaccia è in **italiano** (stringhe ancora inline nei componenti; un livello i18n è da prevedere se servirà un’altra lingua).
 
 | Funzione | Stato |
 |---|---|
@@ -19,9 +21,26 @@ Tutto gira nel browser: nessun backend, nessun database remoto, nessun servizio 
 | Esportazione ZIP (project.json + immagini + manifest) e JSON; importazione ZIP/JSON | ✅ |
 | Modalità anteprima senza strumenti (`O`) | ✅ |
 | Touch: selezione, trascinamento nodi, pinch-zoom e pan a due dita, layout responsive | ✅ |
-| Playtest, personaggi, oggetti, ingressi/uscite, layer mid/foreground | ⏳ Milestone 2–3 (modello dati già pronto, UI non ancora presente) |
+| Oggetti, ingressi/uscite, layer mid/foreground, più ambienti | ⏳ Milestone 3 (modello dati già pronto, UI non ancora presente) |
 
-Il pulsante *Playtest* è volutamente disabilitato finché non esiste la simulazione.
+### Milestone 2 – Simulazione
+
+| Funzione | Stato |
+|---|---|
+| Personaggio provvisorio procedurale (nessun asset richiesto), colore/dimensioni/ombra, più personaggi | ✅ |
+| Strumento **Personaggio** (`K`): clicca un nodo per posizionarlo; nodo di partenza modificabile nell’Inspector | ✅ |
+| Movimento solo lungo i collegamenti (direzione consentita, requisiti/abilità, velocità per collegamento) | ✅ |
+| Movimento a velocità costante anche su curve Bézier (campionamento per lunghezza d’arco) | ✅ |
+| Percorso minimo (Dijkstra) con preferenze per tipo di collegamento; inversione di marcia a metà percorso se conviene | ✅ |
+| **Manuale**: click su un nodo della scena o scelta dall’elenco; destinazioni non raggiungibili rifiutate con messaggio | ✅ |
+| **Autonomo**: sceglie destinazioni raggiungibili, soste (min/max), probabilità di sosta ai nodi, frequenza decisioni e probabilità di cambio direzione, preferenze di percorso | ✅ |
+| **Playtest**: strumenti nascosti, Play / Pausa / Stop / Reset, pannello diagnostico (posizione, nodo, collegamento, velocità, stato animazione, percorso) | ✅ |
+| Stati: IDLE, WALK, CLIMB animati proceduralmente (INTERACT, COLLECT, JUMP, FALL, CUSTOM previsti dal modello, non ancora animati) | ✅/⏳ |
+| Tornando all’Editor le modifiche restano; il Playtest non modifica mai il documento | ✅ |
+
+La simulazione usa un passo fisso di 1/60 s e un generatore pseudo-casuale con seme per personaggio: stesso progetto → stesso comportamento autonomo. Non c’è fisica né collisioni.
+
+**Non ancora**: sprite/sprite sheet importabili per il personaggio (il modello `Character` li prevede), raccolta/interazione con oggetti (Milestone 3).
 
 ## Installazione e avvio
 
@@ -45,7 +64,7 @@ npm run build:standalone   # genera dist/environment-builder.html, un singolo fi
 5. **Inspector** (destra): modifica nome, tipo, coordinate, direzione, velocità, requisiti.
 6. Il progetto si salva da solo; **Export → ZIP** produce un pacchetto autonomo re-importabile dalla libreria.
 
-Scorciatoie: `V` selezione · `H` mano · `N` nodo · `C` connetti · `P` percorso · `Del` elimina · `Esc` annulla · `F` adatta · `+`/`-` zoom · `O` anteprima · `Ctrl+Z` / `Ctrl+Shift+Z` · `Ctrl+S`.
+Scorciatoie: `K` personaggio · `Spazio` Play/Pausa (in Playtest) · `V` selezione · `H` mano · `N` nodo · `C` connetti · `P` percorso · `Del` elimina · `Esc` annulla · `F` adatta · `+`/`-` zoom · `O` anteprima · `Ctrl+Z` / `Ctrl+Shift+Z` · `Ctrl+S`.
 
 ## Architettura
 
@@ -57,6 +76,9 @@ types/                  Modelli TypeScript versionati (Project, Environment, Sce
 engine/
   rendering/SceneView   Scene Manager (PixiJS): fondale, layer, camera, input grezzo, overlay di progettazione.
                         Non conosce store né strumenti.
+  simulation/           Simulation Engine: Agent (movimento), routing (Dijkstra), track (curve a lunghezza d'arco),
+                        PlaytestController (loop a passo fisso, input, diagnostica)
+  characters/           Factory e valori predefiniti dei personaggi
   navigation/           Navigation Editor: grafo (funzioni pure e immutabili), geometria Bézier, hit-testing,
                         NavigationEditor (controller strumenti → comandi sullo store)
   profiles/             Profili ambientali = configurazione (suggerimenti), non motori
@@ -98,6 +120,5 @@ L'import crea sempre un **nuovo** progetto (nuovo id) e non sovrascrive quelli e
 
 ## Roadmap
 
-- **M2 – Simulazione**: personaggio provvisorio, movimento lungo nodi e curve, manuale (click su nodo di destinazione) e autonomo, Playtest con pannello diagnostico.
 - **M3 – Ambienti completi**: più scene, ingressi/uscite collegati, oggetti, layer mid/foreground, duplicazione ambienti.
 - **M4 – Estensioni**: nuovi profili, tipi di movimento, animazioni, interazioni configurabili.

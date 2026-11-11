@@ -14,13 +14,13 @@ export interface EnvironmentProfile {
 }
 
 export const PROFILES: Record<ProfileId, EnvironmentProfile> = {
-  cave: { id: 'cave', label: 'Cave', description: 'Uneven ground, ramps, ladders and ledges.', suggestedEdgeTypes: ['walk', 'ramp', 'climb', 'curve'], suggestedNodeTypes: ['waypoint', 'junction', 'platform'], suggestedObjectTypes: ['collectible', 'observation-point', 'trigger'] },
-  forest: { id: 'forest', label: 'Forest', description: 'Winding trails and clearings.', suggestedEdgeTypes: ['walk', 'curve', 'ramp'], suggestedNodeTypes: ['waypoint', 'junction'], suggestedObjectTypes: ['collectible', 'interaction-point'] },
-  building: { id: 'building', label: 'Building', description: 'Floors, stairs and doors.', suggestedEdgeTypes: ['walk', 'stairs', 'platform-link'], suggestedNodeTypes: ['waypoint', 'entrance', 'exit'], suggestedObjectTypes: ['interaction-point', 'entrance', 'exit'] },
-  ship: { id: 'ship', label: 'Ship', description: 'Decks, ladders and hatches.', suggestedEdgeTypes: ['walk', 'climb', 'stairs'], suggestedNodeTypes: ['waypoint', 'platform', 'entrance'], suggestedObjectTypes: ['interaction-point', 'trigger'] },
-  industrial: { id: 'industrial', label: 'Industrial', description: 'Gantries, ladders and platforms.', suggestedEdgeTypes: ['walk', 'climb', 'stairs', 'platform-link'], suggestedNodeTypes: ['waypoint', 'platform'], suggestedObjectTypes: ['interaction-point', 'trigger'] },
-  outdoor: { id: 'outdoor', label: 'Outdoor', description: 'Open terrain and paths.', suggestedEdgeTypes: ['walk', 'curve', 'ramp'], suggestedNodeTypes: ['waypoint', 'junction'], suggestedObjectTypes: ['observation-point', 'collectible'] },
-  custom: { id: 'custom', label: 'Custom', description: 'No suggestions, maximum freedom.', suggestedEdgeTypes: [], suggestedNodeTypes: [], suggestedObjectTypes: [] },
+  cave: { id: 'cave', label: 'Caverna', description: 'Terreno irregolare, rampe, scale e cenge.', suggestedEdgeTypes: ['walk', 'ramp', 'climb', 'curve'], suggestedNodeTypes: ['waypoint', 'junction', 'platform'], suggestedObjectTypes: ['collectible', 'observation-point', 'trigger'] },
+  forest: { id: 'forest', label: 'Foresta', description: 'Sentieri tortuosi e radure.', suggestedEdgeTypes: ['walk', 'curve', 'ramp'], suggestedNodeTypes: ['waypoint', 'junction'], suggestedObjectTypes: ['collectible', 'interaction-point'] },
+  building: { id: 'building', label: 'Edificio', description: 'Piani, scale e porte.', suggestedEdgeTypes: ['walk', 'stairs', 'platform-link'], suggestedNodeTypes: ['waypoint', 'entrance', 'exit'], suggestedObjectTypes: ['interaction-point', 'entrance', 'exit'] },
+  ship: { id: 'ship', label: 'Nave', description: 'Ponti, scale a pioli e boccaporti.', suggestedEdgeTypes: ['walk', 'climb', 'stairs'], suggestedNodeTypes: ['waypoint', 'platform', 'entrance'], suggestedObjectTypes: ['interaction-point', 'trigger'] },
+  industrial: { id: 'industrial', label: 'Industriale', description: 'Passerelle, scale e piattaforme.', suggestedEdgeTypes: ['walk', 'climb', 'stairs', 'platform-link'], suggestedNodeTypes: ['waypoint', 'platform'], suggestedObjectTypes: ['interaction-point', 'trigger'] },
+  outdoor: { id: 'outdoor', label: 'Esterno', description: 'Terreno aperto e sentieri.', suggestedEdgeTypes: ['walk', 'curve', 'ramp'], suggestedNodeTypes: ['waypoint', 'junction'], suggestedObjectTypes: ['observation-point', 'collectible'] },
+  custom: { id: 'custom', label: 'Personalizzato', description: 'Nessun suggerimento, massima libertà.', suggestedEdgeTypes: [], suggestedNodeTypes: [], suggestedObjectTypes: [] },
 };
 
 export const ALL_EDGE_TYPES: EdgeType[] = ['walk', 'ramp', 'climb', 'stairs', 'platform-link', 'curve'];

@@ -100,3 +100,10 @@
   .hint { display: none; }
 }
 @media (max-width: 560px) { .hideXs { display: none; } .nameInput { width: 84px; } }
+
+/* playtest */
+.mainPlay { grid-template-columns: 1fr 320px; }
+.diag { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; margin: 0; font-size: 12px; }
+.diag dt { color: var(--text-faint); }
+.diag dd { margin: 0; color: var(--text); word-break: break-word; }
+@media (max-width: 900px) { .mainPlay { grid-template-columns: 1fr; grid-template-rows: 1fr; } .mainPlay .inspector { bottom: 0; } }

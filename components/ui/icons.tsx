@@ -25,5 +25,9 @@ export const Icon = {
   image: <S><rect x="3" y="4" width="18" height="16" rx="2" /><circle cx="9" cy="10" r="1.6" /><path d="M21 16l-5-5-9 9" /></S>,
   folder: <S><path d="M3 6a2 2 0 012-2h4l2 2h8a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2z" /></S>,
   swap: <S><path d="M7 4L3 8l4 4M3 8h14M17 20l4-4-4-4M21 16H7" /></S>,
+  character: <S><circle cx="12" cy="6" r="3" /><path d="M7 21v-5a5 5 0 0110 0v5M9 21v-3M15 21v-3" /></S>,
+  pause: <S><path d="M8 5v14M16 5v14" /></S>,
+  stop: <S><rect x="6" y="6" width="12" height="12" rx="1.5" /></S>,
+  reset: <S><path d="M4 12a8 8 0 108-8H7M7 4L4 7l3 3" /></S>,
   curve: <S><circle cx="4" cy="19" r="1.5" /><circle cx="20" cy="5" r="1.5" /><path d="M5 18C5 8 15 16 19 6" /></S>,
 };
