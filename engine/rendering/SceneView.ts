@@ -60,6 +60,8 @@ export interface PuppetDraw {
   figureHeight: number;
   flip: boolean;
   viewKey: string;
+  /** Key-pose playback: the neighbouring key drawn on top, cross-faded. */
+  over?: Omit<PuppetDraw, 'over' | 'flip'> & { alpha: number };
 }
 
 /** A procedural "omino" frame: posed shapes in doll units (feet at the origin, 1000 tall). */
@@ -520,7 +522,7 @@ export class SceneView {
       const cx = c.x * W, cy = c.y * H;
       const lift = c.lift;
       // --- rigged puppet (skinned mesh) when available
-      if (c.puppet && this.drawPuppetMesh(g, c, cx, cy, h, w, lift)) { seenMesh.add(c.id); continue; }
+      if (c.puppet && this.drawPuppetMesh(g, c, cx, cy, h, w, lift)) { seenMesh.add(c.id); if (c.puppet.over) seenMesh.add(c.id + '#over'); continue; }
       // --- sprite (image / sprite sheet) when available; procedural placeholder otherwise
       if (c.sprite) {
         const base = this.textures.get(c.sprite.assetId);
@@ -568,24 +570,36 @@ export class SceneView {
   /** Draws a skinned puppet with a Pixi mesh; false while its texture is still loading (placeholder is used meanwhile). */
   private drawPuppetMesh(g: Graphics, c: CharacterRenderItem, cx: number, cy: number, h: number, w: number, lift: number): boolean {
     const pd = c.puppet!;
+    if (!this.placeMesh(c.id, pd, pd.flip, 1, cx, cy - lift, h)) return false;
+    const ov = pd.over && pd.over.alpha > 0.003 ? pd.over : null;
+    if (ov) {
+      if (this.placeMesh(c.id + '#over', ov, pd.flip, ov.alpha, cx, cy - lift, h)) {
+        const m = this.puppetMeshes.get(c.id + '#over')!.mesh; this.charRoot.addChild(m);   // always above the main layer
+      }
+    }
+    if (c.shadow) g.ellipse(cx, cy, w * 0.55, Math.max(2, h * 0.05)).fill({ color: 0x000000, alpha: 0.35 });
+    if (c.selected) g.ellipse(cx, cy, w * 0.8, Math.max(3, h * 0.09)).stroke({ width: 2 / this.zoom, color: 0xffffff, alpha: 0.9 });
+    return true;
+  }
+
+  private placeMesh(slot: string, pd: Omit<PuppetDraw, 'over' | 'flip'>, flip: boolean, alpha: number, x: number, y: number, h: number): boolean {
     const base = this.textures.get(pd.assetId);
     if (!base) { void this.texture(pd.assetId, () => this.assetLoader(pd.assetId)); return false; }
     const cached = (arr: number[], Ctor: typeof Float32Array | typeof Uint32Array) => { let t = this.typed.get(arr); if (!t) { t = Ctor.from(arr); this.typed.set(arr, t); } return t; };
-    let entry = this.puppetMeshes.get(c.id);
+    let entry = this.puppetMeshes.get(slot);
     if (!entry || entry.key !== pd.viewKey) {
       entry?.mesh.destroy();
       const mesh = new MeshSimple({ texture: base, vertices: new Float32Array(pd.positions), uvs: cached(pd.uvs, Float32Array) as Float32Array, indices: cached(pd.indices, Uint32Array) as Uint32Array });
       this.charRoot.addChild(mesh);
-      entry = { mesh, key: pd.viewKey }; this.puppetMeshes.set(c.id, entry);
+      entry = { mesh, key: pd.viewKey }; this.puppetMeshes.set(slot, entry);
     }
     const m = entry.mesh;
     m.vertices = pd.positions;
+    m.alpha = alpha;
     const s = h / pd.figureHeight;
     m.pivot.set(pd.pivot.x, pd.pivot.y);
-    m.scale.set(s * (pd.flip ? -1 : 1), s);
-    m.position.set(cx, cy - lift);
-    if (c.shadow) g.ellipse(cx, cy, w * 0.55, Math.max(2, h * 0.05)).fill({ color: 0x000000, alpha: 0.35 });
-    if (c.selected) g.ellipse(cx, cy, w * 0.8, Math.max(3, h * 0.09)).stroke({ width: 2 / this.zoom, color: 0xffffff, alpha: 0.9 });
+    m.scale.set(s * (flip ? -1 : 1), s);
+    m.position.set(x, y);
     return true;
   }
 

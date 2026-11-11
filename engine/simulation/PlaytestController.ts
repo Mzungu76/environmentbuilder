@@ -232,7 +232,8 @@ export class PlaytestController {
     const f = pl.frame(puppet, s.state, dt, s.speedPx / figurePx, hint);
     const assetId = f?.view.cutoutAssetId;
     if (!f || !assetId || !f.view.mesh) return null;
-    return { assetId, positions: f.positions, uvs: f.view.mesh.uvs, indices: f.view.mesh.indices, pivot: f.view.pivot, figureHeight: f.view.figureHeight, flip: flipsWithFacing(f.view) && s.facing < 0, viewKey: `${puppet.id}:${f.viewId}:${assetId}` };
+    return { assetId, positions: f.positions, uvs: f.view.mesh.uvs, indices: f.view.mesh.indices, pivot: f.view.pivot, figureHeight: f.view.figureHeight, flip: flipsWithFacing(f.view) && s.facing < 0, viewKey: `${puppet.id}:${f.viewId}:${assetId}`,
+      over: f.over?.view.cutoutAssetId && f.over.view.mesh ? { assetId: f.over.view.cutoutAssetId, positions: f.over.positions, uvs: f.over.view.mesh.uvs, indices: f.over.view.mesh.indices, pivot: f.over.view.pivot, figureHeight: f.over.view.figureHeight, alpha: f.over.alpha, viewKey: `${puppet.id}:${f.over.view.id}:${f.over.view.cutoutAssetId}` } : undefined };
   }
 
   private dollFor(c: Character, s: AgentSnapshot, dt: number): CharacterRenderItem['doll'] {

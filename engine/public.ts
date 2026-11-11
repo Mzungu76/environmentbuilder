@@ -30,6 +30,7 @@ export { spriteFor, parseFrames, type SpriteDraw } from '@/engine/characters/spr
 export { allProfiles, suggestedTypes } from '@/engine/profiles';
 
 // --- rigged characters ("puppets") ---------------------------------------------------------------------------------
+export { sampleSet, posePartway, frameQualities } from '@/engine/puppet/keyposes';
 export { rigOf, skinVertices, clipFor, advancePhase, poseAt, chooseView, chooseViewForState, flipsWithFacing, resolveView } from '@/engine/puppet/runtime';
 export { samplePose, phaseRate, makePreset, defaultClips } from '@/engine/puppet/animation';
 export { buildRig, boneMatrices, BONE_DEFS } from '@/engine/puppet/skeleton';

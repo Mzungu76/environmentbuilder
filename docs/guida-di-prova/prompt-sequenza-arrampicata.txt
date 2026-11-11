@@ -1,0 +1,33 @@
+=== SEQUENZA DI POSE: ARRAMPICATA (N pose in un foglio) ========================
+Importazione: Studio personaggi → passo 3 «Viste» → «Sequenza di pose — arrampicata».
+Indica quante pose contiene il foglio (2-8; 4 è un buon inizio), carica l'immagine: ritaglio, sfondo, scheletro e scala
+sono automatici. Serve avere già il profilo (il programma lo usa come modello per trovare gli arti in ogni posa).
+
+=== PROMPT (inglese) ==========================================================
+
+A row of 4 full-body poses of the SAME character as the reference image, side by side, evenly spaced on one canvas.
+All seen from the SIDE, facing RIGHT, climbing a vertical rope or ladder (do NOT draw the rope or ladder).
+This is one continuous climbing cycle, left to right:
+POSE 1: right hand reaching up high, left hand lower, right knee raised, left leg extended.
+POSE 2: both hands high, right foot pushing up, body pulled up.
+POSE 3: left hand reaching up high, right hand lower, left knee raised, right leg extended.
+POSE 4: both hands high again, left foot pushing up, body pulled up.
+Poses 4 → 1 must loop smoothly.
+
+Keep the EXACT same face, hair, outfit, accessories, colors, proportions and art style as the reference character,
+and the SAME size in every pose (same torso length, same limb lengths): {{STILE}}.
+Each figure complete (hands and feet not cropped), figures NOT touching each other, same ground level feel.
+Clean crisp outline, flat even lighting, no motion blur, no cast shadows, no scenery, no ground, no wall.
+Background: solid flat uniform {{SFONDO}}. Canvas aspect ratio 16:9 (e.g. 2560x1440).
+
+NEGATIVE: different outfit, different face, different proportions between poses, extra limbs, cropped hands or feet,
+overlapping figures, text, watermark, scenery, ground, ladder, rope, perspective distortion, background gradient.
+
+=== NOTE ======================================================================
+- Le pose vanno ordinate nel verso del movimento: l'ultima torna alla prima (ciclo). Se l'AI le mescola, riordinale con le
+  frecce ◀ ▶ sotto le miniature.
+- Le mani e i piedi che salgono devono restare DISTINTI (destra/sinistra): il programma le segue da una posa all'altra.
+- Più pose = movimento più fluido ma più lavoro: 4 bastano per un ciclo, 6 per uno più ricco.
+- Avvisi ⚠ sotto le miniature: scheletro poco sicuro, scala o proporzioni diverse dalle altre pose → rigenera quella posa
+  (o tutto il foglio) con lo stesso personaggio di riferimento.
+- Si può usare lo stesso schema per un salto (decollo, apice, atterraggio): per ora l'importazione guidata è per l'arrampicata.

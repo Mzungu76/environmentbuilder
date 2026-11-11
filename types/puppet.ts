@@ -106,6 +106,8 @@ export interface PuppetView {
   /** Ground contact point (feet centre), in cut-out pixels. */
   pivot: Vec2;
   landmarks: Partial<Record<LandmarkId, Vec2>>;
+  /** Key-pose frames: silhouette overlap (0–1) of the automatic skeleton fit; absent when the skeleton was not fitted. */
+  fitScore?: number;
   mesh: Mesh | null;
   skin: Skin | null;
   /** Optional part-based rebuild of this view (see ManikinData). */
@@ -129,12 +131,27 @@ export interface KeyParams {
   minIsland: number;
 }
 
+/**
+ * Pose-keyed animation: an ordered list of key poses (each a full view drawn in that posture: own image, skeleton, mesh).
+ * Playback goes key → key; between two keys the skeleton difference of the neighbours is used to warp both toward the
+ * in-between pose and they are cross-faded. Deformations stay small because every frame starts from a nearby drawing.
+ */
+export interface PoseSet {
+  frames: PuppetView[];
+  /** Seconds for one full cycle through all the keys. */
+  duration: number;
+  loop: boolean;
+}
+export type PoseSetKey = 'climb' | 'jump';
+
 export interface Puppet {
   id: string;
   name: string;
   source: { assetId: string; width: number; height: number } | null;
   keying: KeyParams;
   views: Partial<Record<ViewId, PuppetView>>;
+  /** Key-pose sequences (override the single climb/jump view when they have 2+ frames). */
+  poseSets?: Partial<Record<PoseSetKey, PoseSet>>;
   /** View used when standing still. */
   idleView: ViewId;
   /** Asset metadata for every image of this puppet (source + cut-outs), exported with the project. */

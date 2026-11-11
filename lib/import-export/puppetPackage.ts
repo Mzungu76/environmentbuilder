@@ -4,6 +4,7 @@ import { SCHEMA_VERSION, VIEW_IDS } from '@/types';
 import { getAsset } from '@/lib/persistence/db';
 import { RUNTIME_SOURCE } from '@/lib/generated/runtimeSource';
 import { resolveView } from '@/engine/puppet/runtime';
+import { frameQualities } from '@/engine/puppet/keyposes';
 
 /**
  * Self-contained puppet package for host games:
@@ -31,7 +32,11 @@ export function validatePuppet(p: Puppet): PuppetValidation {
     if (v === 'side' && !w.stateClips.WALK) warnings.push('Profilo: manca la camminata (WALK).');
   }
   if (!p.views.side) warnings.push('Manca la vista di profilo: serve per camminare a destra e a sinistra.');
-  if (!p.views.climb) warnings.push('Nessuna vista di arrampicata: nello stato CLIMB si userà il profilo.');
+  const cs = p.poseSets?.climb;
+  if (cs && cs.frames.length >= 2) {
+    cs.frames.forEach((f, i) => { if (!f.mesh || !f.skin || !f.cutoutAssetId || Object.keys(f.landmarks).length < 19) errors.push(`Sequenza arrampicata, posa ${i + 1}: scheletro, mesh o immagine mancanti.`); });
+    frameQualities(cs.frames).forEach((q, i) => { if (!q.ok) warnings.push(`Sequenza arrampicata, posa ${i + 1}: ${q.issues.join('; ')}.`); });
+  } else if (!p.views.climb) warnings.push('Nessuna vista di arrampicata: nello stato CLIMB si userà il profilo.');
   if (!p.views.jump) warnings.push('Nessuna vista di salto: negli stati JUMP e FALL si userà il profilo.');
   return { errors, warnings };
 }
@@ -48,7 +53,13 @@ export function puppetJson(p: Puppet) {
     void cutoutAssetId; void _crop; void sourceAssetId; void manikin;
     views[v] = { ...rest, texture: texturePath(v) };
   }
-  return { format: PUPPET_FORMAT, schemaVersion: SCHEMA_VERSION, name: p.name, idleView: p.idleView, views };
+  // key-pose sequences: frames are full views with their own texture (textures/<key>-<n>.png)
+  const poseSets: Record<string, unknown> = {};
+  for (const [key, set] of Object.entries(p.poseSets ?? {})) {
+    if (!set || set.frames.length < 2) continue;
+    poseSets[key] = { duration: set.duration, loop: set.loop, frames: set.frames.map((f, i) => { const { cutoutAssetId, crop: _c, sourceAssetId, manikin, ...rest } = f; void cutoutAssetId; void _c; void sourceAssetId; void manikin; return { ...rest, texture: `textures/${key}-${i}.png` }; }) };
+  }
+  return { format: PUPPET_FORMAT, schemaVersion: SCHEMA_VERSION, name: p.name, idleView: p.idleView, views, poseSets };
 }
 
 const blobToDataUrl = (b: Blob) => new Promise<string>((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result)); r.onerror = () => rej(r.error); r.readAsDataURL(b); });
@@ -64,6 +75,14 @@ export async function buildPuppetPackage(project: Project, puppet: Puppet): Prom
     if (!blob) throw new Error(`Immagine mancante per la vista «${v}»`);
     zip.file(texturePath(v), blob);
     urls[texturePath(v)] = await blobToDataUrl(blob);
+  }
+  for (const [key, set] of Object.entries(puppet.poseSets ?? {})) {
+    if (!set || set.frames.length < 2) continue;
+    for (let i = 0; i < set.frames.length; i++) {
+      const id = set.frames[i].cutoutAssetId, blob = id ? await getAsset(project.id, id) : undefined;
+      if (!blob) throw new Error(`Immagine mancante per la posa ${i + 1} della sequenza «${key}»`);
+      const path = `textures/${key}-${i}.png`; zip.file(path, blob); urls[path] = await blobToDataUrl(blob);
+    }
   }
   zip.file('puppet.json', JSON.stringify(json, null, 2));
   zip.file('environment-runtime.mjs', RUNTIME_SOURCE);
@@ -103,6 +122,7 @@ Note
 - Stati supportati: IDLE, WALK, CLIMB, INTERACT, COLLECT, JUMP, FALL, CUSTOM (quelli senza animazione usano IDLE).
 - speedInFigureHeights = velocità in altezze del personaggio al secondo: sincronizza il passo (clip.cycleLength) ed evita i piedi che scivolano.
 - Il profilo guarda a destra: per andare a sinistra usa flip: true.
+- Sequenze di pose (arrampicata/salto): puppet.json → poseSets.climb = { frames, duration, loop }; a ogni frame R.sampleSet(set, phase) restituisce { under, over } (view + pose + alpha): disegna under opaco e over sopra con globalAlpha = alpha; la fase avanza di dt/duration. Vedi demo.html.
 - Vista fronte/retro: scegli con l'indicazione "view" dei collegamenti (props.view) o per le soste (idleView).
 `;
 }
@@ -123,6 +143,8 @@ function demoHtml(json: unknown, urls: Record<string, string>): string {
 const R = await import(URL.createObjectURL(new Blob([document.getElementById('rt').textContent.replace(/<\\\\\\/script/g,'</script')],{type:'text/javascript'})));
 const data = JSON.parse(document.getElementById('data').textContent), tex = JSON.parse(document.getElementById('tex').textContent);
 const imgs = {};
+const setImgs = {};
+await Promise.all(Object.entries(data.poseSets || {}).flatMap(([k, set]) => set.frames.map((f, i) => new Promise(r => { const im = new Image(); im.onload = () => { setImgs[k + i] = im; r(); }; im.src = tex[f.texture]; }))));
 await Promise.all(Object.entries(data.views).map(([id,v]) => new Promise(r => { const i = new Image(); i.onload = () => { imgs[id] = i; r(); }; i.src = tex[v.texture]; })));
 const ids = Object.keys(data.views); let state = 'WALK', forced = null, phase = 0, last = performance.now();
 const STATES = ['IDLE','WALK','CLIMB','INTERACT','COLLECT','JUMP','FALL','CUSTOM'];
@@ -133,6 +155,14 @@ mk($('views'), ['auto', ...ids], () => forced ?? 'auto', (v) => { forced = v ===
 $('info').textContent = data.name + ' · viste: ' + ids.join(', ');
 function frame(now) {
   const dt = Math.min(0.1, (now - last) / 1000); last = now;
+  const sk = state === 'CLIMB' ? 'climb' : (state === 'JUMP' || state === 'FALL') ? 'jump' : null, set = !forced && sk && data.poseSets && data.poseSets[sk];
+  if (set) {
+    phase = set.loop ? (phase + dt / set.duration) % 1 : Math.min(1, phase + dt / set.duration);
+    const smp = R.sampleSet(set, phase), dpr = devicePixelRatio || 1; cv.width = cv.clientWidth * dpr; cv.height = cv.clientHeight * dpr; ctx.setTransform(dpr,0,0,dpr,0,0);
+    for (const L of [smp.under, smp.over]) { if (!L) continue; const pos = R.skinVertices(L.view, L.pose); if (!pos) continue; ctx.save(); ctx.globalAlpha = L.alpha;
+      R.drawPuppet(ctx, setImgs[sk + set.frames.indexOf(L.view)], pos, L.view.mesh.uvs, L.view.mesh.indices, { x: cv.clientWidth / 2, y: cv.clientHeight * 0.92, scale: (cv.clientHeight * 0.7) / L.view.figureHeight, flip: false, pivot: L.view.pivot }); ctx.restore(); }
+    requestAnimationFrame(frame); return;
+  }
   const vid = forced ?? R.chooseViewForState(data.views, state, data.idleView);
   const view = data.views[vid];
   if (view) {

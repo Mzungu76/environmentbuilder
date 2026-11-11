@@ -7,6 +7,7 @@ import { readImageFile, ACCEPTED_IMAGE_TYPES } from '@/lib/import-export/image';
 import { putAsset } from '@/lib/persistence/db';
 import { blobToImg, imgToBlob, makeView, pruneAssets, storePuppetImage, updatePuppet } from '@/lib/studio/pipeline';
 import { ed } from './shared';
+import { PoseSetEditor } from './PoseSetEditor';
 
 const EXTRA: { id: ViewId; label: string; help: string }[] = [
   { id: 'climb', label: 'Arrampicata', help: 'Mostrata quando il personaggio si arrampica (stato CLIMB).' },
@@ -58,6 +59,7 @@ export function ExtraViews({ store, puppet, projectId }: { store: import('@/lib/
 
   return (
     <div className={ed.section} data-testid="extra-views">
+      <PoseSetEditor store={store} puppet={puppet} projectId={projectId} />
       <h4>Pose aggiuntive (opzionale)</h4>
       <span className={ed.help}>Un’immagine unica non può arrampicarsi o saltare in modo convincente: disegna (o genera) il personaggio già in quella posa e importala qui. Nel gioco la vista giusta compare da sola. La guida è nel passo 1.</span>
       {EXTRA.map((x) => (
