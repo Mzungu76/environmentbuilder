@@ -1,0 +1,30 @@
+{
+  "name": "environment-builder",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Universal 2D Environment Editor & Exploration Engine",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "npx serve out",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "build:standalone": "node tools/build-standalone.mjs",
+    "build:runtime": "node tools/build-runtime.mjs"
+  },
+  "dependencies": {
+    "jszip": "^3.10.2",
+    "next": "^15.5.29",
+    "pixi.js": "^8.22.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "esbuild": "^0.28.2",
+    "typescript": "^5.9.3",
+    "vitest": "^2.1.9"
+  }
+}
