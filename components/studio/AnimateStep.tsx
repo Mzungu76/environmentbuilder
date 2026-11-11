@@ -61,7 +61,7 @@ export function AnimateStep({ store, puppet, projectId, go }: StepProps) {
 
   return (
     <div className={st.main}>
-      <div className={st.stage}>
+      <div className={`${st.stage} ${st.tall}`}>
         <div className={st.toolbar}>
           <ViewTabs puppet={puppet} value={vid} onChange={(v) => { setVid(v); setClipId(null); setSelKey(null); }} requireMesh />
           <button className={`${ed.btn} ${playing ? ed.btnPrimary : ''}`} onClick={() => setPlaying((p) => !p)} data-testid="anim-play">{playing ? 'Pausa' : 'Riproduci'}</button>
@@ -102,11 +102,11 @@ export function AnimateStep({ store, puppet, projectId, go }: StepProps) {
               } else if (e.type === 'up') drag.current = null;
             }} />}
           {clip && (
-            <div className={ed.section} style={{ borderRadius: 8, border: '1px solid var(--border)' }}>
+            <div className={`${ed.section} ${st.timeline}`} style={{ borderRadius: 8, border: '1px solid var(--border)' }}>
               <Slider id="phase" label="Istante del ciclo" value={phase} min={0} max={1} step={0.005} onChange={(v) => { setPhase(v); setPlaying(false); }} fmt={(v) => `${Math.round(v * 100)}%  ·  ${(v * clip.duration).toFixed(2)} s`} />
-              <div className={ed.checkGrid} data-testid="keys">
-                {keys.map((k, i) => <button key={i} className={ed.chip} aria-pressed={selKey === i || nearKey === i} onClick={() => { setSelKey(i); setPhase(k.t); setPlaying(false); }}>◆ {Math.round(k.t * 100)}%</button>)}
+              <div className={`${ed.checkGrid} ${st.keysRow}`} data-testid="keys">
                 <button className={ed.btn} style={{ height: 28 }} onClick={addKeyAtPhase} data-testid="add-key">+ Chiave qui</button>
+                {keys.map((k, i) => <button key={i} className={ed.chip} aria-pressed={selKey === i || nearKey === i} onClick={() => { setSelKey(i); setPhase(k.t); setPlaying(false); }}>◆ {Math.round(k.t * 100)}%</button>)}
                 {nearKey >= 0 && keys.length > 2 && <button className={`${ed.btn} ${ed.btnDanger}`} style={{ height: 28 }} onClick={() => { setClip({ keys: keys.filter((_, i) => i !== nearKey) }); setSelKey(null); }}>Elimina chiave</button>}
               </div>
             </div>

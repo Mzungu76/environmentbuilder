@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, type CSSProperties } from 'react';
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react';
 
 export interface ViewXform { zoom: number; ox: number; oy: number; dpr: number }
 export interface CanvasPointer { type: 'down' | 'move' | 'up'; x: number; y: number; button: number; shift: boolean; pointerType: string }
@@ -32,6 +32,11 @@ export function ZoomCanvas({ contentWidth, contentHeight, draw, onPointer, versi
   const props = useRef({ draw, onPointer, panMode, checker, contentWidth, contentHeight });
   props.current = { draw, onPointer, panMode, checker, contentWidth, contentHeight };
   const raf = useRef(0);
+  const [hand, setHand] = useState(false);
+  const [coarse, setCoarse] = useState(false);
+  const handRef = useRef(false);
+  handRef.current = hand;
+  useEffect(() => setCoarse(window.matchMedia('(pointer: coarse)').matches || window.innerWidth < 900), []);
 
   const render = useCallback(() => {
     cancelAnimationFrame(raf.current);
@@ -82,7 +87,7 @@ export function ZoomCanvas({ contentWidth, contentHeight, draw, onPointer, versi
     const down = (e: PointerEvent) => {
       c.setPointerCapture(e.pointerId); const s = local(e); pts.set(e.pointerId, s);
       if (pts.size === 2) { const [a, b] = [...pts.values()]; pinch = { d: Math.hypot(a.x - b.x, a.y - b.y), cx: (a.x + b.x) / 2, cy: (a.y + b.y) / 2 }; pan = null; return; }
-      if (e.button === 1 || e.button === 2 || props.current.panMode) { pan = s; return; }
+      if (e.button === 1 || e.button === 2 || props.current.panMode || handRef.current) { pan = s; return; }
       emit('down', e);
     };
     const move = (e: PointerEvent) => {
@@ -99,7 +104,8 @@ export function ZoomCanvas({ contentWidth, contentHeight, draw, onPointer, versi
 
   return (
     <div ref={host} style={{ position: 'relative', width: '100%', height: '100%', minHeight: 240, background: '#14161a', borderRadius: 8, overflow: 'hidden', ...style }}>
-      <canvas ref={cv} data-testid={testId} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', touchAction: 'none', cursor: cursor ?? 'default' }} />
+      <canvas ref={cv} data-testid={testId} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', touchAction: 'none', userSelect: 'none', WebkitUserSelect: 'none', WebkitTouchCallout: 'none', cursor: hand ? 'grab' : cursor ?? 'default' }} />
+      {coarse && <button onClick={() => setHand((h) => !h)} aria-pressed={hand} aria-label="Sposta la vista con un dito" title="Sposta la vista con un dito" data-testid="hand-toggle" style={{ position: 'absolute', left: 8, bottom: 8, height: 34, padding: '0 12px', borderRadius: 6, border: `1px solid ${hand ? 'var(--accent)' : 'var(--border)'}`, background: hand ? 'var(--accent-soft)' : 'rgba(23,26,32,.92)', color: 'var(--text)' }}>✋ Sposta</button>}
       <button onClick={fit} aria-label="Adatta alla finestra" title="Adatta alla finestra" style={{ position: 'absolute', right: 8, bottom: 8, height: 30, padding: '0 10px', borderRadius: 6, border: '1px solid var(--border)', background: 'rgba(23,26,32,.92)', color: 'var(--text)' }}>Adatta</button>
     </div>
   );

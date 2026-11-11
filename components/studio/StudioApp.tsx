@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import Link from 'next/link';
 import { EditorStore } from '@/lib/store/editorStore';
 import { loadProject } from '@/lib/persistence/db';
@@ -48,6 +48,8 @@ function Studio({ store, initialPuppet }: { store: EditorStore; initialPuppet: s
   const [step, setStep] = useState(0);
   const [confirmDel, setConfirmDel] = useState(false);
   const puppet = puppets.find((p) => p.id === pid) ?? null;
+  const stepsRef = useRef<HTMLElement>(null);
+  useEffect(() => { stepsRef.current?.querySelector('[aria-current="true"]')?.scrollIntoView({ inline: 'center', block: 'nearest' }); }, [step]);
 
   useEffect(() => {
     const flush = () => { if (store.getState().saveStatus !== 'saved') void store.save(); };
@@ -76,23 +78,23 @@ function Studio({ store, initialPuppet }: { store: EditorStore; initialPuppet: s
   return (
     <div className={st.app}>
       <header className={st.top}>
-        <Link href={`/editor?id=${store.project.id}`} className={ed.btn} data-testid="back-editor">← Editor</Link>
-        <h1>Studio personaggi · {state.project.name}</h1>
+        <Link href={`/editor?id=${store.project.id}`} className={ed.btn} data-testid="back-editor" aria-label="Torna all’editor">←<span className={st.hideSm}> Editor</span></Link>
+        <h1 className={st.hideSm}>Studio personaggi · {state.project.name}</h1>
         <span className={st.spacer} />
-        <select className={ed.select} style={{ width: 200 }} value={pid ?? ''} onChange={(e) => { setPid(e.target.value || null); setStep(0); setConfirmDel(false); }} aria-label="Personaggio" data-testid="puppet-select">
+        <select className={ed.select} style={{ width: 170, flex: '0 1 200px' }} value={pid ?? ''} onChange={(e) => { setPid(e.target.value || null); setStep(0); setConfirmDel(false); }} aria-label="Personaggio" data-testid="puppet-select">
           {puppets.length === 0 && <option value="">Nessun personaggio</option>}
           {puppets.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
         </select>
-        <button className={ed.btn} onClick={create} data-testid="new-puppet">{Icon.plus}Nuovo</button>
+        <button className={ed.btn} onClick={create} data-testid="new-puppet">{Icon.plus}<span className={st.hideSm}>Nuovo</span></button>
         {puppet && (confirmDel
           ? <button className={`${ed.btn} ${ed.btnDanger}`} onClick={() => { store.commitProject((pr) => ({ ...pr, puppets: pr.puppets.filter((p) => p.id !== puppet.id), environments: pr.environments.map((e) => ({ ...e, characters: e.characters.map((c) => (c.puppetId === puppet.id ? { ...c, puppetId: null } : c)) })) })); setPid(null); setConfirmDel(false); }}>Eliminare «{puppet.name}»?</button>
           : <button className={`${ed.btn} ${ed.btnDanger} ${ed.iconBtn}`} onClick={() => setConfirmDel(true)} aria-label="Elimina personaggio" title="Elimina personaggio">{Icon.trash}</button>)}
         <button className={`${ed.btn} ${ed.iconBtn}`} onClick={() => store.undo()} disabled={!state.canUndo} aria-label="Annulla" title="Annulla (Ctrl+Z)">{Icon.undo}</button>
         <button className={`${ed.btn} ${ed.iconBtn}`} onClick={() => store.redo()} disabled={!state.canRedo} aria-label="Ripeti" title="Ripeti">{Icon.redo}</button>
-        <span className={ed.status} role="status"><span className={`${ed.dot} ${st2 === 'dirty' ? ed.dotDirty : st2 === 'error' ? ed.dotError : st2 === 'saving' ? ed.dotSaving : ''}`} />{st2 === 'saved' ? 'Salvato' : st2 === 'dirty' ? 'Modifiche non salvate' : st2 === 'saving' ? 'Salvataggio…' : 'Salvataggio non riuscito'}</span>
-        <Link href="/manuale" target="_blank" className={`${ed.btn} ${ed.iconBtn}`} aria-label="Manuale" title="Manuale">{Icon.help}</Link>
+        <span className={`${ed.status} ${st.hideSm}`} role="status"><span className={`${ed.dot} ${st2 === 'dirty' ? ed.dotDirty : st2 === 'error' ? ed.dotError : st2 === 'saving' ? ed.dotSaving : ''}`} />{st2 === 'saved' ? 'Salvato' : st2 === 'dirty' ? 'Modifiche non salvate' : st2 === 'saving' ? 'Salvataggio…' : 'Salvataggio non riuscito'}</span>
+        <Link href="/manuale" target="_blank" className={`${ed.btn} ${ed.iconBtn} ${st.hideSm}`} aria-label="Manuale" title="Manuale">{Icon.help}</Link>
       </header>
-      <nav className={st.steps} aria-label="Passi">
+      <nav className={st.steps} aria-label="Passi" ref={stepsRef}>
         {STEPS.map((s, i) => (
           <button key={s} className={st.step} aria-current={step === i} onClick={() => setStep(i)} data-testid={`step-${i}`}>
             <span className={st.num}>{i + 1}</span>{s}{puppet && done[i] ? <span className={st.ok} /> : null}

@@ -131,3 +131,13 @@
   .modeSeg button { padding: 0 8px; font-size: 12px; }
   .top .btn { flex: none; }
 }
+
+/* touch screens: comfortable tap targets everywhere (editor and studio) */
+@media (pointer: coarse) {
+  .btn { min-height: 40px; }
+  .iconBtn { min-width: 40px; }
+  .chip { min-height: 36px; padding: 0 14px; }
+  .input, .select { min-height: 40px; }
+  .seg button { min-height: 38px; }
+  .top .btn { min-height: 38px; }
+}

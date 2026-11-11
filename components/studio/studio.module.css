@@ -24,4 +24,29 @@
 .promptBox { font-family: var(--mono); font-size: 11.5px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 8px; max-height: 160px; overflow: auto; white-space: pre-wrap; }
 .guideImg { width: 100%; border: 1px solid var(--border); border-radius: 6px; background: #fff; }
 .empty { display: grid; place-items: center; min-height: 240px; border: 2px dashed var(--border-strong); border-radius: 12px; color: var(--text-dim); text-align: center; padding: 24px; }
-@media (max-width: 900px) { .main { grid-template-columns: 1fr; grid-template-rows: minmax(320px, 55%) 1fr; } .panel { border-left: 0; border-top: 1px solid var(--border); } }
+/* phones & tablets: the work area stays pinned on top, the panel scrolls underneath */
+.hideSm { }
+.tall { }
+.keysRow { }
+.timeline { }
+@media (max-width: 900px) {
+  .top { flex-wrap: nowrap; gap: 6px; padding: 6px 8px; overflow-x: auto; scrollbar-width: none; }
+  .top > * { flex: none; }
+  .top .hideSm { display: none; }
+  .step { height: 34px; padding: 0 10px; }
+  .main { display: block; overflow-y: auto; overscroll-behavior: contain; min-height: 0; }
+  .stage { position: sticky; top: 0; z-index: 5; background: var(--bg); height: min(56dvh, 520px); padding: 8px; box-shadow: 0 6px 16px rgba(0,0,0,.35); }
+  .toolbar { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; }
+  .toolbar > * { flex: none; }
+  .toolbar .help { display: none; }
+  .panel { border-left: 0; border-top: 1px solid var(--border); overflow: visible; }
+  .empty { min-height: 160px; }
+  .tall { height: min(68dvh, 620px); }
+  .keysRow { flex-wrap: nowrap !important; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; }
+  .keysRow > * { flex: none; }
+  .timeline { padding: 8px 12px !important; gap: 6px !important; }
+}
+@media (pointer: coarse) {
+  .item { min-height: 42px; }
+  .step { min-height: 40px; }
+}

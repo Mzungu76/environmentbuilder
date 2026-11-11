@@ -79,9 +79,9 @@ export function ViewsStep({ store, puppet, projectId, go }: StepProps) {
   };
 
   // --- rectangle editing on the sheet --------------------------------------------------------------------------------
-  const hit = (x: number, y: number, zoom: number) => {
+  const hit = (x: number, y: number, zoom: number, touch = false) => {
     if (!cells) return null;
-    const tol = 9 / zoom;
+    const tol = (touch ? 24 : 9) / zoom;
     for (const v of ORDER) {
       const r = cells[v];
       const inX = x >= r.x - tol && x <= r.x + r.w + tol, inY = y >= r.y - tol && y <= r.y + r.h + tol;
@@ -105,7 +105,7 @@ export function ViewsStep({ store, puppet, projectId, go }: StepProps) {
           });
         }}
         onPointer={(e, v) => {
-          if (e.type === 'down') { const h = hit(e.x, e.y, v.zoom); if (h) drag.current = { ...h, startX: e.x, startY: e.y, rect: { ...cells[h.view] } }; }
+          if (e.type === 'down') { const h = hit(e.x, e.y, v.zoom, e.pointerType !== 'mouse'); if (h) drag.current = { ...h, startX: e.x, startY: e.y, rect: { ...cells[h.view] } }; }
           else if (e.type === 'move' && drag.current) {
             const d = drag.current, dx = e.x - d.startX, dy = e.y - d.startY; const r = { ...d.rect };
             if (d.edge === 'move') { r.x += dx; r.y += dy; }

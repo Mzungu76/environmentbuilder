@@ -65,7 +65,7 @@ Senza immagine è usato un personaggio provvisorio (colore, dimensioni, ombra). 
 
 ## 8. Studio personaggi (modellini con scheletro)
 
-Sezione a parte (icona personaggio nella barra dell’editor, oppure *Personaggi* nella Libreria) che trasforma **un foglio di rotazione** — un’unica immagine con fronte, profilo verso destra e retro dello stesso personaggio — in un personaggio con **scheletro e animazioni**. Il builder non genera immagini: nel passo 1 trovi la **guida da dare al tuo generatore AI** (sagoma, mappa delle parti, prompt già scritto da compilare). Pensato per il computer; i passi si possono ripetere e correggere in ogni momento (`Ctrl+Z`, salvataggio automatico).
+Sezione a parte (icona personaggio nella barra dell’editor, oppure *Personaggi* nella Libreria) che trasforma **un foglio di rotazione** — un’unica immagine con fronte, profilo verso destra e retro dello stesso personaggio — in un personaggio con **scheletro e animazioni**. Il builder non genera immagini: nel passo 1 trovi la **guida da dare al tuo generatore AI** (sagoma, mappa delle parti, prompt già scritto da compilare). Funziona anche da **smartphone e tablet**: l’area di lavoro resta fissa in alto e i controlli scorrono sotto; con due dita zoomi e sposti, il pulsante **✋ Sposta** trasforma un dito in «mano» (utile per pennello e ritocchi), e i punti si trascinano toccandoli. Per lavori di precisione (pesi, chiavi) il computer resta più comodo. I passi si possono ripetere e correggere in ogni momento (`Ctrl+Z`, salvataggio automatico).
 
 1. **Importa** — carica il foglio. Qui trovi anche la guida e il prompt (pulsante *Copia*).
 2. **Sfondo** — rimuove lo sfondo piatto. Le tolleranze servono perché le immagini AI non sono mai perfette: *tolleranza colore* (sfondi sporchi o JPEG), *morbidezza del bordo*, *restringi/allarga il contorno* (per eliminare gli aloni), *pulizia dell’alone*, *elimina macchie*, e l’opzione «solo lo sfondo collegato ai bordi» che salva i dettagli chiari dentro il personaggio. Il contagocce sceglie il colore a mano. Anteprima: risultato, originale o confronto.
@@ -76,6 +76,8 @@ Sezione a parte (icona personaggio nella barra dell’editor, oppure *Personaggi
 7. **Anteprima ed esporta** — provi ogni stato e vista, controlli la lista di verifica, **esporti il pacchetto** per un gioco e **assegni l’aspetto** ai personaggi del progetto (o ne crei uno).
 
 Nell’editor, il personaggio usa il modellino scegliendolo in *Aspetto con scheletro* (Inspector del personaggio). Nel Playtest cammina con la vista di profilo (specchiata a sinistra), sosta di fronte, e su un collegamento puoi forzare la vista *Fronte/Retro* (Inspector del percorso → *Vista del personaggio*), ad esempio per scale verso lo spettatore.
+
+**Dimensione nel gioco:** il modellino si scala dall’Inspector del personaggio (*Altezza, % dell’immagine*): la larghezza segue le proporzioni. Regola l’altezza in base ai nodi e agli oggetti dell’ambiente.
 
 **Limiti:** l’immagine unica non contiene ciò che è nascosto (dietro un braccio, l’altra gamba): le copie degli arti lontani e il pennello dei pesi compensano, ma movimenti molto ampi mostrano deformazioni. L’aspetto non cambia con l’inventario.
 
