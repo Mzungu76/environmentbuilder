@@ -23,9 +23,9 @@ import { createCharacter } from '@/engine/characters/factory';
 
 /* ---- inspector -------------------------------------------------------------------------------- */
 
-interface Props { store: EditorStore; env: Environment; selection: Selection; revision: number; open?: boolean; full?: boolean; onToggleFull?: () => void; onClose?: () => void; onFit: () => void; onReplaceImage: () => void; onToggleCurve: (id: string) => void; onDeleteSelection: () => void }
+interface Props { /** controls of the active tool, shown at the top (e.g. Primo piano) */ top?: React.ReactNode; store: EditorStore; env: Environment; selection: Selection; revision: number; open?: boolean; full?: boolean; onToggleFull?: () => void; onClose?: () => void; onFit: () => void; onReplaceImage: () => void; onToggleCurve: (id: string) => void; onDeleteSelection: () => void }
 
-export function Inspector({ store, env, selection, open, full, onToggleFull, onClose, onFit, onReplaceImage, onToggleCurve, onDeleteSelection }: Props) {
+export function Inspector({ top, store, env, selection, open, full, onToggleFull, onClose, onFit, onReplaceImage, onToggleCurve, onDeleteSelection }: Props) {
   const nav = env.navigation;
   const node = selection?.kind === 'node' ? nav.nodes.find((n) => n.id === selection.id) : undefined;
   const edge = selection?.kind === 'edge' ? nav.edges.find((e) => e.id === selection.id) : undefined;
@@ -36,6 +36,7 @@ export function Inspector({ store, env, selection, open, full, onToggleFull, onC
   return (
     <aside className={`${styles.inspector} ${open ? styles.inspectorOpen : ''} ${full ? styles.inspectorFull : ''}`} aria-label="Inspector" data-testid="inspector">
       <SheetBar title={node ? 'Nodo' : edge ? 'Percorso' : chr ? 'Personaggio' : obj ? 'Oggetto' : 'Impostazioni'} full={!!full} onToggleFull={onToggleFull} onClose={onClose} />
+      {top && <div className={styles.inspTop}>{top}</div>}
       <div className={styles.inspHead}>
         <h3>{node ? 'Nodo' : edge ? 'Percorso' : chr ? 'Personaggio' : obj ? 'Oggetto' : 'Ambiente'}</h3>
         {(node || edge || chr || obj) && <button className={`${styles.btn} ${styles.btnDanger}`} onClick={onDeleteSelection} title="Elimina (Canc)" data-testid="delete-selected">{Icon.trash}Elimina</button>}

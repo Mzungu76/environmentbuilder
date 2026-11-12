@@ -89,10 +89,16 @@ export interface GameplayConfig {
 
 /**
  * One brush stroke of an occluder, in order. `add` paints coverage, `sub` erases it. Points are normalized (x, y pairs) to the
- * environment; `radius` is a fraction of the image HEIGHT (round on screen). Later steps add shapes (rect, ellipse, polygon, spline).
+ * environment; `radius` is a fraction of the image HEIGHT (round on screen). Shapes (rect, ellipse, polygon, spline) are ops too.
  */
 export interface OccluderStroke { kind: 'stroke'; mode: 'add' | 'sub'; radius: number; pts: number[] }
-export type OccluderOp = OccluderStroke;
+export type OccluderShapeKind = 'rect' | 'ellipse' | 'polygon' | 'spline';
+/**
+ * A filled geometric shape. `pts` are normalized (x, y pairs): rect and ellipse use two opposite corners of their box (x0, y0, x1, y1),
+ * polygon its vertices, spline the control points of a closed smooth curve that passes through them.
+ */
+export interface OccluderShape { kind: 'shape'; mode: 'add' | 'sub'; shape: OccluderShapeKind; pts: number[] }
+export type OccluderOp = OccluderStroke | OccluderShape;
 /**
  * A part of the backdrop that can hide a character: where `ops` paint coverage, the backdrop itself is drawn again on top of the
  * characters (no extra image). `softness` 0–1 feathers the edge.

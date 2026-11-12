@@ -24,7 +24,7 @@ L’interfaccia è in **italiano** (stringhe ancora inline nei componenti; un li
 | Modalità anteprima senza strumenti (`O`) | ✅ |
 | Touch: selezione, trascinamento nodi, pinch-zoom e pan a due dita, layout responsive | ✅ |
 | Smartphone in orizzontale (altezza ≤ 500 px): scena a tutto schermo, comandi tondi flottanti, menu progetto, pannello proprietà che affianca la scena (mockup in `docs/mockup-mobile.html`, proposta B) | ✅ |
-| **Primo piano**: parti dello sfondo dipinte (pennello/gomma, bordo morbido) che nascondono il personaggio; sostituisce il vecchio livello «primo piano» (schema v5, migrazione automatica) | ✅ (passo 1) |
+| **Primo piano**: parti dello sfondo dipinte (pennello/gomma, bordo morbido) che nascondono il personaggio; sostituisce il vecchio livello «primo piano» (schema v5, migrazione automatica) | ✅ (passi 1–2: pennello, forme e spline modificabili) |
 
 ### Studio personaggi (modellini con scheletro) — sezione `/studio`
 
