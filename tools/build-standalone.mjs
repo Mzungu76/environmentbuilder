@@ -12,7 +12,7 @@ const res = await build({
 });
 let js = '', css = '';
 for (const f of res.outputFiles) { if (f.path.endsWith('.js')) js = f.text; else if (f.path.endsWith('.css')) css = f.text; }
-const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1"><title>Environment Builder</title><style>${css}</style></head><body><div id="root"></div><script>${js.replace(/<\/script/gi, '<\\/script')}</script></body></html>`;
+const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover"><title>Environment Builder</title><style>${css}</style></head><body><div id="root"></div><script>${js.replace(/<\/script/gi, '<\\/script')}</script></body></html>`;
 mkdirSync(path.join(root, 'dist'), { recursive: true });
 writeFileSync(path.join(root, 'dist/environment-builder.html'), html);
 console.log('dist/environment-builder.html', (html.length / 1024).toFixed(0) + ' KB');
