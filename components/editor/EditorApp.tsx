@@ -202,6 +202,13 @@ function Editor({ store }: { store: EditorStore }) {
   const onAssetError = useCallback((id: string, msg: string) => setNotice(`Impossibile caricare l’immagine (${id}): ${msg}`), []);
   const stableOnReady = useCallback((h: SceneHandle | null) => { handle.current = h; setSceneReady(!!h); }, []);
   const memoEnvName = useMemo(() => env.name, [env.name]);
+  const typeBar = hasImage && !state.preview && !playtest && state.tool === 'object' ? (
+    <div className={styles.typeBar} role="group" aria-label="Tipo di oggetto">
+      {OBJECT_TYPES.map((t) => <button key={t.id} className={styles.chip} aria-pressed={state.objectType === t.id} onClick={() => store.setObjectType(t.id)} data-testid={`otype-${t.id}`}>{t.label}</button>)}
+    </div>
+  ) : null;
+  // phone in landscape: tool options live in a side column next to the scene, never on top of the illustration
+  const showOptions = compact && hasImage && !state.preview && !playtest && !inspectorOpen && (state.tool === 'zones' || state.tool === 'object');
 
   return (
     <div className={`${styles.app} ${compact ? styles.compact : ''}`}>
@@ -230,14 +237,10 @@ function Editor({ store }: { store: EditorStore }) {
               </div>
             </div>
           )}
-          {hasImage && !state.preview && !playtest && state.tool === 'object' && (
-            <div className={styles.typeBar} role="group" aria-label="Tipo di oggetto">
-              {OBJECT_TYPES.map((t) => <button key={t.id} className={styles.chip} aria-pressed={state.objectType === t.id} onClick={() => store.setObjectType(t.id)} data-testid={`otype-${t.id}`}>{t.label}</button>)}
-            </div>
-          )}
-          {hasImage && !state.preview && !playtest && state.tool === 'zones' && <ZoneBar store={store} />}
+          {!compact && typeBar}
+          {!compact && hasImage && !state.preview && !playtest && state.tool === 'zones' && <ZoneBar store={store} />}
           {hasImage && !state.preview && !playtest && state.tool !== 'zones' && <div className={styles.hint} style={state.tool === 'object' ? { top: 64 } : undefined}>{toolInfo.hint}</div>}
-          {playtest && ctrl && <PlayTransport ctrl={ctrl} />}
+          {!compact && playtest && ctrl && <PlayTransport ctrl={ctrl} />}
           {notice && <div className={styles.banner} role="alert">{notice}<button onClick={() => setNotice(null)}>Chiudi</button></div>}
           {compact && <CompactControls store={store} state={state} envName={memoEnvName} envId={env.id} canPlaytest={hasImage}
             panelOpen={inspectorOpen} onTogglePanel={() => setInspectorOpen((o) => !o)} onLayers={openLayers}
@@ -250,6 +253,7 @@ function Editor({ store }: { store: EditorStore }) {
             {!playtest && <button className={`${styles.btn} ${styles.iconBtn}`} aria-pressed={state.preview} onClick={() => store.setPreview(!state.preview)} aria-label="Anteprima senza strumenti" title="Anteprima senza strumenti (O)" style={state.preview ? { borderColor: 'var(--accent)' } : undefined} data-testid="preview">{state.preview ? Icon.eyeOff : Icon.eye}</button>}
           </div>
         </div>
+        {showOptions && <aside className={styles.cOptions} aria-label="Opzioni dello strumento" data-testid="c-options">{state.tool === 'zones' ? <ZoneBar store={store} /> : typeBar}</aside>}
         {playtest ? (ctrl && <PlaytestPanel store={store} env={env} ctrl={ctrl} showPaths={state.showPaths} open={inspectorOpen} full={inspectorFull} onToggleFull={() => setInspectorFull((f) => !f)} onClose={closeSheet} />) : <Inspector store={store} env={env} selection={state.selection} revision={state.revision} open={inspectorOpen} full={inspectorFull} onToggleFull={() => setInspectorFull((f) => !f)} onClose={closeSheet}
           onFit={() => handle.current?.view.fit()} onReplaceImage={() => fileInput.current?.click()}
           onToggleCurve={(id) => handle.current?.editor.toggleCurve(id)} onDeleteSelection={() => handle.current?.editor.deleteSelection()} />}
