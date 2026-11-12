@@ -206,8 +206,11 @@ export class SceneView {
           const blob = await loader();
           if (!blob) throw new Error('dati immagine mancanti nell’archivio locale');
           const tex = Texture.from(await createImageBitmap(blob));
-          // mip-mapped, trilinear sampling: big textures drawn small (characters in a wide scene) stay smooth instead of shimmering/pixelated
-          tex.source.autoGenerateMipmaps = true; tex.source.style.scaleMode = 'linear'; tex.source.style.mipmapFilter = 'linear'; tex.source.update();
+          // mip-mapped, trilinear sampling for big textures drawn small (characters in a wide scene). Only when the GPU can really build the
+          // mip chain for this size: asking for mipmap filtering without mipmaps makes the texture "incomplete" and some phones draw nothing.
+          const gl = (this.app?.renderer as unknown as { context?: { supports?: { nonPowOf2mipmaps?: boolean } } } | undefined)?.context;
+          const canMip = !!(gl?.supports?.nonPowOf2mipmaps || tex.source.isPowerOfTwo) && Math.max(tex.source.pixelWidth, tex.source.pixelHeight) <= 4096;
+          if (canMip) { tex.source.autoGenerateMipmaps = true; tex.source.style.scaleMode = 'linear'; tex.source.style.mipmapFilter = 'linear'; }
           this.textures.set(assetId, tex);
           return tex;
         } catch (err) {

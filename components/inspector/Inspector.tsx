@@ -16,15 +16,16 @@ import { ObjectPanel } from './ObjectPanel';
 import { LayersPanel } from './LayersPanel';
 import { GameplayPanel } from './GameplayPanel';
 import { ScenePanel } from './ScenePanel';
+import { Collapsible, SheetBar } from './Collapsible';
 import { nodeScale } from '@/engine/navigation/perspective';
 import { objectIssues, objectTypeInfo } from '@/engine/interaction/objects';
 import { createCharacter } from '@/engine/characters/factory';
 
 /* ---- inspector -------------------------------------------------------------------------------- */
 
-interface Props { store: EditorStore; env: Environment; selection: Selection; revision: number; open?: boolean; onFit: () => void; onReplaceImage: () => void; onToggleCurve: (id: string) => void; onDeleteSelection: () => void }
+interface Props { store: EditorStore; env: Environment; selection: Selection; revision: number; open?: boolean; full?: boolean; onToggleFull?: () => void; onClose?: () => void; onFit: () => void; onReplaceImage: () => void; onToggleCurve: (id: string) => void; onDeleteSelection: () => void }
 
-export function Inspector({ store, env, selection, open, onFit, onReplaceImage, onToggleCurve, onDeleteSelection }: Props) {
+export function Inspector({ store, env, selection, open, full, onToggleFull, onClose, onFit, onReplaceImage, onToggleCurve, onDeleteSelection }: Props) {
   const nav = env.navigation;
   const node = selection?.kind === 'node' ? nav.nodes.find((n) => n.id === selection.id) : undefined;
   const edge = selection?.kind === 'edge' ? nav.edges.find((e) => e.id === selection.id) : undefined;
@@ -33,7 +34,8 @@ export function Inspector({ store, env, selection, open, onFit, onReplaceImage, 
   const select = (s: Selection) => store.setSelection(s);
 
   return (
-    <aside className={`${styles.inspector} ${open ? styles.inspectorOpen : ''}`} aria-label="Inspector" data-testid="inspector">
+    <aside className={`${styles.inspector} ${open ? styles.inspectorOpen : ''} ${full ? styles.inspectorFull : ''}`} aria-label="Inspector" data-testid="inspector">
+      <SheetBar title={node ? 'Nodo' : edge ? 'Percorso' : chr ? 'Personaggio' : obj ? 'Oggetto' : 'Impostazioni'} full={!!full} onToggleFull={onToggleFull} onClose={onClose} />
       <div className={styles.inspHead}>
         <h3>{node ? 'Nodo' : edge ? 'Percorso' : chr ? 'Personaggio' : obj ? 'Oggetto' : 'Ambiente'}</h3>
         {(node || edge || chr || obj) && <button className={`${styles.btn} ${styles.btnDanger}`} onClick={onDeleteSelection} title="Elimina (Canc)" data-testid="delete-selected">{Icon.trash}Elimina</button>}
@@ -210,9 +212,9 @@ function EnvPanel({ store, env, onFit, onReplaceImage }: { store: EditorStore; e
         {objectIssues(store.project, env).map((i, k) => <span key={k} className={styles.warn}>{i.message}</span>)}
         <span className={styles.help}>Aggiungili con lo strumento Oggetto (<kbd>I</kbd>).</span>
       </div>
-      <ProfilesPanel store={store} env={env} />
-      <ScenePanel store={store} env={env} />
-      <GameplayPanel store={store} env={env} />
+      <Collapsible title="Profili" id="profiles"><ProfilesPanel store={store} env={env} /></Collapsible>
+      <Collapsible title="Prospettiva, zone di scala e luce" id="scene"><ScenePanel store={store} env={env} /></Collapsible>
+      <Collapsible title="Gioco: oggetti e crollo" id="gameplay"><GameplayPanel store={store} env={env} /></Collapsible>
       <div className={styles.section}>
         <h4>Personaggi ({env.characters.length})</h4>
         <div className={styles.list}>

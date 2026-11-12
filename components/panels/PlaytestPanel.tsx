@@ -7,11 +7,12 @@ import type { PlaytestController } from '@/engine/simulation/PlaytestController'
 import { BehaviorFields } from '@/components/inspector/CharacterFields';
 import { CheckField, Field } from '@/components/inspector/fields';
 import { Icon } from '@/components/ui/icons';
+import { SheetBar } from '@/components/inspector/Collapsible';
 import styles from '../editor/editor.module.css';
 
 const STATE_IT: Record<string, string> = { IDLE: 'IDLE (fermo)', WALK: 'WALK (cammina)', CLIMB: 'CLIMB (si arrampica)', INTERACT: 'INTERACT', COLLECT: 'COLLECT', JUMP: 'JUMP', FALL: 'FALL', CUSTOM: 'CUSTOM' };
 
-export function PlaytestPanel({ store, env, ctrl, showPaths, open }: { store: EditorStore; env: Environment; ctrl: PlaytestController; showPaths: boolean; open: boolean }) {
+export function PlaytestPanel({ store, env, ctrl, showPaths, open, full, onToggleFull, onClose }: { store: EditorStore; env: Environment; ctrl: PlaytestController; showPaths: boolean; open: boolean; full?: boolean; onToggleFull?: () => void; onClose?: () => void }) {
   const v = useSyncExternalStore(ctrl.subscribe, ctrl.getView, ctrl.getView);
   const [diag, setDiag] = useState(true);
   const [dest, setDest] = useState('');
@@ -26,7 +27,8 @@ export function PlaytestPanel({ store, env, ctrl, showPaths, open }: { store: Ed
   const playing = v.status === 'playing';
 
   return (
-    <aside className={`${styles.inspector} ${open ? styles.inspectorOpen : ''}`} aria-label="Pannello Playtest" data-testid="playtest-panel">
+    <aside className={`${styles.inspector} ${open ? styles.inspectorOpen : ''} ${full ? styles.inspectorFull : ''}`} aria-label="Pannello Playtest" data-testid="playtest-panel">
+      <SheetBar title="Playtest" full={!!full} onToggleFull={onToggleFull} onClose={onClose} />
       <div className={styles.inspHead}>
         <h3>Playtest</h3>
         <span className={styles.badge} data-testid="play-status">{v.status === 'playing' ? 'In esecuzione' : v.status === 'paused' ? 'In pausa' : 'Fermo'}</span>
