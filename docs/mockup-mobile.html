@@ -1,0 +1,253 @@
+<title>Environment Builder Mobile</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600&display=swap">
+<style>
+/* Layout: tre telefoni affiancati (a capo su schermi stretti), ciascuno con una proposta di organizzazione dell'editor. */
+:root {
+  --bg: #0f1115; --surface: #171a20; --surface-2: #1e222a; --surface-3: #272c36;
+  --border: #2c313c; --border-strong: #3a4150;
+  --text: #e6e8ec; --text-dim: #9aa3b2; --text-faint: #6b7385;
+  --accent: #4f8cff; --accent-soft: rgba(79,140,255,.18); --ok: #3ecf8e; --warn: #f5b84a; --danger: #f0616d;
+  --display: "Space Grotesk", system-ui, sans-serif; --body: "Inter", system-ui, sans-serif;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--text); font-family: var(--body); font-size: 14px; line-height: 1.45;
+  padding-block: 32px 48px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.wrap { max-width: 1180px; margin: 0 auto; }
+h1 { font: 700 28px/1.15 var(--display); margin: 0 0 8px; text-wrap: balance; }
+.lead { color: var(--text-dim); max-width: 62ch; margin: 0 0 32px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 40px 24px; justify-items: center; align-items: start; }
+.opt { width: 100%; max-width: 340px; display: flex; flex-direction: column; gap: 16px; }
+.opt h2 { font: 700 18px/1.2 var(--display); margin: 0; }
+.tag { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); font-weight: 600; }
+.opt ul { margin: 0; padding-left: 18px; color: var(--text-dim); display: flex; flex-direction: column; gap: 4px; font-size: 13px; }
+.opt ul b { color: var(--text); font-weight: 600; }
+.verdict { font-size: 13px; color: var(--text-dim); border-top: 1px solid var(--border); padding-top: 10px; }
+.verdict b { color: var(--ok); }
+
+/* telefono */
+.phone { width: 300px; height: 620px; align-self: center; background: #05060a; border: 2px solid var(--border-strong); border-radius: 38px; padding: 10px; box-shadow: 0 20px 50px rgba(0,0,0,.5); }
+.screen { position: relative; width: 100%; height: 100%; border-radius: 28px; overflow: hidden; background: var(--bg); display: flex; flex-direction: column; font-size: 12px; }
+.status { height: 26px; flex: none; display: flex; justify-content: space-between; align-items: center; padding: 0 18px; font-size: 11px; color: var(--text-dim); }
+.notch { width: 70px; height: 14px; border-radius: 8px; background: #05060a; }
+svg.i { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+.top { height: 44px; flex: none; display: flex; align-items: center; gap: 6px; padding: 0 8px; background: var(--surface); border-bottom: 1px solid var(--border); }
+.top .name { flex: 1; min-width: 0; font: 600 13px var(--display); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.top .name small { display: block; font: 400 10px var(--body); color: var(--text-faint); }
+.ib { width: 44px; height: 44px; display: grid; place-items: center; border-radius: 10px; background: none; border: 0; color: var(--text-dim); flex: none; }
+.ib.sm { width: 36px; height: 36px; }
+.ib[aria-pressed="true"], .ib.on { background: var(--accent-soft); color: var(--accent); }
+.dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); flex: none; }
+.stage { position: relative; flex: 1; min-height: 0; background: #11151c; overflow: hidden; }
+.stage > svg.scene { position: absolute; inset: 0; width: 100%; height: 100%; }
+.fl { position: absolute; display: flex; gap: 6px; }
+.pill { height: 28px; padding: 0 10px; border-radius: 14px; background: rgba(23,26,32,.92); border: 1px solid var(--border-strong); display: inline-flex; align-items: center; gap: 6px; font-size: 11px; color: var(--text); }
+.bar { flex: none; display: flex; background: var(--surface); border-top: 1px solid var(--border); padding: 4px 4px 14px; }
+.bar > button { flex: 1; min-width: 0; height: 48px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; background: none; border: 0; color: var(--text-faint); font: 500 10px var(--body); border-radius: 10px; }
+.bar > button[aria-current="true"] { color: var(--accent); }
+.sheet { position: absolute; left: 0; right: 0; bottom: 0; background: var(--surface); border-top: 1px solid var(--border-strong); border-radius: 16px 16px 0 0; box-shadow: 0 -10px 30px rgba(0,0,0,.5); padding: 6px 12px 12px; display: flex; flex-direction: column; gap: 8px; }
+.grab { width: 34px; height: 4px; border-radius: 2px; background: var(--border-strong); margin: 0 auto 2px; }
+.sheet h3 { margin: 0; font: 600 13px var(--display); display: flex; justify-content: space-between; align-items: center; }
+.fld { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.fld label { display: flex; flex-direction: column; gap: 2px; font-size: 10px; color: var(--text-faint); }
+.fld span { height: 34px; border-radius: 8px; background: var(--surface-2); border: 1px solid var(--border); padding: 0 10px; display: flex; align-items: center; color: var(--text); font-size: 12px; }
+.chips { display: flex; gap: 6px; overflow: hidden; }
+.chip { height: 30px; padding: 0 12px; border-radius: 15px; border: 1px solid var(--border-strong); background: var(--surface-2); color: var(--text-dim); display: inline-flex; align-items: center; white-space: nowrap; font-size: 11px; }
+.chip.on { background: var(--accent-soft); border-color: var(--accent); color: var(--text); }
+.btn { height: 36px; border-radius: 9px; border: 1px solid var(--border-strong); background: var(--surface-3); color: var(--text); padding: 0 12px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; font-size: 12px; }
+.btn.pri { background: var(--accent); border-color: var(--accent); color: #fff; }
+.fab { position: absolute; width: 48px; height: 48px; border-radius: 50%; background: var(--accent); color: #fff; display: grid; place-items: center; box-shadow: 0 6px 16px rgba(0,0,0,.5); border: 0; }
+.dial { position: absolute; display: flex; flex-direction: column; gap: 8px; align-items: flex-end; }
+.dial .row { display: flex; align-items: center; gap: 8px; }
+.dial .lab { background: rgba(23,26,32,.95); border: 1px solid var(--border-strong); border-radius: 8px; padding: 3px 8px; font-size: 11px; }
+.dial .mini { width: 40px; height: 40px; border-radius: 50%; background: var(--surface-3); border: 1px solid var(--border-strong); display: grid; place-items: center; color: var(--text); }
+.dial .mini.on { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+.seg { display: flex; background: var(--surface-2); border-radius: 10px; padding: 3px; gap: 2px; margin: 8px; flex: none; }
+.seg button { flex: 1; height: 32px; border: 0; border-radius: 8px; background: none; color: var(--text-dim); font: 500 11px var(--body); }
+.seg button[aria-selected="true"] { background: var(--surface-3); color: var(--text); box-shadow: 0 0 0 1px var(--border-strong); }
+.tools { display: flex; background: var(--surface); border-top: 1px solid var(--border); padding: 4px 6px; gap: 2px; justify-content: space-around; flex: none; }
+.drawer { position: absolute; inset: 0 70px 0 0; background: var(--surface); border-right: 1px solid var(--border-strong); padding: 14px 12px; display: flex; flex-direction: column; gap: 6px; z-index: 5; }
+.scrim { position: absolute; inset: 0; background: rgba(0,0,0,.55); z-index: 4; }
+.drawer .it { display: flex; align-items: center; gap: 10px; height: 44px; padding: 0 10px; border-radius: 10px; color: var(--text-dim); }
+.drawer .it.on { background: var(--accent-soft); color: var(--text); }
+.drawer h4 { margin: 8px 0 2px; font: 600 10px var(--body); letter-spacing: .08em; text-transform: uppercase; color: var(--text-faint); }
+.hud { position: absolute; left: 50%; transform: translateX(-50%); display: flex; gap: 6px; }
+
+.compare { margin-top: 48px; overflow-x: auto; border: 1px solid var(--border); border-radius: 12px; }
+.compare table { border-collapse: collapse; width: 100%; min-width: 620px; font-size: 13px; }
+.compare th, .compare td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--border); vertical-align: top; }
+.compare th { font: 600 11px var(--body); letter-spacing: .08em; text-transform: uppercase; color: var(--text-faint); background: var(--surface); }
+.compare tr:last-child td { border-bottom: 0; }
+.compare td:first-child { color: var(--text-dim); }
+</style>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="scene" viewBox="0 0 300 500" preserveAspectRatio="xMidYMid slice">
+      <rect width="300" height="500" fill="#1a2230"/>
+      <rect y="300" width="300" height="200" fill="#222b3a"/>
+      <rect x="20" y="120" width="90" height="180" rx="4" fill="#2a3547"/>
+      <rect x="190" y="90" width="90" height="210" rx="4" fill="#2f3b50"/>
+      <g fill="#3b4a63"><rect x="34" y="140" width="22" height="26"/><rect x="68" y="140" width="22" height="26"/><rect x="34" y="184" width="22" height="26"/><rect x="204" y="112" width="22" height="26"/><rect x="240" y="112" width="22" height="26"/></g>
+      <rect x="120" y="230" width="50" height="70" rx="3" fill="#33425a"/>
+      <path d="M40 330 L120 380 C170 400 200 340 250 360" fill="none" stroke="#4f8cff" stroke-width="3" stroke-linecap="round"/>
+      <path d="M120 380 L110 440" fill="none" stroke="#3ecf8e" stroke-width="3" stroke-linecap="round"/>
+      <g stroke="#111827" stroke-width="2"><circle cx="40" cy="330" r="7" fill="#f5b84a"/><circle cx="120" cy="380" r="7" fill="#4f8cff"/><circle cx="250" cy="360" r="7" fill="#4f8cff"/><circle cx="110" cy="440" r="7" fill="#3ecf8e"/></g>
+      <circle cx="120" cy="380" r="13" fill="none" stroke="#fff" stroke-width="2"/>
+      <rect x="138" y="262" width="14" height="14" rx="3" fill="#f5b84a"/>
+    </symbol>
+    <symbol id="i-select" viewBox="0 0 24 24"><path d="M5 3l14 8-6 2-2 6z"/></symbol>
+    <symbol id="i-pan" viewBox="0 0 24 24"><path d="M8 12V5a1.5 1.5 0 013 0v6m0-1V4a1.5 1.5 0 013 0v7m0-5a1.5 1.5 0 013 0v8a6 6 0 01-6 6h-1a6 6 0 01-5-3l-3-5a1.5 1.5 0 012.5-1.5L8 14"/></symbol>
+    <symbol id="i-node" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3"/></symbol>
+    <symbol id="i-path" viewBox="0 0 24 24"><circle cx="5" cy="18" r="2"/><circle cx="19" cy="6" r="2"/><path d="M7 18c8 0 2-12 10-12"/></symbol>
+    <symbol id="i-object" viewBox="0 0 24 24"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M12 12l8-4.5M12 12v9M12 12L4 7.5"/></symbol>
+    <symbol id="i-char" viewBox="0 0 24 24"><circle cx="12" cy="7" r="3.5"/><path d="M5 21c0-4 3-7 7-7s7 3 7 7"/></symbol>
+    <symbol id="i-layers" viewBox="0 0 24 24"><path d="M12 3l9 5-9 5-9-5z"/><path d="M3 13l9 5 9-5"/></symbol>
+    <symbol id="i-play" viewBox="0 0 24 24"><path d="M7 4l13 8-13 8z"/></symbol>
+    <symbol id="i-undo" viewBox="0 0 24 24"><path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 010 12h-3"/></symbol>
+    <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+    <symbol id="i-sliders" viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></symbol>
+    <symbol id="i-folder" viewBox="0 0 24 24"><path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></symbol>
+    <symbol id="i-fit" viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></symbol>
+    <symbol id="i-pause" viewBox="0 0 24 24"><path d="M8 5v14M16 5v14"/></symbol>
+    <symbol id="i-down" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></symbol>
+  </defs>
+</svg>
+
+<div class="wrap">
+  <h1>Environment Builder su smartphone</h1>
+  <p class="lead">Tre modi di organizzare l'editor sotto i 560 px. Oggi la barra strumenti diventa una fila in basso e l'Inspector un pannello a scomparsa. Le tre proposte partono da lì e cambiano dove vive ogni comando. La scena resta sempre la protagonista.</p>
+
+  <div class="grid">
+
+    <!-- A -->
+    <section class="opt">
+      <span class="tag">Proposta A</span>
+      <h2>Barra a schede in basso</h2>
+      <div class="phone"><div class="screen">
+        <div class="status"><span>9:41</span><span class="notch"></span><span>87%</span></div>
+        <div class="top">
+          <button class="ib sm" aria-label="Menu"><svg class="i"><use href="#i-menu"/></svg></button>
+          <div class="name">Porto vecchio<small>Ambiente: Banchina</small></div>
+          <span class="dot"></span>
+          <button class="ib sm" aria-label="Annulla"><svg class="i"><use href="#i-undo"/></svg></button>
+        </div>
+        <div class="stage">
+          <svg class="scene"><use href="#scene"/></svg>
+          <div class="fl" style="left:8px;top:8px"><span class="pill"><svg class="i" style="width:14px;height:14px"><use href="#i-node"/></svg>Aggiungi nodo</span></div>
+          <div class="fl" style="right:8px;top:8px"><button class="ib sm" style="background:rgba(23,26,32,.92);border:1px solid var(--border-strong)" aria-label="Adatta"><svg class="i"><use href="#i-fit"/></svg></button></div>
+          <div class="sheet">
+            <div class="grab"></div>
+            <h3>Nodo · Banchina 2 <span class="chip on">Punto di sosta</span></h3>
+            <div class="fld"><label>Nome<span>Banchina 2</span></label><label>Tipo<span>Sosta</span></label><label>X<span>120</span></label><label>Y<span>380</span></label></div>
+          </div>
+        </div>
+        <nav class="bar" aria-label="Sezioni">
+          <button aria-current="true"><svg class="i"><use href="#i-path"/></svg>Scena</button>
+          <button><svg class="i"><use href="#i-object"/></svg>Oggetti</button>
+          <button><svg class="i"><use href="#i-char"/></svg>Persone</button>
+          <button><svg class="i"><use href="#i-layers"/></svg>Livelli</button>
+          <button><svg class="i"><use href="#i-play"/></svg>Prova</button>
+        </nav>
+      </div></div>
+      <ul>
+        <li><b>Cinque sezioni</b> sempre raggiungibili col pollice: Scena, Oggetti, Persone, Livelli, Prova.</li>
+        <li><b>Nome e salvataggio</b> in una barra sottile, il resto nel menu a sinistra.</li>
+        <li><b>Inspector</b> come sheet dal basso, sopra la scena, con campi a due colonne.</li>
+      </ul>
+      <p class="verdict"><b>Più vicina a oggi.</b> Pattern noto, poco da imparare. Gli strumenti di disegno restano però dentro la sezione Scena.</p>
+    </section>
+
+    <!-- B -->
+    <section class="opt">
+      <span class="tag">Proposta B</span>
+      <h2>Scena a tutto schermo e pulsante rapido</h2>
+      <div class="phone"><div class="screen">
+        <div class="status"><span>9:41</span><span class="notch"></span><span>87%</span></div>
+        <div class="stage" style="flex:1">
+          <svg class="scene"><use href="#scene"/></svg>
+          <div class="fl" style="left:8px;right:8px;top:6px;justify-content:space-between;align-items:center">
+            <button class="ib sm" style="background:rgba(23,26,32,.92);border:1px solid var(--border-strong)" aria-label="Menu"><svg class="i"><use href="#i-menu"/></svg></button>
+            <span class="pill" style="height:36px;padding:0 14px"><span class="dot"></span>Banchina<svg class="i" style="width:14px;height:14px"><use href="#i-down"/></svg></span>
+            <button class="ib sm" style="background:rgba(23,26,32,.92);border:1px solid var(--border-strong)" aria-label="Annulla"><svg class="i"><use href="#i-undo"/></svg></button>
+          </div>
+          <div class="dial" style="right:12px;bottom:92px">
+            <div class="row"><span class="lab">Oggetto</span><span class="mini"><svg class="i"><use href="#i-object"/></svg></span></div>
+            <div class="row"><span class="lab">Percorso</span><span class="mini on"><svg class="i"><use href="#i-path"/></svg></span></div>
+            <div class="row"><span class="lab">Nodo</span><span class="mini"><svg class="i"><use href="#i-node"/></svg></span></div>
+            <div class="row"><span class="lab">Personaggio</span><span class="mini"><svg class="i"><use href="#i-char"/></svg></span></div>
+          </div>
+          <button class="fab" style="right:12px;bottom:28px" aria-label="Chiudi strumenti"><svg class="i"><use href="#i-x"/></svg></button>
+          <div class="fl" style="left:12px;bottom:28px">
+            <button class="ib" style="width:48px;height:48px;border-radius:50%;background:var(--surface-3);border:1px solid var(--border-strong);color:var(--text)" aria-label="Proprietà"><svg class="i"><use href="#i-sliders"/></svg></button>
+            <button class="ib" style="width:48px;height:48px;border-radius:50%;background:var(--surface-3);border:1px solid var(--border-strong);color:var(--ok)" aria-label="Prova"><svg class="i"><use href="#i-play"/></svg></button>
+          </div>
+        </div>
+      </div></div>
+      <ul>
+        <li><b>Nessuna barra fissa.</b> La scena occupa quasi tutto lo schermo, utile con illustrazioni verticali.</li>
+        <li><b>Pulsante rapido</b> in basso a destra apre gli strumenti. Lo strumento attivo resta visibile.</li>
+        <li><b>Ambienti</b> in un selettore al centro in alto. <b>Proprietà</b> e <b>Prova</b> a sinistra.</li>
+      </ul>
+      <p class="verdict"><b>Massimo spazio per disegnare.</b> Costa un tocco in più per cambiare strumento e i comandi si scoprono meno facilmente.</p>
+    </section>
+
+    <!-- C -->
+    <section class="opt">
+      <span class="tag">Proposta C</span>
+      <h2>Modalità con strumenti contestuali</h2>
+      <div class="phone"><div class="screen">
+        <div class="status"><span>9:41</span><span class="notch"></span><span>87%</span></div>
+        <div class="top">
+          <button class="ib sm" aria-label="Menu"><svg class="i"><use href="#i-menu"/></svg></button>
+          <div class="name">Porto vecchio<small>Salvato</small></div>
+          <button class="ib sm" aria-label="Annulla"><svg class="i"><use href="#i-undo"/></svg></button>
+        </div>
+        <div class="seg" role="tablist" aria-label="Modalità">
+          <button role="tab" aria-selected="true">Percorsi</button>
+          <button role="tab" aria-selected="false">Oggetti</button>
+          <button role="tab" aria-selected="false">Persone</button>
+          <button role="tab" aria-selected="false">Prova</button>
+        </div>
+        <div class="stage">
+          <svg class="scene"><use href="#scene"/></svg>
+          <div class="fl" style="left:8px;top:8px"><span class="pill">Banchina ▾</span></div>
+          <div class="fl" style="right:8px;top:8px"><span class="pill">3 nodi · 2 percorsi</span></div>
+          <div class="chips" style="position:absolute;left:8px;right:8px;bottom:8px">
+            <span class="chip on">Camminata</span><span class="chip">Scala</span><span class="chip">Salto</span><span class="chip">Teletrasporto</span>
+          </div>
+        </div>
+        <div class="tools" role="toolbar" aria-label="Strumenti Percorsi">
+          <button class="ib" aria-pressed="true" aria-label="Seleziona"><svg class="i"><use href="#i-select"/></svg></button>
+          <button class="ib" aria-label="Mano"><svg class="i"><use href="#i-pan"/></svg></button>
+          <button class="ib" aria-label="Nodo"><svg class="i"><use href="#i-node"/></svg></button>
+          <button class="ib" aria-label="Percorso"><svg class="i"><use href="#i-path"/></svg></button>
+          <button class="ib" aria-label="Proprietà"><svg class="i"><use href="#i-sliders"/></svg></button>
+        </div>
+        <div style="height:14px;background:var(--surface);flex:none"></div>
+      </div></div>
+      <ul>
+        <li><b>Una modalità per volta:</b> Percorsi, Oggetti, Persone, Prova. Ognuna mostra solo i suoi strumenti.</li>
+        <li><b>Opzioni del tipo</b> (tipo di movimento, tipo di oggetto) come chip sopra la barra, senza coprire i comandi.</li>
+        <li><b>Menu a tendina</b> per progetto, esporta, livelli e manuale.</li>
+      </ul>
+      <p class="verdict"><b>Più ordinata con molte funzioni.</b> Mostra solo ciò che serve, ma aggiunge una fila in alto e riduce l'altezza della scena.</p>
+    </section>
+  </div>
+
+  <h2 style="font:700 18px var(--display);margin:56px 0 12px">Confronto</h2>
+  <div class="compare">
+    <table>
+      <thead><tr><th></th><th>A · Schede</th><th>B · Pulsante rapido</th><th>C · Modalità</th></tr></thead>
+      <tbody>
+        <tr><td>Altezza scena</td><td>Media</td><td>Massima</td><td>Più ridotta</td></tr>
+        <tr><td>Cambio strumento</td><td>2 tocchi</td><td>2 tocchi</td><td>1 tocco</td></tr>
+        <tr><td>Scoperta dei comandi</td><td>Alta</td><td>Bassa</td><td>Alta</td></tr>
+        <tr><td>Lavoro nel codice</td><td>Basso: estende la barra attuale</td><td>Medio: nuovo componente</td><td>Medio: raggruppa gli strumenti per modalità</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
