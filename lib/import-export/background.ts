@@ -23,8 +23,8 @@ export async function importBackground(store: EditorStore, file: File): Promise<
   });
 }
 
-/** Adds a mid/foreground layer (the file is stored as a normal image asset). */
-export async function importLayer(store: EditorStore, role: 'midground' | 'foreground', file: File): Promise<void> {
+/** Adds a mid-ground layer (the file is stored as a normal image asset). */
+export async function importLayer(store: EditorStore, role: 'midground', file: File): Promise<void> {
   const { meta, blob } = await readImageFile(file);
   await putAsset(store.project.id, meta.id, blob);
   store.commitEnv((env) => addLayer(env, role, meta));

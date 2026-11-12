@@ -10,7 +10,7 @@ import { CheckField, NumberField } from './fields';
 import { Icon } from '@/components/ui/icons';
 import styles from '../editor/editor.module.css';
 
-/** Layer manager: background (mandatory), midground and foreground, with visibility, order, offset and opacity. */
+/** Layer manager: background (mandatory), midground, with visibility, order, offset and opacity. */
 export function LayersPanel({ store, env }: { store: EditorStore; env: Environment }) {
   const [open, setOpen] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -24,7 +24,7 @@ export function LayersPanel({ store, env }: { store: EditorStore; env: Environme
     try { if (role === 'replace-bg') await importBackground(store, f); else if (role !== 'background') await importLayer(store, role, f); }
     catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
   };
-  const roles: LayerRole[] = ['foreground', 'midground', 'background'];
+  const roles: LayerRole[] = ['midground', 'background'];
   return (
     <div className={styles.section} data-testid="layers-panel">
       <h4>Livelli grafici</h4>
@@ -68,11 +68,8 @@ export function LayersPanel({ store, env }: { store: EditorStore; env: Environme
           </div>
         );
       })}
-      <div className={styles.row2}>
-        <button className={styles.btn} onClick={() => ask('midground')} data-testid="add-mid">{Icon.plus}Piano intermedio</button>
-        <button className={styles.btn} onClick={() => ask('foreground')} data-testid="add-fore">{Icon.plus}Primo piano</button>
-      </div>
-      <span className={styles.help}>Il primo piano è disegnato sopra i personaggi. Usa PNG con trasparenza della stessa dimensione dello sfondo.</span>
+      <button className={styles.btn} onClick={() => ask('midground')} data-testid="add-mid">{Icon.plus}Piano intermedio</button>
+      <span className={styles.help}>Per le parti che nascondono il personaggio usa lo strumento Primo piano (G): si dipingono direttamente sullo sfondo.</span>
       {err && <span className={styles.warn} role="alert">{err}</span>}
       <input ref={file} type="file" accept={ACCEPTED_IMAGE_TYPES.join(',')} hidden data-testid="layer-file" onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; void onFile(f); }} />
     </div>

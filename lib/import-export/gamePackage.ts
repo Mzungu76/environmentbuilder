@@ -5,6 +5,8 @@ import { getAsset } from '@/lib/persistence/db';
 import { RUNTIME_SOURCE } from '@/lib/generated/runtimeSource';
 import { gameReadiness } from '@/engine/game/validate';
 import { computeLightMap } from '@/lib/studio/lightmap';
+import { hasCoverage, occGrid, occluderAlpha, occluderCoverage } from '@/engine/navigation/occluders';
+import { bakeCutout, cutoutBlob } from '@/engine/rendering/occluderBake';
 
 /**
  * Scenario package for the game app:
@@ -47,13 +49,25 @@ export async function buildGamePackage(project: Project, environmentId?: string)
     if (!blob) continue;
     const path = `assets/${a.id}.${extOf(a.mime)}`; zip.file(path, blob); assetFiles[a.id] = path; urls[a.id] = await blobToDataUrl(blob);
   }
+  // occluders: the cut-out of the backdrop for each one, ready to draw over the characters (the ops stay in project.json)
+  const occFiles: { id: string; name: string; image: string }[] = [];
+  const bgLayer = env.layers.find((l) => l.role === 'background');
+  const bgBlob = bgLayer ? await getAsset(project.id, bgLayer.assetId) : undefined;
+  if (bgBlob && env.occluders?.length) {
+    const bmp = await createImageBitmap(bgBlob), { w, h } = occGrid(env);
+    for (const o of env.occluders) {
+      const cov = occluderCoverage(env, o); if (!hasCoverage(cov)) continue;
+      const { canvas } = bakeCutout(bmp, occluderAlpha(env, o, cov), w, h), blob = await cutoutBlob(canvas);
+      const path = `assets/occluder-${o.id}.png`; zip.file(path, blob); urls[`occ:${o.id}`] = await blobToDataUrl(blob); occFiles.push({ id: o.id, name: o.name, image: path });
+    }
+  }
   // only what this scenario needs
   // the light map travels with the scenario (computed now if the scene uses light but it was never calculated)
   let envOut = env;
   if (env.lighting?.enabled && !env.lightMap) { const m = await computeLightMap(project.id, env).catch(() => null); if (m) envOut = { ...env, lightMap: m }; }
   const slim: Project = { ...project, environments: [envOut], activeEnvironmentId: env.id, puppets: project.puppets.filter((p) => usedPuppets.has(p.id)) };
   zip.file('project.json', JSON.stringify(slim, null, 2));
-  zip.file('scenario.json', JSON.stringify({ ...scenarioManifest(project, env.id), assets: assetFiles }, null, 2));
+  zip.file('scenario.json', JSON.stringify({ ...scenarioManifest(project, env.id), assets: assetFiles, occluders: occFiles }, null, 2));
   zip.file('environment-runtime.mjs', RUNTIME_SOURCE);
   zip.file('game-example.html', exampleHtml(slim, urls));
   zip.file('README.md', readme(env.name));
@@ -137,8 +151,9 @@ $('roll').onclick = () => {
   $('dice').innerHTML = v.map(x => '<div class="die' + (match && counts[x] >= 2 ? ' match' : '') + '">' + x + '</div>').join('');
   if (match) session.triggerCollect();
 };
-const order = { background: 0, midground: 1, foreground: 2 };
-function drawLayers(role) { for (const l of env.layers.filter(l => l.visible && (role === 'foreground') === (l.role === 'foreground')).sort((a, b) => (order[a.role] ?? 0) - (order[b.role] ?? 0))) { const im = img[l.assetId]; if (!im) continue; ctx.globalAlpha = l.opacity ?? 1; ctx.drawImage(im, l.offsetX * env.width, l.offsetY * env.height); ctx.globalAlpha = 1; } }
+const order = { background: 0, midground: 1 };
+function drawOccluders() { const bg = env.layers.find(l => l.role === 'background'); for (const o of env.occluders || []) { const im = img['occ:' + o.id]; if (im) ctx.drawImage(im, (bg ? bg.offsetX : 0) * env.width, (bg ? bg.offsetY : 0) * env.height, env.width, env.height); } }
+function drawLayers() { for (const l of env.layers.filter(l => l.visible).sort((a, b) => (order[a.role] ?? 0) - (order[b.role] ?? 0))) { const im = img[l.assetId]; if (!im) continue; ctx.globalAlpha = l.opacity ?? 1; ctx.drawImage(im, l.offsetX * env.width, l.offsetY * env.height); ctx.globalAlpha = 1; } }
 function drawPuppet(c, pf) {
   const layers = [pf.under ?? pf, ...(pf.over ? [pf.over] : [])]; void layers;
   const draw = (view, pos, alpha) => { const tex = img[view.cutoutAssetId]; if (!tex || !pos || !view.mesh) return; const s = c.heightPx / view.figureHeight; ctx.save(); ctx.globalAlpha = alpha; if (c.light) ctx.filter = 'brightness(' + c.light.brightness.toFixed(2) + ')';
@@ -154,9 +169,9 @@ function frame(now) {
   ctx.setTransform(k, 0, 0, k, (cv.width - env.width * k) / 2, (cv.height - env.height * k) / 2);
   const sh = f.collapse.shake, amp = 14; ctx.translate(sh.x * amp, sh.y * amp);
   ctx.fillStyle = '#000'; ctx.fillRect(0, 0, env.width, env.height);
-  drawLayers('back');
+  drawLayers();
   for (const c of f.characters) { if (c.puppet) drawPuppet(c, c.puppet); else { ctx.fillStyle = '#fbbf24'; ctx.fillRect(c.x - 15, c.y - c.heightPx, 30, c.heightPx); } }
-  drawLayers('foreground');
+  drawOccluders();
   for (const p of f.pickups) { const t = p.progress; ctx.beginPath(); ctx.fillStyle = p.collectible.color; ctx.globalAlpha = 1 - t * t; ctx.arc(p.x, p.y - 60 - t * 160, 16 + 8 * Math.sin(t * Math.PI), 0, Math.PI * 2); ctx.fill(); ctx.globalAlpha = 1; }
   // dust and darkness grow with the intensity
   ctx.fillStyle = 'rgba(0,0,0,' + (f.collapse.intensity * 0.55) + ')'; ctx.fillRect(0, 0, env.width, env.height);

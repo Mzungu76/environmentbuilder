@@ -24,6 +24,16 @@ migrations[3] = (doc) => ({
   environments: (doc.environments ?? []).map((env: any) => ({ ...env, characters: (env.characters ?? []).map((c: any) => ({ ...c, dollId: c.dollId ?? null })) })),
 });
 
+// v4 → v5: the "foreground" layer role is gone (parts in front of the characters are painted occluders now); old foreground layers
+// become ordinary mid-ground layers so no image is lost.
+migrations[4] = (doc) => ({
+  ...doc, schemaVersion: 5,
+  environments: (doc.environments ?? []).map((env: any) => ({
+    ...env, occluders: env.occluders ?? [],
+    layers: (env.layers ?? []).map((l: any) => (l.role === 'foreground' ? { ...l, role: 'midground' } : l)),
+  })),
+});
+
 function normalizeInteraction(i: any) {
   return {
     id: i.id, kind: i.kind ?? 'custom', label: i.label ?? i.kind ?? 'Interazione', trigger: i.trigger ?? 'manual', once: i.once ?? false,

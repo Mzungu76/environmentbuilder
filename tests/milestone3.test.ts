@@ -80,17 +80,17 @@ describe('layers', () => {
   it('adds, reorders within role, hides and protects the background', () => {
     let e = createEnvironment();
     e.layers = [{ id: 'bg', name: 'bg', role: 'background', assetId: 'a0', visible: true, offsetX: 0, offsetY: 0, opacity: 1 }];
-    e = addLayer(e, 'midground', meta('m1')); e = addLayer(e, 'foreground', meta('f1')); e = addLayer(e, 'midground', meta('m2'));
+    e = addLayer(e, 'midground', meta('m1')); e = addLayer(e, 'midground', meta('m2'));
     const ids = e.layers.map((l) => l.assetId);
-    expect(ids).toEqual(['a0', 'm1', 'f1', 'm2']);
-    const m2 = e.layers[3].id;
-    e = moveLayer(e, m2, 'down'); // swaps with m1, skipping foreground
-    expect(e.layers.map((l) => l.assetId)).toEqual(['a0', 'm2', 'f1', 'm1']);
+    expect(ids).toEqual(['a0', 'm1', 'm2']);
+    const m2 = e.layers[2].id;
+    e = moveLayer(e, m2, 'down'); // swaps with m1
+    expect(e.layers.map((l) => l.assetId)).toEqual(['a0', 'm2', 'm1']);
     expect(moveLayer(e, m2, 'down')).toBe(e); // already at the back of its role
     e = updateLayer(e, m2, { visible: false, offsetX: 0.1 });
     expect(e.layers.find((l) => l.id === m2)!.visible).toBe(false);
     expect(removeLayer(e, 'bg')).toBe(e);
-    expect(removeLayer(e, m2).layers).toHaveLength(3);
+    expect(removeLayer(e, m2).layers).toHaveLength(2);
   });
 });
 

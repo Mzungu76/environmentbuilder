@@ -35,6 +35,7 @@ export const Icon = {
   copy: <S><rect x="8" y="8" width="12" height="12" rx="2" /><path d="M16 8V6a2 2 0 00-2-2H6a2 2 0 00-2 2v8a2 2 0 002 2h2" /></S>,
   up: <S><path d="M6 15l6-6 6 6" /></S>,
   install: <S><path d="M12 3v12M7 10l5 5 5-5" /><path d="M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2" /></S>,
+  occluder: <S><path d="M3 20V10a9 9 0 0118 0v10" /><path d="M8 20v-7a4 4 0 018 0v7" /></S>,
   menu: <S><path d="M4 6h16M4 12h16M4 18h16" /></S>,
   close: <S><path d="M6 6l12 12M18 6L6 18" /></S>,
   more: <S><circle cx="5" cy="12" r="1.5" /><circle cx="12" cy="12" r="1.5" /><circle cx="19" cy="12" r="1.5" /></S>,

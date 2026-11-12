@@ -15,7 +15,7 @@ export interface CustomProfile {
 }
 
 /** Bump when the serialized shape changes and add a migration in lib/serialization/migrations.ts. */
-export const SCHEMA_VERSION = 4;
+export const SCHEMA_VERSION = 5;
 
 export interface Project {
   schemaVersion: number;
