@@ -137,6 +137,8 @@ export class SceneView {
 
   /** When true, single-pointer drag pans the camera (pan tool / space held). */
   panMode = false;
+  /** True while the camera is still the one set by fit(): a window resize then re-fits instead of just re-centring. */
+  private autoFit = false;
   onPointer: (e: ViewPointerEvent) => void = () => {};
   onCamera: (zoom: number) => void = () => {};
   onAssetError: (assetId: string, message: string) => void = () => {};
@@ -173,7 +175,10 @@ export class SceneView {
     this.resizeObs = new ResizeObserver(() => {
       // keep the view centred on the same point when the viewport changes size
       const w = host.clientWidth, h = host.clientHeight;
-      if (lastW && lastH) this.world.position.set(this.world.x + (w - lastW) / 2, this.world.y + (h - lastH) / 2);
+      // browser bars and fullscreen change the size without a reliable window 'resize': always resync the canvas
+      this.app?.resize();
+      if (this.autoFit && this.envW && this.envH) this.fit();
+      else if (lastW && lastH) this.world.position.set(this.world.x + (w - lastW) / 2, this.world.y + (h - lastH) / 2);
       lastW = w; lastH = h; this.dirty = true;
     });
     this.resizeObs.observe(host);
@@ -293,7 +298,7 @@ export class SceneView {
     if (!this.app) return;
     const pad = 0.94;
     const z = Math.min(this.vw / this.envW, this.vh / this.envH) * pad;
-    this.zoom = z;
+    this.zoom = z; this.autoFit = true;
     this.world.scale.set(z);
     this.world.position.set((this.vw - this.envW * z) / 2, (this.vh - this.envH * z) / 2);
     this.onCamera(z); this.dirty = true;
@@ -305,7 +310,7 @@ export class SceneView {
     const z = Math.min(32, Math.max(0.02, this.zoom * factor));
     const k = z / this.zoom;
     this.world.position.set(sx - (sx - this.world.x) * k, sy - (sy - this.world.y) * k);
-    this.zoom = z;
+    this.zoom = z; this.autoFit = false;
     this.world.scale.set(z);
     this.onCamera(z); this.dirty = true;
   }
@@ -328,7 +333,7 @@ export class SceneView {
   }
   /** Camera shake (environment px): the whole scene moves by the opposite offset, without touching pan/zoom. */
   setShake(x: number, y: number) { this.world.pivot.set(x, y); }
-  panBy(dx: number, dy: number) { this.world.position.set(this.world.x + dx, this.world.y + dy); }
+  panBy(dx: number, dy: number) { this.autoFit = false; this.world.position.set(this.world.x + dx, this.world.y + dy); }
 
   /** Pixels of environment covered by one screen pixel. */
   get pxPerScreenPx() { return 1 / this.zoom; }

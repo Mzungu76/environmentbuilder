@@ -6,7 +6,7 @@ import type { EditorState, EditorStore, ToolId } from '@/lib/store/editorStore';
 import { Icon } from '@/components/ui/icons';
 import { TOOLS } from './ToolPalette';
 import { NameField } from './TopBar';
-import { FullscreenButton, InstallButton } from '@/components/shell/pwa';
+import { FullscreenButton, FullscreenFab, InstallButton } from '@/components/shell/pwa';
 import { EnvTabs } from '@/components/panels/EnvTabs';
 import styles from '../editor/editor.module.css';
 
@@ -53,6 +53,7 @@ export function CompactControls(p: Props) {
       </div>
 
       <div className={styles.cTopRight}>
+        <FullscreenFab className={styles.cRound} />
         {!playtest && <button className={styles.cRound} onClick={() => store.undo()} disabled={!state.canUndo} aria-label="Annulla" data-testid="undo">{Icon.undo}</button>}
         <button className={`${styles.cRound} ${styles.cPlay}`} onClick={() => store.setMode(playtest ? 'editor' : 'playtest')} disabled={!playtest && !p.canPlaytest}
           aria-label={playtest ? 'Esci dal Playtest' : 'Prova'} title={p.canPlaytest || playtest ? undefined : 'Importa prima un’immagine'} data-testid="c-play">{playtest ? Icon.stop : Icon.play}</button>

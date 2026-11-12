@@ -42,7 +42,8 @@ export function MobileShell() {
     // Browsers only allow fullscreen / orientation lock from a user gesture, so it happens on the first tap.
     let first: (() => void) | null = null;
     if (isPhone() && !isStandalone()) {
-      first = () => { void goFullscreenLandscape(); window.removeEventListener('pointerup', first!); };
+      // keep trying on every tap until the browser actually grants it
+      first = () => { void goFullscreenLandscape().then(() => { if (document.fullscreenElement) window.removeEventListener('pointerup', first!); }); };
       window.addEventListener('pointerup', first);
     }
     // iOS cannot lock the orientation: ask the user to turn the phone.
@@ -96,4 +97,16 @@ export function FullscreenButton({ className }: { className?: string }) {
   }, []);
   if (!ok) return null;
   return <button className={className} onClick={() => (on ? void document.exitFullscreen() : void goFullscreenLandscape())} data-testid="fullscreen">{Icon.fit}{on ? 'Esci da schermo intero' : 'Schermo intero'}</button>;
+}
+
+/** Round fullscreen button for the floating controls: only while the browser bars are showing. */
+export function FullscreenFab({ className }: { className?: string }) {
+  const [show, setShow] = useState(false);
+  useEffect(() => {
+    const upd = () => setShow(!!document.fullscreenEnabled && !document.fullscreenElement && !isStandalone());
+    upd(); document.addEventListener('fullscreenchange', upd);
+    return () => document.removeEventListener('fullscreenchange', upd);
+  }, []);
+  if (!show) return null;
+  return <button className={className} onClick={() => void goFullscreenLandscape()} aria-label="Schermo intero" title="Schermo intero" data-testid="fullscreen-fab">{Icon.fit}</button>;
 }
