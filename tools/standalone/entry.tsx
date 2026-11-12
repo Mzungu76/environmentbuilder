@@ -5,6 +5,7 @@ import LibraryPage from '../../app/page';
 import EditorPage from '../../app/editor/page';
 import ManualePage from '../../app/manuale/page';
 import StudioPage from '../../app/studio/page';
+import { MobileShell } from '../../components/shell/pwa';
 
 function App() {
   const [hash, setHash] = useState(window.location.hash);
@@ -13,4 +14,4 @@ function App() {
   if (hash.startsWith('#/studio')) return <StudioPage key={hash} />;
   return hash.startsWith('#/editor') ? <EditorPage key={hash} /> : <LibraryPage />;
 }
-createRoot(document.getElementById('root')!).render(<StrictMode><App /></StrictMode>);
+createRoot(document.getElementById('root')!).render(<StrictMode><App /><MobileShell /></StrictMode>);

@@ -1,0 +1,7 @@
+.rotate { position: fixed; inset: 0; z-index: 1000; background: var(--bg); color: var(--text); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; text-align: center; padding: 24px; }
+.rotate p { margin: 8px 0 0; font-size: 18px; font-weight: 600; }
+.rotate small { color: var(--text-dim); }
+.rotate svg { color: var(--accent); animation: turn 2.4s ease-in-out infinite; }
+@keyframes turn { 0%, 30% { transform: rotate(0); } 60%, 100% { transform: rotate(-90deg); } }
+.installWrap { position: relative; display: inline-flex; }
+.iosHelp { position: absolute; top: calc(100% + 6px); right: 0; z-index: 50; width: 190px; background: var(--surface-2); border: 1px solid var(--border-strong); border-radius: 8px; padding: 8px 10px; font-size: 12px; color: var(--text-dim); }

@@ -6,6 +6,7 @@ import type { EditorState, EditorStore, ToolId } from '@/lib/store/editorStore';
 import { Icon } from '@/components/ui/icons';
 import { TOOLS } from './ToolPalette';
 import { NameField } from './TopBar';
+import { FullscreenButton, InstallButton } from '@/components/shell/pwa';
 import { EnvTabs } from '@/components/panels/EnvTabs';
 import styles from '../editor/editor.module.css';
 
@@ -94,6 +95,8 @@ export function CompactControls(p: Props) {
               <button className={styles.btn} onClick={() => { setMenu(false); p.onExportZip(); }} data-testid="export-zip">{Icon.export}Esporta ZIP</button>
               <button className={styles.btn} onClick={() => { setMenu(false); p.onExportJson(); }} data-testid="export-json">{Icon.export}Esporta JSON</button>
               <button className={styles.btn} onClick={() => { setMenu(false); p.onExportGame(); }} data-testid="export-game">{Icon.export}Pacchetto per il gioco</button>
+              <InstallButton className={styles.btn} />
+              <FullscreenButton className={styles.btn} />
               <button className={styles.btn} onClick={p.onNew}>{Icon.plus}Nuovo progetto</button>
               <Link href="/" className={styles.btn}>{Icon.folder}Apri progetto</Link>
               <Link href="/manuale" target="_blank" rel="noreferrer" className={styles.btn} data-testid="open-manual">{Icon.help}Manuale</Link>
