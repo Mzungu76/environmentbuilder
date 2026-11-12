@@ -91,7 +91,7 @@ export function ImportStep({ store, puppet, projectId, go }: StepProps) {
           <a className={ed.btn} href={url(paperMeasuresMod)} download="guida-burattino.png">Scarica la guida con le misure</a>
           <div className={st.promptBox} data-testid="prompt-paper">{paperPrompt}</div>
           <button className={ed.btn} onClick={async () => { try { await navigator.clipboard.writeText(paperPrompt); } catch { setErr('Copia non riuscita: seleziona il testo a mano.'); } }}>Copia il prompt del burattino</button>
-          <span className={ed.help}>Vista di fronte e di schiena (un solo braccio e una sola gamba: l’altro lato è lo specchio):</span>
+          <span className={ed.help}>Vista di fronte e di schiena (ogni segmento di arto in una casella, per ciascun lato, su due righe):</span>
           <a className={ed.btn} href={url(paperFrontMod)} download="guida-burattino-fronte-pulita.png">Guida di fronte (per l’AI)</a>
           <button className={ed.btn} onClick={async () => { try { await navigator.clipboard.writeText(paperFrontPrompt); } catch { setErr('Copia non riuscita: seleziona il testo a mano.'); } }}>Copia il prompt di fronte</button>
           <a className={ed.btn} href={url(paperBackMod)} download="guida-burattino-retro-pulita.png">Guida di schiena (per l’AI)</a>

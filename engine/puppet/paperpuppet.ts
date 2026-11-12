@@ -14,9 +14,14 @@ import { components, newImg, type Img } from './imageProc';
 
 export const PART_IDS = ['head', 'torso', 'pelvis', 'uarm', 'farm', 'hand', 'thigh', 'shin', 'foot'] as const;
 export type PartId = (typeof PART_IDS)[number];
-export type PieceId = PartId | 'accA' | 'accB';
+export const LIMB_IDS = ['uarm', 'farm', 'hand', 'thigh', 'shin', 'foot'] as const;
+export type LimbId = (typeof LIMB_IDS)[number];
+/** Frontal sheets can draw the image-LEFT limbs as pieces of their own (keys …L), instead of mirroring the right ones. */
+export type LimbLeft = `${LimbId}L`;
+export type PieceId = PartId | 'accA' | 'accB' | LimbLeft;
 export const PIECE_LABEL: Record<PieceId, string> = {
   head: 'Testa', torso: 'Busto', pelvis: 'Bacino', uarm: 'Braccio', farm: 'Avambraccio', hand: 'Mano', thigh: 'Coscia', shin: 'Gamba', foot: 'Piede', accA: 'Accessorio A', accB: 'Accessorio B',
+  uarmL: 'Braccio sx', farmL: 'Avambraccio sx', handL: 'Mano sx', thighL: 'Coscia sx', shinL: 'Gamba sx', footL: 'Piede sx',
 };
 const TOP_ROW: PieceId[] = ['head', 'torso', 'pelvis', 'accA', 'accB'];
 const BOTTOM_ROW: PieceId[] = ['uarm', 'farm', 'hand', 'thigh', 'shin', 'foot'];
@@ -53,14 +58,21 @@ export function extractPieces(keyed: Img): Extracted {
   }
   const list = [...groups.values()].map((g) => ({ ...g, cy: (g.box.y0 + g.box.y1) / 2, cx: (g.box.x0 + g.box.x1) / 2 }));
   if (list.length < 9) throw new Error(`Ho trovato ${list.length} pezzi separati, ne servono almeno 9 (testa, busto, bacino, braccio, avambraccio, mano, coscia, gamba, piede). Se due pezzi si toccano, rigenera il foglio lasciando più spazio.`);
-  // two rows: split at the largest vertical gap between piece centres
+  // rows: the top row (head, torso, pelvis, gear) and one or two rows of limbs — split at the largest vertical gaps between piece centres
   const byY = [...list].sort((a, b) => a.cy - b.cy);
-  let cut = 1, gap = -1;
-  for (let i = 1; i < byY.length; i++) { const g = byY[i].cy - byY[i - 1].cy; if (g > gap) { gap = g; cut = i; } }
-  const top = byY.slice(0, cut).sort((a, b) => a.cx - b.cx), bottom = byY.slice(cut).sort((a, b) => a.cx - b.cx);
+  const gaps = byY.slice(1).map((g, i) => ({ i: i + 1, gap: g.cy - byY[i].cy })).sort((a, b) => b.gap - a.gap);
+  let cut = gaps[0].i;
   const warnings: string[] = [];
+  let top = byY.slice(0, cut).sort((a, b) => a.cx - b.cx), rest = byY.slice(cut);
+  let bottom = rest.sort((a, b) => a.cx - b.cx), bottomL: typeof rest | null = null;
+  if (rest.length >= 11) {      // two rows of limbs: right then left of the image
+    const rs = [...rest].sort((a, b) => a.cy - b.cy);
+    let c2 = 1, g2 = -1; for (let i = 1; i < rs.length; i++) { const g = rs[i].cy - rs[i - 1].cy; if (g > g2) { g2 = g; c2 = i; } }
+    bottom = rs.slice(0, c2).sort((a, b) => a.cx - b.cx); bottomL = rs.slice(c2).sort((a, b) => a.cx - b.cx);
+    if (bottom.length !== 6 || bottomL.length !== 6) throw new Error(`Con gli arti su due righe servono 6 pezzi per riga: ne ho trovati ${bottom.length} e ${bottomL.length}.`);
+  }
   if (top.length < 3) throw new Error(`Nella riga alta servono almeno 3 pezzi (testa, busto, bacino): ne ho trovati ${top.length}.`);
-  if (bottom.length !== 6) throw new Error(`Nella riga bassa servono 6 pezzi (braccio, avambraccio, mano, coscia, gamba, piede): ne ho trovati ${bottom.length}.`);
+  if (bottom.length !== 6) throw new Error(`Nella riga degli arti servono 6 pezzi (braccio, avambraccio, mano, coscia, gamba, piede): ne ho trovati ${bottom.length}.`);
   if (top.length > 5) warnings.push(`Nella riga alta ci sono ${top.length} pezzi: uso i primi 5 (testa, busto, bacino e due accessori).`);
   const assign = (row: typeof top, ids: PieceId[], pieces: Pieces) => row.slice(0, ids.length).forEach((g, k) => {
     const x0 = Math.floor(g.box.x0), y0 = Math.floor(g.box.y0), w = Math.ceil(g.box.x1) - x0, h = Math.ceil(g.box.y1) - y0, P = 3;
@@ -74,6 +86,7 @@ export function extractPieces(keyed: Img): Extracted {
   });
   const pieces: Pieces = {};
   assign(top, TOP_ROW, pieces); assign(bottom, BOTTOM_ROW, pieces);
+  if (bottomL) assign(bottomL, BOTTOM_ROW.map((id) => `${id}L` as PieceId), pieces);
   return { pieces, warnings };
 }
 
@@ -271,14 +284,15 @@ function rowExtent(img: Img, y0: number, y1: number): { x0: number; x1: number }
  */
 export function assembleFrontal(pieces: Pieces, opt: PaperOptions, kind: 'front' | 'back'): PaperAssembly {
   for (const id of PART_IDS) if (!pieces[id]) throw new Error(`Manca il pezzo «${PIECE_LABEL[id]}».`);
-  const off = (id: PieceId): Vec2 => { const a = opt.adjust?.[id]; return a ? { x: a.dx, y: a.dy } : { x: 0, y: 0 }; };
+  const off = (id: string, side?: 'R' | 'L'): Vec2 => { const a = opt.adjust?.[id], b = side ? opt.adjust?.[`${id}:${side}`] : undefined; return { x: (a?.dx ?? 0) + (b?.dx ?? 0), y: (a?.dy ?? 0) + (b?.dy ?? 0) }; };
   const sub = (a: Vec2, b: Vec2) => ({ x: a.x - b.x, y: a.y - b.y }), add = (a: Vec2, b: Vec2) => ({ x: a.x + b.x, y: a.y + b.y });
   const base = Object.fromEntries((PART_IDS as readonly PieceId[]).map((id) => [id, { ...jointsOf(id, pieces[id]!, true), ...(opt.joints?.[id] ?? {}) }])) as Record<PartId, Joints>;
   const imgs: Record<'R' | 'L', Record<string, Img>> = { R: {}, L: {} }, jt: Record<'R' | 'L', Record<string, Joints>> = { R: {}, L: {} };
-  for (const id of ['uarm', 'farm', 'hand', 'thigh', 'shin', 'foot'] as const) {
-    const im = pieces[id]!, fl = flipX(im), w = im.width - 1, j = base[id];
+  for (const id of LIMB_IDS) {
+    const im = pieces[id]!, j = base[id], lk = `${id}L` as LimbLeft, own = pieces[lk];
     imgs.R[id] = im; jt.R[id] = j;
-    imgs.L[id] = fl; jt.L[id] = { prox: { x: w - j.prox.x, y: j.prox.y }, dist: { x: w - j.dist.x, y: j.dist.y } };
+    if (own) { imgs.L[id] = own; jt.L[id] = { ...jointsOf(id, own, true), ...(opt.joints?.[lk] ?? {}) }; }        // the left limb was drawn separately
+    else { const w = im.width - 1; imgs.L[id] = flipX(im); jt.L[id] = { prox: { x: w - j.prox.x, y: j.prox.y }, dist: { x: w - j.dist.x, y: j.dist.y } }; }  // …or mirrored from the right one
   }
   const pos: Record<string, Vec2> = {};
   const pel = pieces.pelvis!, pb = opaqueBox(pel);
@@ -298,12 +312,12 @@ export function assembleFrontal(pieces: Pieces, opt: PaperOptions, kind: 'front'
   const sides = ['R', 'L'] as const;
   for (const s of sides) {
     const J = jt[s];
-    pos[`uarm${s}`] = add(sub(shoulder[s], J.uarm.prox), off('uarm')); const elbow = add(pos[`uarm${s}`], J.uarm.dist);
-    pos[`farm${s}`] = add(sub(elbow, J.farm.prox), off('farm')); const wrist = add(pos[`farm${s}`], J.farm.dist);
-    pos[`hand${s}`] = add(sub(wrist, J.hand.prox), off('hand')); const tip = add(pos[`hand${s}`], J.hand.dist);
-    pos[`thigh${s}`] = add(sub(add(pos.pelvis, hip[s]), J.thigh.prox), off('thigh')); const knee = add(pos[`thigh${s}`], J.thigh.dist);
-    pos[`shin${s}`] = add(sub(knee, J.shin.prox), off('shin')); const ankle = add(pos[`shin${s}`], J.shin.dist);
-    pos[`foot${s}`] = add(sub(ankle, J.foot.prox), off('foot')); const toe = add(pos[`foot${s}`], J.foot.dist);
+    pos[`uarm${s}`] = add(sub(shoulder[s], J.uarm.prox), off('uarm', s)); const elbow = add(pos[`uarm${s}`], J.uarm.dist);
+    pos[`farm${s}`] = add(sub(elbow, J.farm.prox), off('farm', s)); const wrist = add(pos[`farm${s}`], J.farm.dist);
+    pos[`hand${s}`] = add(sub(wrist, J.hand.prox), off('hand', s)); const tip = add(pos[`hand${s}`], J.hand.dist);
+    pos[`thigh${s}`] = add(sub(add(pos.pelvis, hip[s]), J.thigh.prox), off('thigh', s)); const knee = add(pos[`thigh${s}`], J.thigh.dist);
+    pos[`shin${s}`] = add(sub(knee, J.shin.prox), off('shin', s)); const ankle = add(pos[`shin${s}`], J.shin.dist);
+    pos[`foot${s}`] = add(sub(ankle, J.foot.prox), off('foot', s)); const toe = add(pos[`foot${s}`], J.foot.dist);
     Object.assign(lm, { [`shoulder${s}`]: shoulder[s], [`elbow${s}`]: elbow, [`wrist${s}`]: wrist, [`hand${s}`]: tip, [`hip${s}`]: add(pos.pelvis, hip[s]), [`knee${s}`]: knee, [`ankle${s}`]: ankle, [`toe${s}`]: toe });
     joint[`ankle${s}`] = ankle;
   }
@@ -321,7 +335,7 @@ export function assembleFrontal(pieces: Pieces, opt: PaperOptions, kind: 'front'
     ...sides.flatMap((s) => (['uarm', 'farm', 'hand'] as const).map((id) => ({ id: id as PieceId, side: s, key: `${id}${s}` }))),
     { id: 'head', key: 'head' },
   ];
-  const zs = order.map((o, i) => ({ o, k: i + (opt.adjust?.[o.id]?.z ?? 0) * 1.5 })).sort((a, b) => a.k - b.k).map((e) => e.o);
+  const zs = order.map((o, i) => ({ o, k: i + ((opt.adjust?.[o.id]?.z ?? 0) + (o.side ? opt.adjust?.[`${o.id}:${o.side}`]?.z ?? 0 : 0)) * 1.5 })).sort((a, b) => a.k - b.k).map((e) => e.o);
   for (const o of zs) {
     const img = o.side ? imgs[o.side][o.id] : pieces[o.id];
     if (!img || !pos[o.key]) continue;

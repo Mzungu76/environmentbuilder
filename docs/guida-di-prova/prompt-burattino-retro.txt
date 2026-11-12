@@ -1,4 +1,4 @@
-=== BURATTINO DI CARTA DI SCHIENA: FOGLIO DEI PEZZI ======================================
+=== BURATTINO DI CARTA DI SCHIENA: FOGLIO DEI PEZZI (ogni segmento di arto separato, per ciascun lato) ======================================
 Ordine di lavoro:
  1. Definisci prima il personaggio con l'AI (stile, volto, abiti, colori) fino a un'immagine di riferimento approvata.
  2. Poi, nella stessa conversazione o con un nuovo prompt, allega:
@@ -17,14 +17,31 @@ The second reference image is a LAYOUT GUIDE made of grey silhouettes. Draw ONE 
 at the same position and the same size and proportions as the silhouette. The guide is only a layout: do NOT draw its outlines,
 its grey fill, any numbers, labels, crosses or boxes.
 
-The sheet is a cut-out kit that will be re-assembled as a jointed puppet seen from the BACK: the character
-stands facing away from the viewer, perfectly symmetrical pose, arms relaxed at the sides.
-Parts: head (back of the head, hair/hat from behind), torso (chest and back seen from the back), pelvis (hips),
-upper arm, forearm, hand, thigh, lower leg (shin), foot (seen from behind, heel and sole visible).
-Draw only ONE arm and ONE leg (they will be mirrored for the other side), so draw them in a neutral way that works on both sides.
-Gear boxes, each drawn ALONE as a separate piece:
-- BACKPACK box: the backpack seen from BEHIND, complete, WITHOUT its shoulder straps, as it appears on the back of the character.
-- second box: any other carried gear seen from behind, or leave EMPTY.
+The sheet is a cut-out kit that will be re-assembled as a jointed puppet seen from the BACK: the character stands
+facing away from the viewer, arms relaxed at the sides, legs straight, feet side by side.
+There are THREE rows of pieces:
+ROW 1: head (back of the head, hair or hat from behind), torso (back seen from the back), pelvis, then two gear boxes.
+ROW 2: the limbs on the viewer's RIGHT side of the figure, one piece per segment: upper arm, forearm, hand, thigh, lower leg, foot.
+ROW 3: the limbs on the viewer's LEFT side of the figure, the same six pieces. Draw them as real left/right counterparts, NOT as
+a mirrored copy: any asymmetric detail (watch, pocket, patch, knee pad, sleeve roll) follows the character.
+(In the BACK view the viewer's right is the character's RIGHT side.)
+
+EACH BOX HOLDS ONE SINGLE SEGMENT - NEVER A WHOLE LIMB:
+- UPPER ARM box: only shoulder-to-elbow (the sleeve), NOT the forearm and NOT the hand.
+- FOREARM box: only elbow-to-wrist, NOT the hand.
+- HAND box: only the hand with a little wrist.
+- THIGH box: only hip-to-knee, NOT the lower leg.
+- LOWER LEG box: only knee-to-ankle, NOT the foot.
+- FOOT box: only the boot/foot, seen from behind, heel and sole visible.
+Each segment is a separate, complete piece with rounded ends that extend PAST the joint, so it can rotate behind its neighbour.
+
+LIMBS ARE SEEN FROM THE BACK, like the rest of the body: the arm hangs along the body, drawn as seen by the viewer
+(the back of the sleeve, the back of the forearm, the back of the hand with fingers pointing down) - NOT in side view, NOT in profile.
+The legs likewise: thigh and shin seen straight from the back.
+
+Gear boxes (end of row 1), each drawn ALONE as a separate piece:
+- BACKPACK box: the backpack seen from BEHIND, complete, WITHOUT its shoulder straps.
+- second box: other carried gear seen from behind, or leave EMPTY.
 Leave a gear box EMPTY if the character has no such item.
 
 THE TORSO IS DRAWN WITHOUT ARMS: only the shirt body (chest, back, collar/neck opening, the empty round armhole at the
@@ -45,7 +62,7 @@ RULES FOR EVERY PART
 - Clean, crisp edges on a transparent-looking flat background.
 - Background: solid flat uniform {{SFONDO}} everywhere between and around the parts. No ground, no scenery, no text.
 
-NEGATIVE: side view, profile view, 3/4 view, arms or sleeves painted on the torso, straps or backpack painted on the torso, bent or rotated limbs, parts overlapping each other, parts cut off by the canvas, a whole assembled body, perspective,
+NEGATIVE: whole arm or whole leg in one box, side view, profile view, 3/4 view, mirrored copies, arms or sleeves painted on the torso, straps or backpack painted on the torso, bent or rotated limbs, parts overlapping each other, parts cut off by the canvas, a whole assembled body, perspective,
 3/4 view, front view, different outfit, different face, different colors between parts, drop shadows, text, labels, numbers,
 grey silhouettes visible, guide outlines visible, extra parts, background gradient.
 
@@ -64,5 +81,7 @@ grey silhouettes visible, guide outlines visible, extra parts, background gradie
 - Zaino (con il piccone) e bretella vanno nelle due ultime caselle: lo zaino sta DIETRO al busto, la bretella SOPRA il busto.
   Il busto deve essere senza braccia, senza maniche e senza bretelle (nel foglio precedente erano dipinte sopra).
 
-- Vista posteriore: il personaggio deve avere la STESSA identità del profilo (stessi abiti, colori, proporzioni). Si disegna un solo
-  braccio e una sola gamba: l'app li specchia. Lo zaino visto da dietro va nella prima casella: nella vista di schiena si vede SOPRA il busto.
+- Vista posteriore: stessa identita' del profilo (abiti, colori, proporzioni). Ogni casella contiene UN SOLO segmento (non l'arto intero);
+  gli arti sono su due righe, destra e sinistra dell'immagine, disegnati davvero (non specchiati). Lo zaino visto da dietro va nella prima casella: nella vista di schiena sta SOPRA il busto.
+- Se l'AI disegna ancora arti interi in una casella, chiedi: "each box contains ONLY the labelled segment; regenerate the upper
+  arm box as the shoulder-to-elbow part only". Puoi anche generare riga per riga con la stessa guida.

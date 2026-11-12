@@ -10,7 +10,7 @@ W, H = 2048, 1536
 THREE_Q = '--34' in sys.argv      # 3/4 variant: deeper head, torso and pelvis (the body is turned a little toward the viewer)
 FRONT, BACK = '--front' in sys.argv, '--back' in sys.argv      # frontal variants: the camera sees the character from the front / the back
 FRONTAL = FRONT or BACK
-S = 1.3                      # canvas px per unit; a standing figure is 1000 units = 1300 px tall
+S = 1.0 if FRONTAL else 1.3                      # canvas px per unit; a standing figure is 1000 units = 1300 px tall
 PADX, PADY = 30, 64          # slot margin around the silhouette (px); the top/bottom margins hold the label and the measures
 
 # id, label, bone, w, h (units, INCLUDING the overlap past the joints), shape, proximal pivot, distal pivot (units, inside the piece)
@@ -34,15 +34,22 @@ if FRONTAL:
       ('head',   'TESTA (con cappello o capelli)' + (', di fronte' if FRONT else ', di nuca'), 'head', 195, 240, 'head', (97, 205), (97, 8)),
       ('torso',  'BUSTO (senza braccia)', 'torso', 250, 350, 'torso', (125, 305), (125, 40)),
       ('pelvis', 'BACINO', 'pelvis', 240, 140, 'torso', (120, 55), (120, 105)),
-      ('uarm',   'BRACCIO', 'uarmR', 80, 210, 'limb', (40, 40), (40, 175)),
-      ('farm',   'AVAMBRACCIO', 'farmR', 70, 200, 'limb', (35, 35), (35, 165)),
-      ('hand',   'MANO', 'handR', 80, 100, 'limb', (40, 25), (40, 92)),
-      ('thigh',  'COSCIA', 'thighR', 112, 270, 'limb', (56, 52), (56, 220)),
-      ('shin',   'GAMBA (stinco)', 'shinR', 92, 270, 'limb', (46, 44), (46, 230)),
-      ('foot',   'PIEDE (visto da %s)' % ('davanti' if FRONT else 'dietro'), 'footR', 100, 130, 'limb', (50, 30), (50, 115)),
+      ('uarm',   'BRACCIO (solo spalla-gomito)', 'uarmR', 80, 210, 'limb', (40, 40), (40, 175)),
+      ('farm',   'AVAMBRACCIO (solo gomito-polso)', 'farmR', 70, 200, 'limb', (35, 35), (35, 165)),
+      ('hand',   'MANO (solo la mano)', 'handR', 80, 100, 'limb', (40, 25), (40, 92)),
+      ('thigh',  'COSCIA (solo anca-ginocchio)', 'thighR', 112, 270, 'limb', (56, 52), (56, 220)),
+      ('shin',   'GAMBA (solo ginocchio-caviglia)', 'shinR', 92, 270, 'limb', (46, 44), (46, 230)),
+      ('foot',   'PIEDE (da %s)' % ('davanti' if FRONT else 'dietro'), 'footR', 100, 130, 'limb', (50, 30), (50, 115)),
       ('accA',   'ZAINO (visibile da dietro)' if BACK else 'ZAINO (nascosto, facoltativo)', None, 230, 260, 'free', None, None),
       ('accB',   'BRETELLE (sul busto)' if FRONT else 'ACCESSORIO (facoltativo)', None, 150, 300, 'free', None, None),
     ]
+
+if FRONTAL:
+    # each limb piece is drawn TWICE, once per side (different sleeve/glove/boot details, no mirroring)
+    R = [p for p in PARTS if p[0] in ('uarm', 'farm', 'hand', 'thigh', 'shin', 'foot')]
+    PARTS = [(p[0], p[1].replace(' (', ' dx (', 1), p[2], *p[3:]) if p in R else p for p in PARTS]
+    for p in R:
+        PARTS.append((p[0] + 'L', p[1].replace(' (', ' sx (', 1), p[2][:-1] + 'L', *p[3:]))
 
 def font(sz, bold=False):
     for p in ['/usr/share/fonts/truetype/dejavu/DejaVuSans%s.ttf' % ('-Bold' if bold else '')]:
@@ -51,6 +58,7 @@ def font(sz, bold=False):
 
 # rows of slots (shelf layout)
 ROWS = [['head', 'torso', 'pelvis', 'accA', 'accB'], ['uarm', 'farm', 'hand', 'thigh', 'shin', 'foot']]
+if FRONTAL: ROWS.append(['uarmL', 'farmL', 'handL', 'thighL', 'shinL', 'footL'])
 byid = {p[0]: p for p in PARTS}
 layout = {'canvas': {'width': W, 'height': H}, 'unitPx': S, 'standingHeightPx': round(1000 * S), 'parts': {}}
 y = 110
@@ -60,7 +68,7 @@ for row in ROWS:
     for pid in row:
         _, label, bone, uw, uh, shape, prox, dist = byid[pid]
         pw, ph = round(uw * S), round(uh * S)
-        sw, sh = max(pw + 2 * PADX, 190), ph + 2 * PADY
+        sw, sh = max(pw + 2 * PADX, 215 if FRONTAL else 190), ph + 2 * PADY
         piece = {'x': x + (sw - pw) // 2, 'y': y + PADY, 'w': pw, 'h': ph}
         layout['parts'][pid] = {
             'label': label, 'bone': bone, 'shape': shape,
@@ -72,7 +80,7 @@ for row in ROWS:
         rowh = max(rowh, sh)
     assert x - 20 <= W - 40, f'row too wide: {x}'
     y += rowh + 40
-assert y - 40 <= H - 90, f'canvas too short: {y}'
+assert y - 40 <= H - 60, f'canvas too short: {y}'
 
 def silhouette(d, p, fill, outline):
     pc = p['piece']; x0, y0, x1, y1 = pc['x'], pc['y'], pc['x'] + pc['w'], pc['y'] + pc['h']
@@ -102,9 +110,9 @@ def render(annotated):
                 d.line([q['x'] - 14, q['y'], q['x'] + 14, q['y']], fill=col, width=3); d.line([q['x'], q['y'] - 14, q['x'], q['y'] + 14], fill=col, width=3)
                 d.ellipse([q['x'] - 6, q['y'] - 6, q['x'] + 6, q['y'] + 6], outline=col, width=3)
     if annotated:
-        d.text((50, 30), ('GUIDA BURATTINO DI FRONTE' if FRONT else 'GUIDA BURATTINO DI SCHIENA' if BACK else 'GUIDA BURATTINO 3/4' if THREE_Q else 'GUIDA BURATTINO') + (' — vista frontale, un solo braccio e una sola gamba (l\'altro lato è lo specchio), pezzi dritti.' if FRONTAL else ' — vista laterale (destra), pezzi dritti e non ruotati.'), fill=(0, 0, 0), font=font(26, True))
+        d.text((50, 30), ('GUIDA BURATTINO DI FRONTE' if FRONT else 'GUIDA BURATTINO DI SCHIENA' if BACK else 'GUIDA BURATTINO 3/4' if THREE_Q else 'GUIDA BURATTINO') + (' — pezzi dritti, ogni segmento di arto separato, per ciascun lato (dx e sx dell\'immagine).' if FRONTAL else ' — vista laterale (destra), pezzi dritti e non ruotati.'), fill=(0, 0, 0), font=font(26, True))
         d.text((50, 64), 'Croce ROSSA = snodo con il pezzo precedente (prossimale).  Croce BLU = snodo con il pezzo successivo (distale).  Il disegno deve proseguire oltre lo snodo (estremità arrotondata).', fill=(60, 60, 60), font=font(21))
-        d.text((50, H - 60), 'Le sagome grigie indicano posizione e proporzioni: i pezzi devono stare DENTRO la propria casella, senza toccare i bordi.  1 unità = 1/1000 dell\'altezza in piedi (1000 u = %d px).' % layout['standingHeightPx'], fill=(60, 60, 60), font=font(22))
+        d.text((50, H - 50), 'Le sagome grigie indicano posizione e proporzioni: i pezzi devono stare DENTRO la propria casella, senza toccare i bordi.  1 unità = 1/1000 dell\'altezza in piedi (1000 u = %d px).' % layout['standingHeightPx'], fill=(60, 60, 60), font=font(22))
     return im
 
 os.makedirs(OUT, exist_ok=True)

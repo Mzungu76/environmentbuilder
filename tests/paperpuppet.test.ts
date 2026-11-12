@@ -80,4 +80,21 @@ describe('paper puppet', () => {
     expect(idx(f, 'accA')).toBeLessThan(idx(f, 'torso')); expect(idx(b, 'accA')).toBeGreaterThan(idx(b, 'torso'));
     const m = buildPaperMesh(f), n = m.mesh.vertices.length / 2; expect(m.skin.idx.length).toBe(n * 4);
   });
+  it('frontal sheets with limbs on two rows: left limbs are their own pieces (not mirrored) and move independently', () => {
+    const s2 = newImg(1400, 1200);
+    const top: [number, number, number, number][] = [[40, 90, 200, 240], [300, 70, 250, 340], [600, 120, 240, 200], [900, 100, 210, 300]];
+    for (const [x, y, w, h] of top) rect(s2, x, y, w, h, [(x / 6) % 255, 120, 90]);
+    const limbs: [number, number, number][] = [[50, 90, 230], [220, 80, 210], [380, 80, 130], [520, 110, 290], [700, 100, 295], [880, 180, 120]];
+    limbs.forEach(([x, w, h]) => rect(s2, x, 520, w, h, [40, (x / 5) % 255, 200]));                  // right row
+    limbs.forEach(([x, w, h], i) => rect(s2, x, 900, w + (i === 0 ? 30 : 0), h, [200, (x / 5) % 255, 40]));   // left row: the upper arm is wider → not a mirror
+    const ex = extractPieces(s2);
+    expect(ex.pieces.uarmL).toBeDefined(); expect(ex.pieces.uarmL!.width).toBe(120 + 6); expect(ex.pieces.uarm!.width).toBe(90 + 6);
+    const f = assembleFrontal(ex.pieces, { farShade: 0.3 }, 'front'), base = f.placed;
+    const uR = base.find((p) => p.bone === 'uarmR')!, uL = base.find((p) => p.bone === 'uarmL')!;
+    expect(uL.img.width).toBe(126); expect(uR.img.width).toBe(96);                              // each side uses its own drawing
+    const moved = assembleFrontal(ex.pieces, { farShade: 0.3, adjust: { 'uarm:L': { dx: 15, dy: 8, z: 0 } } }, 'front');
+    const rel = (a: typeof f, k: 'elbowL' | 'elbowR') => a.landmarks[k]!.x - a.landmarks.neck!.x;        // the canvas origin may shift when a piece moves, so measure from the neck
+    expect(rel(moved, 'elbowL') - rel(f, 'elbowL')).toBeCloseTo(15, 3); expect(rel(moved, 'elbowR')).toBeCloseTo(rel(f, 'elbowR'), 3);   // only the left arm moved
+    expect(buildPaperMesh(moved).parts.length).toBe(base.length);
+  });
 });
