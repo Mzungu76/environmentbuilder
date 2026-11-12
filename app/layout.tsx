@@ -5,7 +5,7 @@ export const metadata: Metadata = {
   title: 'Environment Builder',
   description: 'Editor universale di ambienti 2D e motore di esplorazione',
 };
-export const viewport: Viewport = { width: 'device-width', initialScale: 1, maximumScale: 1 };
+export const viewport: Viewport = { width: 'device-width', initialScale: 1, maximumScale: 1, viewportFit: 'cover' };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
