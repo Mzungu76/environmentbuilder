@@ -626,7 +626,7 @@ export class SceneView {
     if (look && look.halo > 0.01 && this.placeMesh(c.id + '#halo', pd, pd.flip, Math.min(1, look.halo), cx, cy - lift, h)) {
       const hm = this.puppetMeshes.get(c.id + '#halo')!.mesh;
       hm.tint = parseInt(look.haloColor.replace('#', ''), 16) || 0xffffff;
-      if (!hm.filters || !(hm.filters[0] instanceof BlurFilter)) hm.filters = [new BlurFilter({ strength: 6, quality: 2 })];
+      if (!hm.filters || !(hm.filters[0] instanceof BlurFilter)) hm.filters = [new BlurFilter({ strength: 6, quality: 2, resolution: 'inherit' })];
       const mi = this.charRoot.getChildIndex(main);
       if (this.charRoot.getChildIndex(hm) > mi) this.charRoot.setChildIndex(hm, mi);
     }
@@ -644,7 +644,8 @@ export class SceneView {
     const holder = mesh as MeshSimple & { __lookKey?: string };
     const existing = mesh.filters && mesh.filters[0] instanceof ColorMatrixFilter ? (mesh.filters[0] as ColorMatrixFilter) : null;
     if (holder.__lookKey === key && existing) return;
-    const f = existing ?? new ColorMatrixFilter();       // reused: the light changes continuously while the character walks
+    // Pixi renders a filter at resolution 1 by default: on a phone (DPR 2+) the filtered figure came out blurry. 'inherit' = the canvas resolution.
+    const f = existing ?? new ColorMatrixFilter({ resolution: 'inherit' });       // reused: the light changes continuously while the character walks
     f.reset();
     f.brightness(look.brightness, false); f.contrast(look.contrast - 1, true); f.saturate(look.saturation - 1, true);
     if (look.tintAmount > 0.01) {
