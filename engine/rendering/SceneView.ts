@@ -1,3 +1,4 @@
+import { bakeCutout } from './occluderBake';
 import { Application, BlurFilter, ColorMatrixFilter, Container, Graphics, MeshSimple, Rectangle, Sprite, Texture } from 'pixi.js';
 import type { SpriteDraw } from '@/engine/characters/sprites';
 import type { DollShape } from '@/engine/doll/shapes';
@@ -99,6 +100,9 @@ const NODE_COLORS: Record<string, number> = {
 const SELECT_COLOR = 0xffffff;
 const HANDLE_COLOR = 0xfde047;
 
+/** One occluder ready to draw: alpha grid (w×h cells, 0–255) of the cut-out. */
+export interface OccluderItem { id: string; alpha: Uint8Array; w: number; h: number; version: number }
+
 export class SceneView {
   private app!: Application;
   private world = new Container();
@@ -107,7 +111,12 @@ export class SceneView {
   private brushGfx = new Graphics();
   private bgRoot = new Container();   // background + midground
   private objRoot = new Container();  // object images (below characters)
-  private fgRoot = new Container();   // foreground (above characters)
+  private occRoot = new Container();  // occluders: cut-outs of the backdrop drawn above the characters
+  private occEntries = new Map<string, { sprite: Sprite; tex: Texture | null; canvas: HTMLCanvasElement | null; version: number }>();
+  private occItems: OccluderItem[] = [];
+  private bgInfo: { tex: Texture; x: number; y: number } | null = null;
+  private occTintSprite: Sprite | null = null;
+  private occTintTex: Texture | null = null;
   private objSprites = new Map<string, Sprite>();
   /** Objects consumed at runtime (e.g. collected in the playtest): hidden but still part of the document. */
   private hiddenObjects = new Set<string>();
@@ -163,7 +172,7 @@ export class SceneView {
     host.appendChild(app.canvas);
     app.canvas.style.touchAction = 'none';
     app.canvas.style.display = 'block';
-    this.world.addChild(this.bgRoot, this.objRoot, this.charRoot, this.charGfx, this.fgRoot, this.overlay, this.brushGfx);
+    this.world.addChild(this.bgRoot, this.objRoot, this.charRoot, this.charGfx, this.occRoot, this.overlay, this.brushGfx);
     app.stage.addChild(this.world);
     app.ticker.add((t) => {
       this.onTick(Math.min(0.1, t.deltaMS / 1000));
@@ -187,6 +196,8 @@ export class SceneView {
   destroy() {
     this.destroyed = true;
     this.resizeObs?.disconnect();
+    for (const e of this.occEntries.values()) e.tex?.destroy(true);
+    this.occEntries.clear();
     for (const t of this.textures.values()) t.destroy(true);
     this.textures.clear();
     if (this.app) this.app.destroy(true, { children: true });
@@ -198,6 +209,13 @@ export class SceneView {
     this.envW = Math.max(1, w); this.envH = Math.max(1, h);
     if (changed || refit) { this.fit(); }
     this.dirty = true;
+  }
+
+  /** Mip-mapped trilinear sampling for big textures drawn small, only when the GPU can really build the mip chain for this size. */
+  private applyMip(tex: Texture) {
+    const gl = (this.app?.renderer as unknown as { context?: { supports?: { nonPowOf2mipmaps?: boolean } } } | undefined)?.context;
+    const canMip = !!(gl?.supports?.nonPowOf2mipmaps || tex.source.isPowerOfTwo) && Math.max(tex.source.pixelWidth, tex.source.pixelHeight) <= 4096;
+    if (canMip) { tex.source.autoGenerateMipmaps = true; tex.source.style.scaleMode = 'linear'; tex.source.style.mipmapFilter = 'linear'; }
   }
 
   /** Texture cache keyed by asset id (shared by layers and objects); concurrent loads are de-duplicated. */
@@ -213,9 +231,7 @@ export class SceneView {
           const tex = Texture.from(await createImageBitmap(blob));
           // mip-mapped, trilinear sampling for big textures drawn small (characters in a wide scene). Only when the GPU can really build the
           // mip chain for this size: asking for mipmap filtering without mipmaps makes the texture "incomplete" and some phones draw nothing.
-          const gl = (this.app?.renderer as unknown as { context?: { supports?: { nonPowOf2mipmaps?: boolean } } } | undefined)?.context;
-          const canMip = !!(gl?.supports?.nonPowOf2mipmaps || tex.source.isPowerOfTwo) && Math.max(tex.source.pixelWidth, tex.source.pixelHeight) <= 4096;
-          if (canMip) { tex.source.autoGenerateMipmaps = true; tex.source.style.scaleMode = 'linear'; tex.source.style.mipmapFilter = 'linear'; }
+          this.applyMip(tex);
           this.textures.set(assetId, tex);
           return tex;
         } catch (err) {
@@ -228,18 +244,18 @@ export class SceneView {
     return p;
   }
 
-  /** Synchronizes layer sprites. Draw order: background/midground → objects → characters → foreground. */
+  /** Synchronizes layer sprites. Draw order: background/midground → objects → characters → occluders. */
   async setLayers(sources: LayerSource[]) {
     const version = ++this.layerVersion;
     const wanted = new Set(sources.map((s) => s.layer.id));
     for (const [id, sp] of this.sprites) if (!wanted.has(id)) { sp.destroy(); this.sprites.delete(id); }
 
-    const roleOrder = { background: 0, midground: 1, foreground: 2 } as const;
+    const roleOrder = { background: 0, midground: 1 } as const;
     const ordered = sources.map((s, i) => ({ s, i })).sort((a, b) => roleOrder[a.s.layer.role] - roleOrder[b.s.layer.role] || a.i - b.i);
     const texs = await Promise.all(ordered.map(({ s }) => this.texture(s.layer.assetId, s.blobLoader)));
     if (this.destroyed || version !== this.layerVersion) return; // superseded by a newer call
 
-    const counts = { bg: 0, fg: 0 };
+    let bgCount = 0, bgInfo: SceneView['bgInfo'] = null;
     ordered.forEach(({ s }, k) => {
       const tex = texs[k];
       const { layer } = s;
@@ -248,10 +264,12 @@ export class SceneView {
       if (!sp) { sp = new Sprite(tex); this.sprites.set(layer.id, sp); } else if (sp.texture !== tex) sp.texture = tex;
       sp.visible = layer.visible; sp.alpha = layer.opacity;
       sp.position.set(layer.offsetX * this.envW, layer.offsetY * this.envH);
-      const root = layer.role === 'foreground' ? this.fgRoot : this.bgRoot;
-      if (sp.parent !== root) root.addChild(sp);
-      root.setChildIndex(sp, layer.role === 'foreground' ? counts.fg++ : counts.bg++);
+      if (sp.parent !== this.bgRoot) this.bgRoot.addChild(sp);
+      this.bgRoot.setChildIndex(sp, bgCount++);
+      if (layer.role === 'background' && !bgInfo) bgInfo = { tex, x: sp.x, y: sp.y };
     });
+    this.bgInfo = bgInfo;
+    this.rebuildOccluders();
     this.dirty = true;
   }
 
@@ -315,6 +333,40 @@ export class SceneView {
     this.onCamera(z); this.dirty = true;
   }
   zoomCenter(factor: number) { this.zoomAt(factor, this.vw / 2, this.vh / 2); }
+  /**
+   * Occluders to draw over the characters: the backdrop cut by each alpha grid. `version` changes whenever the grid changes
+   * (the grid may be edited in place while painting). Entries missing from the list are removed.
+   */
+  setOccluders(items: OccluderItem[]) { this.occItems = items; this.rebuildOccluders(); }
+  private rebuildOccluders() {
+    const wanted = new Set(this.occItems.map((o) => o.id));
+    for (const [id, e] of this.occEntries) if (!wanted.has(id)) { e.sprite.destroy(); e.tex?.destroy(true); this.occEntries.delete(id); }
+    const bg = this.bgInfo, img = bg?.tex.source.resource as (CanvasImageSource & { width: number; height: number }) | undefined;
+    if (!bg || !img || !img.width) { for (const e of this.occEntries.values()) e.sprite.visible = false; return; }
+    for (const it of this.occItems) {
+      let e = this.occEntries.get(it.id);
+      if (e && e.version === it.version && e.sprite.visible) { e.sprite.position.set(bg.x, bg.y); continue; }
+      if (!e) { e = { sprite: new Sprite(), tex: null, canvas: null, version: -1 }; this.occEntries.set(it.id, e); this.occRoot.addChild(e.sprite); }
+      try {
+        const { canvas, scale } = bakeCutout(img, it.alpha, it.w, it.h, e.canvas ?? undefined);
+        if (!e.tex || e.canvas !== canvas) { e.tex?.destroy(true); e.tex = Texture.from(canvas); this.applyMip(e.tex); e.sprite.texture = e.tex; } else e.tex.source.update();
+        e.canvas = canvas; e.version = it.version;
+        e.sprite.scale.set(scale); e.sprite.position.set(bg.x, bg.y); e.sprite.visible = true;
+      } catch { e.sprite.visible = false; }
+    }
+    this.dirty = true;
+  }
+  /** Translucent tint of the occluder being painted (editor, Primo piano tool). Pass null to hide it. */
+  setOccluderTint(canvas: HTMLCanvasElement | null) {
+    if (!canvas) { if (this.occTintSprite) this.occTintSprite.visible = false; return; }
+    if (!this.occTintSprite || !this.occTintTex || this.occTintTex.source.resource !== canvas) {
+      this.occTintSprite?.destroy(); this.occTintTex?.destroy(true);
+      this.occTintTex = Texture.from(canvas); this.occTintSprite = new Sprite(this.occTintTex);
+      this.world.addChildAt(this.occTintSprite, this.world.getChildIndex(this.overlay));
+    } else this.occTintTex.source.update();
+    this.occTintSprite.width = this.envW; this.occTintSprite.height = this.envH; this.occTintSprite.visible = true;
+  }
+
   /** Shows the painted scale zones as a translucent layer (editor, zones tool). Pass null to hide it. */
   setZoneCanvas(canvas: HTMLCanvasElement | null) {
     if (!canvas) { if (this.zoneSprite) this.zoneSprite.visible = false; return; }

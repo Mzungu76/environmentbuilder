@@ -2,7 +2,7 @@ import type { Environment, LightMapData } from '@/types';
 import { buildLightMap } from '@/engine/game/light';
 import { imgToCanvas, loadAssetImg } from './pipeline';
 
-const ORDER: Record<string, number> = { background: 0, midground: 1, foreground: 2 };
+const ORDER: Record<string, number> = { background: 0, midground: 1 };
 
 /** Reduces the visible layers of the environment to a coarse light map (the colours the characters walk through). */
 export const LIGHT_PRECISIONS = [64, 128, 256, 384, 512];

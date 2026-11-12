@@ -13,19 +13,22 @@ export class ZoneEditor {
   private work: { id: string; mask: Uint8Array } | null = null;
   private last: Vec2 | null = null;
   private unsub: () => void;
+  /** True while this editor is showing its overlay/ring (so it never clears the ones of another tool). */
+  private shown = false;
 
   constructor(private store: EditorStore, private view: SceneView) {
     this.unsub = store.subscribe(() => this.refresh());
     this.refresh();
   }
 
-  dispose() { this.unsub(); this.view.setZoneCanvas(null); this.view.setBrush(0, 0, 0, null); }
+  dispose() { this.unsub(); this.view.setZoneCanvas(null); if (this.shown) this.view.setBrush(0, 0, 0, null); }
 
   private active() { const s = this.store.getState(); return s.tool === 'zones' && s.mode === 'editor' && !s.preview; }
 
   /** Redraws the translucent zone layer (or hides it when the tool is not active). */
   refresh() {
-    if (!this.active()) { this.view.setZoneCanvas(null); this.view.setBrush(0, 0, 0, null); return; }
+    if (!this.active()) { this.view.setZoneCanvas(null); if (this.shown) { this.shown = false; this.view.setBrush(0, 0, 0, null); } return; }
+    this.shown = true;
     const env = this.store.env;
     if (!env.width || !env.height) return;
     const { w, h } = zoneGrid(env);

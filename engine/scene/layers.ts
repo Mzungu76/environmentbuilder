@@ -1,7 +1,7 @@
 import type { Environment, ImageAssetMeta, LayerRole, SceneLayer } from '@/types';
 import { uid } from '@/lib/ids';
 
-/** Layer list order = draw order (back→front) within the same role. Roles: background < midground < foreground. */
+/** Layer list order = draw order (back→front) within the same role. Roles: background < midground. */
 
 export function addLayer(env: Environment, role: Exclude<LayerRole, 'background'>, meta: ImageAssetMeta): Environment {
   const layer: SceneLayer = { id: uid('layer'), name: meta.fileName, role, assetId: meta.id, visible: true, offsetX: 0, offsetY: 0, opacity: 1 };
@@ -35,4 +35,4 @@ export function moveLayer(env: Environment, id: string, dir: 'up' | 'down'): Env
   return { ...env, layers };
 }
 
-export const ROLE_LABEL: Record<LayerRole, string> = { background: 'Sfondo', midground: 'Piano intermedio', foreground: 'Primo piano' };
+export const ROLE_LABEL: Record<LayerRole, string> = { background: 'Sfondo', midground: 'Piano intermedio' };

@@ -56,7 +56,17 @@ Proprietà di un collegamento: **direzione** (entrambi i sensi / solo Da→A / s
 
 ## 6. Livelli grafici (`L`)
 
-Sfondo (obbligatorio) + piani intermedi + primi piani. Per ogni livello: mostra/nascondi, avanti/indietro, spostamento X/Y, opacità. Il **primo piano passa sopra i personaggi**. Usa PNG con trasparenza grandi come lo sfondo.
+Sfondo (obbligatorio) + piani intermedi (sempre dietro ai personaggi). Per ogni livello: mostra/nascondi, avanti/indietro, spostamento X/Y, opacità. Per le parti che **nascondono il personaggio** non si usano più i livelli: vedi lo strumento Primo piano (`G`).
+
+### Primo piano (`G`)
+
+Lo strumento **Primo piano** dipinge direttamente sullo sfondo le parti che nascondono il personaggio quando ci passa dietro (rocce, archi, pilastri). Non servono immagini separate: dove dipingi, lo sfondo viene ridisegnato sopra il personaggio.
+
+- **Nuova** crea una parte (ne puoi avere quante vuoi, ognuna con nome e colore). **Pennello** aggiunge, **Gomma** toglie; la dimensione è regolabile.
+- **Bordo** rende il margine più morbido (0 = netto).
+- Ogni tratto è un passo di annullamento (`Ctrl+Z`).
+- Per ora il personaggio passa **sempre dietro** le parti dipinte. Le forme geometriche, le spline e la regola davanti/dietro in base alla profondità arrivano nei passi successivi.
+- Nel pacchetto per il gioco ogni parte viaggia come immagine (`assets/occluder-….png`) da disegnare sopra i personaggi, e in `scenario.json` sotto `occluders`.
 
 ## 7. Personaggi
 

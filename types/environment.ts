@@ -2,7 +2,7 @@ import type { NavigationGraph } from './navigation';
 import type { InteractiveObject, Entrance, Exit } from './interaction';
 import type { Character } from './character';
 
-export type LayerRole = 'background' | 'midground' | 'foreground';
+export type LayerRole = 'background' | 'midground';
 
 export interface SceneLayer {
   id: string;
@@ -87,6 +87,18 @@ export interface GameplayConfig {
   collapse: CollapseConfig;
 }
 
+/**
+ * One brush stroke of an occluder, in order. `add` paints coverage, `sub` erases it. Points are normalized (x, y pairs) to the
+ * environment; `radius` is a fraction of the image HEIGHT (round on screen). Later steps add shapes (rect, ellipse, polygon, spline).
+ */
+export interface OccluderStroke { kind: 'stroke'; mode: 'add' | 'sub'; radius: number; pts: number[] }
+export type OccluderOp = OccluderStroke;
+/**
+ * A part of the backdrop that can hide a character: where `ops` paint coverage, the backdrop itself is drawn again on top of the
+ * characters (no extra image). `softness` 0–1 feathers the edge.
+ */
+export interface Occluder { id: string; name: string; color: string; softness: number; ops: OccluderOp[] }
+
 export interface Environment {
   id: string;
   name: string;
@@ -94,7 +106,7 @@ export interface Environment {
   width: number;
   height: number;
   profiles: ProfileId[];
-  /** Order = draw order (back to front) within each role; roles are drawn background → midground → foreground. */
+  /** Order = draw order (back to front) within each role; roles are drawn background → midground. Parts of the scene in front of the characters are `occluders`, not layers. */
   layers: SceneLayer[];
   assets: ImageAssetMeta[];
   navigation: NavigationGraph;
@@ -108,6 +120,8 @@ export interface Environment {
   perspective?: { topScale: number; bottomScale: number };
   /** Size zones painted on the backdrop (they refine / override the automatic perspective). */
   scaleZones?: ScaleZone[];
+  /** Parts of the backdrop drawn over the characters (painted like the scale zones). */
+  occluders?: Occluder[];
   /** 0–1: how gently the size changes across and around the painted zones (default 0.5). */
   scaleSoftness?: number;
   /** Light of the scene reproduced on the characters (see engine/game/light). */
