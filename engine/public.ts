@@ -30,6 +30,8 @@ export { spriteFor, parseFrames, type SpriteDraw } from '@/engine/characters/spr
 export { allProfiles, suggestedTypes } from '@/engine/profiles';
 
 // --- rigged characters ("puppets") ---------------------------------------------------------------------------------
+export { buildLightMap, sampleLight, applyLight } from '@/engine/game/light';
+export { baseScale, nodeScale, scaleAlong } from '@/engine/navigation/perspective';
 export { GameSession, createGameSession, type SessionEvent, type SessionFrame, type CharacterFrame, type CollectResult, type SessionOptions } from '@/engine/game/session';
 export { CollapseTimer } from '@/engine/game/collapse';
 export { defaultGameplay, defaultCollapse, newCollectible } from '@/engine/game/defaults';

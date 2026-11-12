@@ -11,6 +11,7 @@ import { exitNodeIds, resolveExit } from '@/engine/interaction/objects';
 import { availableInteractions, createRuntimeState, performInteraction, resetRuntimeState, type Available, type GameEvent, type RuntimeState } from '@/engine/interaction/system';
 import { emitHostEvent } from '@/lib/integration/hostBridge';
 import { CollapseTimer } from '@/engine/game/collapse';
+import { applyLight, sampleLight } from '@/engine/game/light';
 import { defaultGameplay } from '@/engine/game/defaults';
 import { createRng } from './rng';
 
@@ -272,13 +273,20 @@ export class PlaytestController {
     this.publish();
   }
 
+  /** The character's own look plus the light of the zone of the background it stands in (if the scene has light enabled). */
+  private lookFor(c: Character, x: number, y: number, scale: number) {
+    const L = this.env.lighting, m = this.env.lightMap;
+    if (!L?.enabled || !m) return c.look;
+    return applyLight(c.look, sampleLight(m, x, Math.max(0, y - c.height * scale * 0.4), L.strength));
+  }
+
   private puppetFor(c: Character, s: AgentSnapshot, dt: number): CharacterRenderItem['puppet'] {
     const puppet = c.puppetId ? this.store.project.puppets.find((p) => p.id === c.puppetId) : undefined;
     if (!puppet) return null;
     let pl = this.players.get(c.id); if (!pl) { pl = new PuppetPlayer(); this.players.set(c.id, pl); }
-    const figurePx = Math.max(1, c.height * this.env.height);
+    const figurePx = Math.max(1, c.height * s.scale * this.env.height);
     const hint = s.edgeId ? this.env.navigation.edges.find((e) => e.id === s.edgeId)?.props.view : undefined;
-    const f = pl.frame(puppet, s.state, dt, s.speedPx / figurePx, hint);
+    const f = pl.frame(puppet, s.state, dt, s.speedPx / figurePx, hint, { clip: s.edgeId ? this.env.navigation.edges.find((e) => e.id === s.edgeId)?.props.clip : undefined, progress: s.edgeProgress });
     const assetId = f?.view.cutoutAssetId;
     if (!f || !assetId || !f.view.mesh) return null;
     return { assetId, positions: f.positions, uvs: f.view.mesh.uvs, indices: f.view.mesh.indices, pivot: f.view.pivot, figureHeight: f.view.figureHeight, flip: flipsWithFacing(f.view) && s.facing < 0, viewKey: `${puppet.id}:${f.viewId}:${assetId}`,
@@ -291,7 +299,7 @@ export class PlaytestController {
     const doll = c.dollId ? this.store.project.dolls.find((d) => d.id === c.dollId) : undefined;
     if (!doll) return null;
     let pl = this.dollPlayers.get(c.id); if (!pl) { pl = new DollPlayer(); this.dollPlayers.set(c.id, pl); }
-    const figurePx = Math.max(1, c.height * this.env.height);
+    const figurePx = Math.max(1, c.height * s.scale * this.env.height);
     return { shapes: pl.frame(doll, s.state, dt, s.speedPx / figurePx), outline: doll.colors.outline, outlineWidth: doll.style.outline * 1000, flip: s.facing < 0 };
   }
 
@@ -301,7 +309,7 @@ export class PlaytestController {
     const items: CharacterRenderItem[] = [];
     for (const [id, a] of this.agents) {
       const c = a.config, s = a.snapshot();
-      items.push({ id, x: s.x, y: s.y, width: c.width, height: c.height, color: c.color, facing: s.facing, state: s.state, shadow: c.shadow, selected: false, lift: s.lift, sprite: spriteFor(c, s.state), stateTime: s.stateTime, liveClock: false, puppet: this.puppetFor(c, s, dt), doll: this.dollFor(c, s, dt), look: c.look });
+      items.push({ id, x: s.x, y: s.y, width: c.width * s.scale, height: c.height * s.scale, color: c.color, facing: s.facing, state: s.state, shadow: c.shadow, selected: false, lift: s.lift, sprite: spriteFor(c, s.state), stateTime: s.stateTime, liveClock: false, puppet: this.puppetFor(c, s, dt), doll: this.dollFor(c, s, dt), look: this.lookFor(c, s.x, s.y, s.scale) });
     }
     this.view.setCharacters(items);
   }

@@ -4,6 +4,7 @@ import { SCHEMA_VERSION } from '@/types';
 import { getAsset } from '@/lib/persistence/db';
 import { RUNTIME_SOURCE } from '@/lib/generated/runtimeSource';
 import { gameReadiness } from '@/engine/game/validate';
+import { computeLightMap } from '@/lib/studio/lightmap';
 
 /**
  * Scenario package for the game app:
@@ -25,6 +26,7 @@ export function scenarioManifest(project: Project, environmentId: string) {
     format: SCENARIO_FORMAT, version: 1, schemaVersion: SCHEMA_VERSION, name: env.name, environmentId: env.id, size: { width: env.width, height: env.height },
     characters: env.characters.map((c) => ({ id: c.id, name: c.name, puppetId: c.puppetId ?? null })),
     nodes: env.navigation.nodes.length, edges: env.navigation.edges.length,
+    perspective: env.perspective ?? null, lighting: env.lighting?.enabled ? { strength: env.lighting.strength } : null,
     // what the game may know: the items and how the collapse is announced. The duration of the collapse is NEVER exported.
     collectibles: (g?.collectibles ?? []).map((c) => ({ id: c.id, name: c.name, points: c.points, weight: c.weight, color: c.color })),
     collectSeconds: g?.collectSeconds ?? 1.4, celebrateSeconds: g?.celebrateSeconds ?? 1.2,
@@ -46,7 +48,10 @@ export async function buildGamePackage(project: Project, environmentId?: string)
     const path = `assets/${a.id}.${extOf(a.mime)}`; zip.file(path, blob); assetFiles[a.id] = path; urls[a.id] = await blobToDataUrl(blob);
   }
   // only what this scenario needs
-  const slim: Project = { ...project, environments: [env], activeEnvironmentId: env.id, puppets: project.puppets.filter((p) => usedPuppets.has(p.id)) };
+  // the light map travels with the scenario (computed now if the scene uses light but it was never calculated)
+  let envOut = env;
+  if (env.lighting?.enabled && !env.lightMap) { const m = await computeLightMap(project.id, env).catch(() => null); if (m) envOut = { ...env, lightMap: m }; }
+  const slim: Project = { ...project, environments: [envOut], activeEnvironmentId: env.id, puppets: project.puppets.filter((p) => usedPuppets.has(p.id)) };
   zip.file('project.json', JSON.stringify(slim, null, 2));
   zip.file('scenario.json', JSON.stringify({ ...scenarioManifest(project, env.id), assets: assetFiles }, null, 2));
   zip.file('environment-runtime.mjs', RUNTIME_SOURCE);
@@ -93,6 +98,7 @@ Contenuto
 - Il crollo ha una durata casuale tra due limiti che il gioco non conosce mai: riceve solo l'intensità del tremore (che cresce in modo irregolare, con falsi allarmi) e gli eventi di fase. All'evento 'collapse' il gioco finisce: nessuno si muove più e triggerCollect() risponde { ok:false, reason:'collapsed' }.
 - Le richieste di raccolta fatte mentre il personaggio sta già raccogliendo vengono messe in coda.
 - Gli oggetti e i punti sono quelli di scenario.json (collectibles): ogni scenario può avere cose diverse.
+- Prospettiva: c.heightPx e la velocità sono già scalati (c.scale). Luce: c.light = { brightness, tint, tintAmount } della zona in cui si trova il personaggio (null se lo scenario non la usa): applicali allo sprite (in Pixi: ColorMatrixFilter o sprite.tint).
 `;
 }
 
@@ -135,7 +141,7 @@ const order = { background: 0, midground: 1, foreground: 2 };
 function drawLayers(role) { for (const l of env.layers.filter(l => l.visible && (role === 'foreground') === (l.role === 'foreground')).sort((a, b) => (order[a.role] ?? 0) - (order[b.role] ?? 0))) { const im = img[l.assetId]; if (!im) continue; ctx.globalAlpha = l.opacity ?? 1; ctx.drawImage(im, l.offsetX * env.width, l.offsetY * env.height); ctx.globalAlpha = 1; } }
 function drawPuppet(c, pf) {
   const layers = [pf.under ?? pf, ...(pf.over ? [pf.over] : [])]; void layers;
-  const draw = (view, pos, alpha) => { const tex = img[view.cutoutAssetId]; if (!tex || !pos || !view.mesh) return; const s = c.heightPx / view.figureHeight; ctx.save(); ctx.globalAlpha = alpha;
+  const draw = (view, pos, alpha) => { const tex = img[view.cutoutAssetId]; if (!tex || !pos || !view.mesh) return; const s = c.heightPx / view.figureHeight; ctx.save(); ctx.globalAlpha = alpha; if (c.light) ctx.filter = 'brightness(' + c.light.brightness.toFixed(2) + ')';
     R.drawPuppet(ctx, tex, pos, view.mesh.uvs, view.mesh.indices, { x: c.x, y: c.y - c.lift, scale: s, flip: c.facing < 0 && R.flipsWithFacing(view), pivot: view.pivot }); ctx.restore(); };
   const atts = (front) => (pf.attachments || []).filter(a => a.front === front).forEach(a => { const tex = img[a.assetId]; if (!tex) return; const v = pf.view, s = c.heightPx / v.figureHeight; ctx.save(); R.drawPuppet(ctx, tex, a.positions, a.uvs, a.indices, { x: c.x, y: c.y - c.lift, scale: s, flip: c.facing < 0 && R.flipsWithFacing(v), pivot: v.pivot }); ctx.restore(); });
   atts(false); draw(pf.view, pf.positions, 1); if (pf.over) draw(pf.over.view, pf.over.positions, pf.over.alpha); atts(true);

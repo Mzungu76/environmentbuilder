@@ -15,6 +15,8 @@ import { CharacterPanel } from './CharacterPanel';
 import { ObjectPanel } from './ObjectPanel';
 import { LayersPanel } from './LayersPanel';
 import { GameplayPanel } from './GameplayPanel';
+import { ScenePanel } from './ScenePanel';
+import { nodeScale } from '@/engine/navigation/perspective';
 import { objectIssues, objectTypeInfo } from '@/engine/interaction/objects';
 import { createCharacter } from '@/engine/characters/factory';
 
@@ -70,6 +72,12 @@ function NodePanel({ store, env, node, select }: { store: EditorStore; env: Envi
           <NumberField id="n-y" label="Y" value={Math.round(node.y * env.height)} min={0} max={env.height} onCommit={(v) => move(node.x, v / env.height)} />
         </div>
         <span className={styles.help}>Normalizzate: {node.x.toFixed(4)}, {node.y.toFixed(4)}</span>
+      </div>
+      <div className={styles.section}>
+        <NumberField id="n-scale" label="Scala del personaggio qui (%)" value={Math.round(nodeScale(env, node) * 100)} min={5} max={300} step={5}
+          onCommit={(v) => { const props = { ...node.props }; props.scale = String(v / 100); edit({ props }); }}
+          help="Per la prospettiva: più piccolo dove la scena va in profondità. Lungo i percorsi la scala passa gradualmente da un nodo all’altro." />
+        {node.props.scale && <button className={styles.btn} onClick={() => { const props = { ...node.props }; delete props.scale; edit({ props }); }}>Usa la scala automatica</button>}
       </div>
       <div className={styles.section}>
         <h4>Collegamenti ({links.length})</h4>
@@ -139,8 +147,31 @@ function EdgePanel({ store, env, edge, select, onToggleCurve }: { store: EditorS
           </select>
         </Field>
       </div>
+      <ClipSelect store={store} env={env} edge={edge} edit={edit} />
       <div className={styles.section}><PropsField id="e-props" value={edge.props} onCommit={(p) => edit({ props: p })} /></div>
     </>
+  );
+}
+
+/** Animation of the rigged character on this segment: any clip of its puppet (also the ones made in the Studio), or automatic. */
+function ClipSelect({ store, env, edge, edit }: { store: EditorStore; env: Environment; edge: NavigationEdge; edit: (p: Partial<NavigationEdge>) => void }) {
+  const ids = new Set(env.characters.map((c) => c.puppetId).filter(Boolean) as string[]);
+  const puppets = store.project.puppets.filter((p) => ids.has(p.id));
+  if (!puppets.length) return null;
+  const names = new Map<string, string>();      // name → which views have it
+  for (const p of puppets) for (const v of Object.values(p.views)) for (const c of v?.clips ?? []) names.set(c.name, (names.get(c.name) ? names.get(c.name) + ', ' : '') + `${p.name}/${v!.id}`);
+  const cur = edge.props.clip ?? '';
+  return (
+    <div className={styles.section}>
+      <Field label="Animazione su questo tratto" id="e-clip" help="Automatica = quella dello stato del tipo di collegamento (camminata, arrampicata…). Altrimenti scegli una qualsiasi animazione del personaggio, anche quelle create da te: se non dura in ciclo viene distribuita lungo tutto il tratto.">
+        <select id="e-clip" className={styles.select} value={cur} data-testid="edge-clip"
+          onChange={(ev) => { const props = { ...edge.props }; if (ev.target.value) props.clip = ev.target.value; else delete props.clip; edit({ props }); }}>
+          <option value="">Automatica</option>
+          {cur && !names.has(cur) && <option value={cur}>{cur} (non trovata)</option>}
+          {[...names.keys()].sort((a, b) => a.localeCompare(b)).map((n) => <option key={n} value={n}>{n}</option>)}
+        </select>
+      </Field>
+    </div>
   );
 }
 
@@ -180,6 +211,7 @@ function EnvPanel({ store, env, onFit, onReplaceImage }: { store: EditorStore; e
         <span className={styles.help}>Aggiungili con lo strumento Oggetto (<kbd>I</kbd>).</span>
       </div>
       <ProfilesPanel store={store} env={env} />
+      <ScenePanel store={store} env={env} />
       <GameplayPanel store={store} env={env} />
       <div className={styles.section}>
         <h4>Personaggi ({env.characters.length})</h4>

@@ -4,6 +4,7 @@ import { createRng } from '@/engine/simulation/rng';
 import { availableInteractions, createRuntimeState, performInteraction, type GameEvent, type RuntimeState } from '@/engine/interaction/system';
 import { PuppetPlayer, type PuppetFrame } from '@/engine/puppet/player';
 import { CollapseTimer } from './collapse';
+import { sampleLight, type LightSample } from './light';
 import { defaultGameplay } from './defaults';
 
 /**
@@ -21,6 +22,10 @@ export interface CharacterFrame {
   puppetId: string | null; puppet: PuppetFrame | null;
   /** Character size in environment pixels (use it to scale the puppet: scale = heightPx / view.figureHeight). */
   heightPx: number;
+  /** Perspective scale already applied to heightPx (1 = normal). */
+  scale: number;
+  /** Light of the zone the character stands in (null when the scene has no light map): apply brightness / tint to the sprite. */
+  light: LightSample | null;
 }
 export interface PickupFrame { collectible: Collectible; x: number; y: number; /** 0–1 progress of the pop-up (appears at 0, ends at 1). */ progress: number; character: string }
 export interface SessionFrame {
@@ -184,10 +189,10 @@ export class GameSession {
     for (const [id, a] of this.agents) {
       const s = a.snapshot(), cfg = a.config;
       const puppet = cfg.puppetId ? (this.project.puppets.find((p: Puppet) => p.id === cfg.puppetId) ?? null) : null;
-      const heightPx = Math.max(1, cfg.height * this.env.height);
+      const heightPx = Math.max(1, cfg.height * s.scale * this.env.height);
       const hint = s.edgeId ? this.env.navigation.edges.find((e) => e.id === s.edgeId)?.props.view : undefined;
-      const pf = puppet ? this.players.get(id)!.frame(puppet, s.state, dt, s.speedPx / heightPx, hint) : null;
-      characters.push({ id, name: cfg.name, x: s.x * this.env.width, y: s.y * this.env.height, facing: s.facing, state: s.state, speedPx: s.speedPx, lift: s.lift, edgeId: s.edgeId, nodeId: s.nodeId, puppetId: cfg.puppetId ?? null, puppet: pf, heightPx });
+      const pf = puppet ? this.players.get(id)!.frame(puppet, s.state, dt, s.speedPx / heightPx, hint, { clip: s.edgeId ? this.env.navigation.edges.find((e) => e.id === s.edgeId)?.props.clip : undefined, progress: s.edgeProgress }) : null;
+      characters.push({ id, name: cfg.name, x: s.x * this.env.width, y: s.y * this.env.height, facing: s.facing, state: s.state, speedPx: s.speedPx, lift: s.lift, edgeId: s.edgeId, nodeId: s.nodeId, puppetId: cfg.puppetId ?? null, puppet: pf, heightPx, scale: s.scale, light: this.env.lighting?.enabled && this.env.lightMap ? sampleLight(this.env.lightMap, s.x, Math.max(0, s.y - cfg.height * s.scale * 0.4), this.env.lighting.strength) : null });
     }
     return {
       time: this.time, environment: { id: this.env.id, width: this.env.width, height: this.env.height }, characters,

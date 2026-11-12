@@ -136,6 +136,8 @@ const f = session.frame(dt);
 // f.pickups   = oggetti appena raccolti (per l'animazione verso il contatore)
 // f.collapse  = { intensity, shake: {x, y, angle}, stage, collapsed }
 // f.score     = { points, counts }
+// c.scale / c.heightPx: prospettiva già applicata.   c.light = { brightness, tint, tintAmount } | null: luce della zona (applicala allo sprite).
+// Su un tratto di percorso con animazione scelta (edge.props.clip) la sessione la usa da sola.
 
 session.triggerCollect();                 // oggetto a caso (per peso)
 session.triggerCollect('Gemma');          // per nome o per id

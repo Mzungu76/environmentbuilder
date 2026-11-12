@@ -613,17 +613,20 @@ export class SceneView {
   private applyLook(mesh: MeshSimple, look?: CharacterLook) {
     const neutral = !look || (Math.abs(look.brightness - 1) < 0.01 && Math.abs(look.contrast - 1) < 0.01 && Math.abs(look.saturation - 1) < 0.01 && look.tintAmount < 0.01);
     if (neutral) { if (mesh.filters && mesh.filters[0] instanceof ColorMatrixFilter) mesh.filters = null; return; }
-    const key = `${look.brightness}|${look.contrast}|${look.saturation}|${look.tint}|${look.tintAmount}`;
+    const key = `${look.brightness.toFixed(2)}|${look.contrast.toFixed(2)}|${look.saturation.toFixed(2)}|${look.tint}|${look.tintAmount.toFixed(2)}`;
     const holder = mesh as MeshSimple & { __lookKey?: string };
-    if (holder.__lookKey === key && mesh.filters && mesh.filters[0] instanceof ColorMatrixFilter) return;
-    const f = new ColorMatrixFilter();
+    const existing = mesh.filters && mesh.filters[0] instanceof ColorMatrixFilter ? (mesh.filters[0] as ColorMatrixFilter) : null;
+    if (holder.__lookKey === key && existing) return;
+    const f = existing ?? new ColorMatrixFilter();       // reused: the light changes continuously while the character walks
+    f.reset();
     f.brightness(look.brightness, false); f.contrast(look.contrast - 1, true); f.saturate(look.saturation - 1, true);
     if (look.tintAmount > 0.01) {
       const col = parseInt(look.tint.replace('#', ''), 16) || 0xffffff, r = ((col >> 16) & 255) / 255, gr = ((col >> 8) & 255) / 255, b = (col & 255) / 255, k = look.tintAmount;
       const m = f.matrix; // multiply the RGB rows by the tint, blended by the amount
       for (let row = 0; row < 3; row++) { const t = [r, gr, b][row], mix = 1 - k + k * t; for (let c2 = 0; c2 < 5; c2++) m[row * 5 + c2] *= mix; }
     }
-    mesh.filters = [f]; holder.__lookKey = key;
+    if (!existing) mesh.filters = [f];
+    holder.__lookKey = key;
   }
 
   private placeMesh(slot: string, pd: Omit<PuppetDraw, 'over' | 'flip' | 'attachments'>, flip: boolean, alpha: number, x: number, y: number, h: number): boolean {

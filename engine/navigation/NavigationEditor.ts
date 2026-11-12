@@ -3,6 +3,7 @@ import type { CharacterRenderItem, PlaytestMarkers } from '@/engine/rendering/Sc
 import { createCharacter } from '@/engine/characters/factory';
 import { spriteFor } from '@/engine/characters/sprites';
 import { PuppetPlayer } from '@/engine/puppet/player';
+import { nodeScale } from './perspective';
 import { DollPlayer } from '@/engine/doll/player';
 import type { EditorStore } from '@/lib/store/editorStore';
 import type { SceneView, ViewPointerEvent } from '@/engine/rendering/SceneView';
@@ -63,7 +64,8 @@ export class NavigationEditor {
       for (const c of env.characters) {
         const n = env.navigation.nodes.find((x) => x.id === c.startNodeId);
         if (!n) continue;
-        items.push({ id: c.id, x: n.x, y: n.y, width: c.width, height: c.height, color: c.color, facing: 1, state: 'IDLE', shadow: c.shadow, selected: s.selection?.kind === 'character' && s.selection.id === c.id, lift: 0, sprite: spriteFor(c, 'IDLE'), stateTime: 0, liveClock: true, puppet: this.puppetDraw(c), doll: this.dollDraw(c), look: c.look });
+        const ps = nodeScale(env, n);
+        items.push({ id: c.id, x: n.x, y: n.y, width: c.width * ps, height: c.height * ps, color: c.color, facing: 1, state: 'IDLE', shadow: c.shadow, selected: s.selection?.kind === 'character' && s.selection.id === c.id, lift: 0, sprite: spriteFor(c, 'IDLE'), stateTime: 0, liveClock: true, puppet: this.puppetDraw(c), doll: this.dollDraw(c), look: c.look });
       }
       this.view.setCharacters(items);
     }

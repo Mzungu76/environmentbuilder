@@ -30,6 +30,9 @@ export type BuiltinProfileId = 'cave' | 'forest' | 'building' | 'ship' | 'indust
 /** Built-in id or the id of a user-defined profile stored in the project (`Project.customProfiles`). */
 export type ProfileId = BuiltinProfileId | (string & {});
 
+/** Coarse colour map of the background (RGB bytes, base64): the light the character walks through. */
+export interface LightMapData { w: number; h: number; data: string }
+
 /** Something the character can find (a gem, a coin…): counted by the game, worth points. */
 export interface Collectible {
   id: string;
@@ -95,4 +98,9 @@ export interface Environment {
   characters: Character[];
   /** Rules of the game for this scenario (optional). */
   gameplay?: GameplayConfig;
+  /** Characters shrink with distance: scale at the top / bottom of the image (see engine/navigation/perspective). */
+  perspective?: { topScale: number; bottomScale: number };
+  /** Light of the scene reproduced on the characters (see engine/game/light). */
+  lighting?: { enabled: boolean; strength: number };
+  lightMap?: LightMapData;
 }

@@ -3,6 +3,7 @@ import { buildTrack, pointAt, reverseTrack, type Track } from './track';
 import { canTraverse, findRoute, reachableNodes, type RouteStep } from './routing';
 import { createRng, hashString } from './rng';
 import { getMovementType } from '@/engine/movement/movementTypes';
+import { nodeScale, scaleAlong } from '@/engine/navigation/perspective';
 
 export interface AgentSnapshot {
   x: number; y: number;           // normalized
@@ -21,6 +22,10 @@ export interface AgentSnapshot {
   stateTime: number;              // seconds since the animation state last changed
   lift: number;                   // visual lift in px (jump arcs)
   acting: boolean;                // performing a queued interaction
+  /** 0–1 along the current path segment (0 when standing on a node). */
+  edgeProgress: number;
+  /** Perspective scale (1 = normal size) at the current position. */
+  scale: number;
 }
 
 export type GoToResult = { ok: true } | { ok: false; reason: 'no-node' | 'unreachable' };
@@ -101,7 +106,14 @@ export class Agent {
   get busy() { return this.actions.length > 0 || this.actionLeft > 0; }
 
   private profile() { return { abilities: this.config.abilities, edgeWeights: this.config.behavior.edgeWeights }; }
-  private pxSpeed() { return this.config.speed * this.env.height; }
+  /** Perspective scale at the current position: along a path it blends the scales of its two nodes. */
+  private scaleNow(): number {
+    const nav = this.env.navigation;
+    if (this.track) return scaleAlong(this.env, nav.nodes.find((n) => n.id === this.track!.from), nav.nodes.find((n) => n.id === this.track!.to), this.track.length > 0 ? this.s / this.track.length : 0);
+    return nodeScale(this.env, nav.nodes.find((n) => n.id === this.nodeId) ?? { y: this.pos.y, props: {} });
+  }
+  /** Far away = smaller steps in the picture: the speed follows the scale. */
+  private pxSpeed() { return this.config.speed * this.env.height * this.scaleNow(); }
 
   // --- commands ------------------------------------------------------------------------------
 
@@ -276,6 +288,8 @@ export class Agent {
       destinationId: this.destination, routeNodeIds: this.track ? nodeIds : nodeIds.slice(1),
       routeEdgeIds: [...(this.track ? [this.track.edgeId] : []), ...this.route.map((r) => r.edgeId)],
       waiting: Math.max(0, this.pause), time: this.time, stateTime: this.time - this.stateSince, lift: this.lift, acting: this.actionLeft > 0 || this.actions.length > 0,
+      edgeProgress: this.track && this.track.length > 0 ? Math.min(1, this.s / this.track.length) : 0,
+      scale: this.scaleNow(),
     };
   }
 }

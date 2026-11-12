@@ -24,7 +24,16 @@ export function rigOf(view: PuppetView): Rig | null {
   return rigCache.get(view) ?? null;
 }
 
-export function clipFor(view: PuppetView, state: CharacterState): Clip | undefined {
+/**
+ * The clip playing for a state. `clipName` (e.g. set on a path segment in the editor) wins over the state mapping, so ANY clip of the
+ * puppet — including the ones the author made — can be used on a segment. Falls back to the state's clip when the view has no such clip.
+ */
+export function clipFor(view: PuppetView, state: CharacterState, clipName?: string): Clip | undefined {
+  if (clipName) {
+    const n = clipName.trim().toLowerCase();
+    const named = view.clips.find((c) => c.id === clipName) ?? view.clips.find((c) => c.name.trim().toLowerCase() === n);
+    if (named) return named;
+  }
   const id = view.stateClips[state] ?? view.stateClips.IDLE;
   return view.clips.find((c) => c.id === id);
 }
@@ -52,15 +61,15 @@ export function skinVertices(view: PuppetView, pose: Pose, out?: Float32Array): 
 }
 
 /** Playback clock helper: advances `phase` for a state, syncing walk-like clips to the travel speed (figure heights / s). */
-export function advancePhase(view: PuppetView, state: CharacterState, phase: number, dt: number, speedFigureHeights = 0): number {
-  const clip = clipFor(view, state);
+export function advancePhase(view: PuppetView, state: CharacterState, phase: number, dt: number, speedFigureHeights = 0, clipName?: string): number {
+  const clip = clipFor(view, state, clipName);
   if (!clip) return phase;
   const next = phase + dt * phaseRate(clip, speedFigureHeights);
   return clip.loop ? next % 1 : Math.min(1, next);
 }
 
-export const poseAt = (view: PuppetView, state: CharacterState, phase: number): Pose => {
-  const clip = clipFor(view, state);
+export const poseAt = (view: PuppetView, state: CharacterState, phase: number, clipName?: string): Pose => {
+  const clip = clipFor(view, state, clipName);
   return clip ? clampPose(samplePose(clip, phase), view.id) : { rot: {}, dx: 0, dy: 0 };
 };
 
