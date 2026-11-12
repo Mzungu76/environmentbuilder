@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import type { EditorState } from '@/lib/store/editorStore';
 import { Icon } from '@/components/ui/icons';
+import { InstallButton } from '@/components/shell/pwa';
 import styles from '../editor/editor.module.css';
 
 interface Props {
@@ -23,7 +24,7 @@ interface Props {
   canPlaytest: boolean;
 }
 
-function NameField({ value, onCommit, label, className }: { value: string; onCommit: (v: string) => void; label: string; className?: string }) {
+export function NameField({ value, onCommit, label, className }: { value: string; onCommit: (v: string) => void; label: string; className?: string }) {
   const [v, setV] = useState(value);
   useEffect(() => setV(value), [value]);
   const commit = () => { const t = v.trim(); if (t && t !== value) onCommit(t); else setV(value); };
@@ -79,6 +80,7 @@ export function TopBar(p: Props) {
         )}
       </div>
       <Link href={`/studio?id=${state.project.id}`} className={`${styles.btn} ${styles.iconBtn}`} title="Studio personaggi" aria-label="Studio personaggi" data-testid="open-studio">{Icon.character}</Link>
+      <InstallButton className={`${styles.btn} ${styles.iconBtn} ${styles.hideXs}`} label={false} />
       <Link href="/manuale" target="_blank" rel="noreferrer" className={`${styles.btn} ${styles.iconBtn} ${styles.hideXs}`} title="Manuale (si apre in una nuova scheda)" aria-label="Manuale" data-testid="open-manual">{Icon.help}</Link>
       <button className={`${styles.btn} ${styles.iconBtn} ${styles.inspToggle}`} onClick={p.onToggleInspector} aria-label="Mostra/nascondi inspector" title="Inspector">{Icon.panel}</button>
     </header>

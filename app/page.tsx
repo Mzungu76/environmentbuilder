@@ -9,6 +9,7 @@ import { createProject } from '@/lib/serialization/factory';
 import { migrateProject } from '@/lib/serialization/migrations';
 import { importProjectZip } from '@/lib/import-export/archive';
 import { Icon } from '@/components/ui/icons';
+import { InstallButton } from '@/components/shell/pwa';
 import styles from './library.module.css';
 
 function Thumb({ projectId, assetId }: { projectId: string; assetId: string | null }) {
@@ -54,6 +55,7 @@ export default function LibraryPage() {
       <div className={styles.head}>
         <div><h1>Environment Builder</h1><p>Trasforma illustrazioni 2D in ambienti esplorabili e configurabili.</p></div>
         <div className={styles.actions}>
+          <InstallButton className={styles.btn} />
           <Link href="/manuale" className={styles.btn} data-testid="open-manual">Manuale</Link>
           <button className={styles.btn} onClick={() => importRef.current?.click()} data-testid="import-project">{Icon.folder}Importa progetto…</button>
         </div>

@@ -23,8 +23,21 @@ import type { Character } from '@/types';
 import { createRuntimeState, resetRuntimeState } from '@/engine/interaction/system';
 import { PlaytestController } from '@/engine/simulation/PlaytestController';
 import { Inspector } from '@/components/inspector/Inspector';
+import { CompactControls } from '@/components/toolbar/CompactControls';
 import { Icon } from '@/components/ui/icons';
 import styles from './editor.module.css';
+
+/** Smartphone held sideways: little height, plenty of width. Bars are replaced by floating controls. */
+function useCompactLandscape() {
+  const [c, setC] = useState(false);
+  useEffect(() => {
+    const m = window.matchMedia('(orientation: landscape) and (max-height: 500px)');
+    const f = () => setC(m.matches);
+    f(); m.addEventListener('change', f);
+    return () => m.removeEventListener('change', f);
+  }, []);
+  return c;
+}
 
 type Load = { status: 'loading' } | { status: 'error'; message: string } | { status: 'ready'; store: EditorStore };
 
@@ -71,6 +84,9 @@ function Editor({ store }: { store: EditorStore }) {
   const ctrlRef = useRef<PlaytestController | null>(null);
   ctrlRef.current = ctrl;
   const playtest = state.mode === 'playtest';
+  const compact = useCompactLandscape();
+  // Compact layout: the panel opens by itself when something is selected or the playtest starts.
+  useEffect(() => { if (compact && playtest) setInspectorOpen(true); }, [compact, playtest]);
 
   // Playtest lifecycle: the controller owns the pointer/tick while active and restores the editor on exit.
   // Walking into an exit switches the active environment and starts a new controller there (`playKey`).
@@ -125,8 +141,8 @@ function Editor({ store }: { store: EditorStore }) {
   const setTool = useCallback((t: ToolId) => store.setTool(t), [store]);
   // phones: the settings panel is a bottom sheet — it opens by itself when something is selected, and gets out of the way while painting zones
   const selKey = state.selection ? `${state.selection.kind}:${state.selection.id}` : null;
-  useEffect(() => { if (selKey && typeof window !== 'undefined' && window.innerWidth < 900) setInspectorOpen(true); }, [selKey]);
-  useEffect(() => { if (state.tool === 'zones' && typeof window !== 'undefined' && window.innerWidth < 900) { setInspectorOpen(false); setInspectorFull(false); } }, [state.tool]);
+  useEffect(() => { if (selKey && (compact || (typeof window !== 'undefined' && window.innerWidth < 900))) setInspectorOpen(true); }, [selKey, compact]);
+  useEffect(() => { if (state.tool === 'zones' && (compact || (typeof window !== 'undefined' && window.innerWidth < 900))) { setInspectorOpen(false); setInspectorFull(false); } }, [state.tool, compact]);
   const closeSheet = useCallback(() => { setInspectorOpen(false); setInspectorFull(false); }, []);
   const openLayers = useCallback(() => { store.setSelection(null); store.setTool('select'); setInspectorOpen(true); }, [store]);
 
@@ -186,20 +202,27 @@ function Editor({ store }: { store: EditorStore }) {
   const onAssetError = useCallback((id: string, msg: string) => setNotice(`Impossibile caricare l’immagine (${id}): ${msg}`), []);
   const stableOnReady = useCallback((h: SceneHandle | null) => { handle.current = h; setSceneReady(!!h); }, []);
   const memoEnvName = useMemo(() => env.name, [env.name]);
+  const typeBar = hasImage && !state.preview && !playtest && state.tool === 'object' ? (
+    <div className={styles.typeBar} role="group" aria-label="Tipo di oggetto">
+      {OBJECT_TYPES.map((t) => <button key={t.id} className={styles.chip} aria-pressed={state.objectType === t.id} onClick={() => store.setObjectType(t.id)} data-testid={`otype-${t.id}`}>{t.label}</button>)}
+    </div>
+  ) : null;
+  // phone in landscape: tool options live in a side column next to the scene, never on top of the illustration
+  const showOptions = compact && hasImage && !state.preview && !playtest && !inspectorOpen && (state.tool === 'zones' || state.tool === 'object');
 
   return (
-    <div className={styles.app}>
-      <TopBar
+    <div className={`${styles.app} ${compact ? styles.compact : ''}`}>
+      {!compact && <TopBar
         state={state} envName={memoEnvName}
         onProjectName={(n) => store.commitProject((p) => ({ ...p, name: n }))}
         onEnvName={(n) => store.commitEnv((e) => ({ ...e, name: n }))}
         onNew={onNew} onSave={() => void store.save()} onUndo={() => store.undo()} onRedo={() => store.redo()}
         onExportZip={onExportZip} onExportJson={onExportJson} onExportGame={onExportGame} onToggleInspector={() => setInspectorOpen((o) => !o)}
         onMode={(m) => store.setMode(m)} canPlaytest={hasImage}
-      />
-      <EnvTabs store={store} envs={state.project.environments} activeId={env.id} locked={playtest} />
-      <div className={`${styles.main} ${playtest ? styles.mainPlay : ''}`}>
-        {!playtest && <ToolPalette tool={state.tool} onTool={setTool} onLayers={openLayers} />}
+      />}
+      {!compact && <EnvTabs store={store} envs={state.project.environments} activeId={env.id} locked={playtest} />}
+      <div className={`${styles.main} ${playtest ? styles.mainPlay : ''} ${compact && inspectorOpen ? styles.panelOpen : ''}`}>
+        {!compact && !playtest && <ToolPalette tool={state.tool} onTool={setTool} onLayers={openLayers} />}
         <div className={styles.stageWrap}
           onDragOver={(e) => { e.preventDefault(); setDragOver(true); }} onDragLeave={() => setDragOver(false)}
           onDrop={(e) => { e.preventDefault(); setDragOver(false); void importFile(e.dataTransfer.files[0]); }}>
@@ -214,15 +237,14 @@ function Editor({ store }: { store: EditorStore }) {
               </div>
             </div>
           )}
-          {hasImage && !state.preview && !playtest && state.tool === 'object' && (
-            <div className={styles.typeBar} role="group" aria-label="Tipo di oggetto">
-              {OBJECT_TYPES.map((t) => <button key={t.id} className={styles.chip} aria-pressed={state.objectType === t.id} onClick={() => store.setObjectType(t.id)} data-testid={`otype-${t.id}`}>{t.label}</button>)}
-            </div>
-          )}
-          {hasImage && !state.preview && !playtest && state.tool === 'zones' && <ZoneBar store={store} />}
+          {!compact && typeBar}
+          {!compact && hasImage && !state.preview && !playtest && state.tool === 'zones' && <ZoneBar store={store} />}
           {hasImage && !state.preview && !playtest && state.tool !== 'zones' && <div className={styles.hint} style={state.tool === 'object' ? { top: 64 } : undefined}>{toolInfo.hint}</div>}
-          {playtest && ctrl && <PlayTransport ctrl={ctrl} />}
+          {!compact && playtest && ctrl && <PlayTransport ctrl={ctrl} />}
           {notice && <div className={styles.banner} role="alert">{notice}<button onClick={() => setNotice(null)}>Chiudi</button></div>}
+          {compact && <CompactControls store={store} state={state} envName={memoEnvName} envId={env.id} canPlaytest={hasImage}
+            panelOpen={inspectorOpen} onTogglePanel={() => setInspectorOpen((o) => !o)} onLayers={openLayers}
+            onNew={onNew} onExportZip={onExportZip} onExportJson={onExportJson} onExportGame={onExportGame} />}
           <div className={styles.hud}>
             <button className={`${styles.btn} ${styles.iconBtn}`} onClick={() => handle.current?.view.zoomCenter(0.8)} aria-label="Riduci" title="Riduci (-)">{Icon.minus}</button>
             <span className={styles.zoomLabel} data-testid="zoom">{Math.round(zoom * 100)}%</span>
@@ -231,6 +253,7 @@ function Editor({ store }: { store: EditorStore }) {
             {!playtest && <button className={`${styles.btn} ${styles.iconBtn}`} aria-pressed={state.preview} onClick={() => store.setPreview(!state.preview)} aria-label="Anteprima senza strumenti" title="Anteprima senza strumenti (O)" style={state.preview ? { borderColor: 'var(--accent)' } : undefined} data-testid="preview">{state.preview ? Icon.eyeOff : Icon.eye}</button>}
           </div>
         </div>
+        {showOptions && <aside className={styles.cOptions} aria-label="Opzioni dello strumento" data-testid="c-options">{state.tool === 'zones' ? <ZoneBar store={store} /> : typeBar}</aside>}
         {playtest ? (ctrl && <PlaytestPanel store={store} env={env} ctrl={ctrl} showPaths={state.showPaths} open={inspectorOpen} full={inspectorFull} onToggleFull={() => setInspectorFull((f) => !f)} onClose={closeSheet} />) : <Inspector store={store} env={env} selection={state.selection} revision={state.revision} open={inspectorOpen} full={inspectorFull} onToggleFull={() => setInspectorFull((f) => !f)} onClose={closeSheet}
           onFit={() => handle.current?.view.fit()} onReplaceImage={() => fileInput.current?.click()}
           onToggleCurve={(id) => handle.current?.editor.toggleCurve(id)} onDeleteSelection={() => handle.current?.editor.deleteSelection()} />}

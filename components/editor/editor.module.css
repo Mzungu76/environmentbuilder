@@ -164,3 +164,56 @@
   .section { padding: 12px; }
   .zoneBar { top: 6px; }
 }
+
+/* ---- smartphone in landscape: floating controls, scene full screen, properties split the stage ---- */
+.app.compact { grid-template-rows: 1fr; padding-left: env(safe-area-inset-left, 0px); padding-right: env(safe-area-inset-right, 0px); }
+.compact .main { grid-template-columns: minmax(0, 1fr); grid-auto-flow: column; grid-auto-columns: auto; grid-template-rows: 1fr; }
+.compact .stageWrap { grid-row: 1; grid-column: 1; }
+.compact .inspector { display: none; position: static; grid-row: 1; grid-column: auto; width: 230px; max-height: none; transform: none; visibility: visible; box-shadow: none; border-top: 0; border-left: 1px solid var(--border-strong); }
+.compact .panelOpen .inspector { display: block; }
+.compact .hint { display: none; }
+.compact .hud { left: 64px; bottom: 8px; }
+.compact .typeBar { top: auto; bottom: 52px; left: 50%; }
+.compact .banner { top: 60px; right: 8px; max-width: 300px; }
+.compact .empty { padding: 8px; }
+.compact .dropzone { padding: 16px 20px; }
+
+.cRound { width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; background: rgba(39,44,54,.94); border: 1px solid var(--border-strong); color: var(--text); padding: 0; flex: none; }
+.cRound:disabled { opacity: .4; cursor: not-allowed; }
+.cRound[aria-pressed="true"] { background: var(--accent-strong); border-color: var(--accent); color: #fff; }
+.cPlay { color: var(--ok); }
+.cPill { height: 44px; padding: 0 14px; border-radius: 22px; display: inline-flex; align-items: center; gap: 8px; background: rgba(23,26,32,.94); border: 1px solid var(--border-strong); color: var(--text); max-width: 200px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cTopLeft { position: absolute; top: 8px; left: 8px; display: flex; gap: 8px; align-items: center; z-index: 8; }
+.cTopRight { position: absolute; top: 8px; right: 8px; display: flex; gap: 8px; align-items: center; z-index: 8; }
+.cTools { position: absolute; top: 60px; left: 8px; bottom: 8px; display: flex; flex-direction: column; flex-wrap: wrap; align-content: flex-start; gap: 6px; z-index: 8; }
+.cMore { position: absolute; left: calc(100% + 6px); bottom: 0; max-height: 100%; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; }
+.cLabeled { width: auto; border-radius: 22px; padding: 0 14px 0 12px; display: inline-flex; gap: 8px; font-size: 12px; white-space: nowrap; }
+.cScrim { position: absolute; inset: 0; background: rgba(0,0,0,.55); z-index: 20; }
+.cMenu { position: absolute; z-index: 21; top: 8px; bottom: 8px; left: 8px; width: min(440px, calc(100% - 16px)); overflow-y: auto; background: var(--surface); border: 1px solid var(--border-strong); border-radius: 16px; display: flex; flex-direction: column; box-shadow: 0 10px 40px rgba(0,0,0,.6); }
+.cMenuHead { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-bottom: 1px solid var(--border); }
+.cMenuHead .nameInput { flex: 1; width: auto; }
+.cMenuGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 10px; }
+.cMenuGrid .btn { height: 44px; justify-content: flex-start; }
+.compact .envTabs { border-bottom: 1px solid var(--border); }
+
+/* compact landscape vs. the bottom-sheet rules above and the zone/transport bars */
+.compact .sheetBar { display: none; }
+.compact .inspHead { top: 0; }
+.compact .inspector.inspectorFull { position: static; border-radius: 0; max-height: none; }
+.compact .zoneBar, .compact .transport { top: 58px; max-width: calc(100% - 140px); }
+.compact input, .compact select, .compact textarea { font-size: 14px; }
+
+/* short viewports (browser bars showing): smaller buttons, tools wrap into a second column, zoom moves to the right */
+@media (max-height: 340px) {
+  .cRound { width: 40px; height: 40px; }
+  .cTools { gap: 4px; }
+  .cPill { height: 40px; }
+  .compact .hud { left: auto; right: 8px; }
+  .compact .typeBar { left: 40%; }
+}
+
+/* tool options (zones, object type) in a side column instead of floating over the picture */
+.cOptions { grid-row: 1; grid-column: auto; width: 190px; background: var(--surface); border-left: 1px solid var(--border-strong); padding: 8px 10px; overflow-y: auto; min-height: 0; display: flex; flex-direction: column; gap: 8px; }
+.cOptions .zoneBar, .cOptions .typeBar { position: static; transform: none; max-width: none; background: none; border: 0; padding: 0; flex-direction: column; align-items: stretch; justify-content: flex-start; flex-wrap: nowrap; gap: 8px; }
+.cOptions .zoneBar input[type="range"] { width: 100%; }
+.cOptions .typeBar .chip { min-height: 40px; justify-content: center; text-align: center; }

@@ -1,0 +1,267 @@
+<title>Environment Builder Mobile</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600&display=swap">
+<style>
+/* Layout: tre telefoni affiancati (a capo su schermi stretti), ciascuno con una proposta di organizzazione dell'editor. */
+:root {
+  --bg: #0f1115; --surface: #171a20; --surface-2: #1e222a; --surface-3: #272c36;
+  --border: #2c313c; --border-strong: #3a4150;
+  --text: #e6e8ec; --text-dim: #9aa3b2; --text-faint: #6b7385;
+  --accent: #4f8cff; --accent-soft: rgba(79,140,255,.18); --ok: #3ecf8e; --warn: #f5b84a; --danger: #f0616d;
+  --display: "Space Grotesk", system-ui, sans-serif; --body: "Inter", system-ui, sans-serif;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--text); font-family: var(--body); font-size: 14px; line-height: 1.45;
+  padding-block: 32px 48px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.wrap { max-width: 1180px; margin: 0 auto; }
+h1 { font: 700 28px/1.15 var(--display); margin: 0 0 8px; text-wrap: balance; }
+.lead { color: var(--text-dim); max-width: 62ch; margin: 0 0 32px; }
+.grid { display: grid; grid-template-columns: 1fr; gap: 48px; }
+.opt { width: 100%; display: grid; grid-template-columns: minmax(0, 700px) minmax(260px, 1fr); gap: 8px 32px; align-items: start; }
+.opt .head { grid-column: 1 / -1; display: flex; flex-direction: column; gap: 4px; }
+.opt .txt { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+@media (max-width: 1000px) { .opt { grid-template-columns: minmax(0, 1fr); } }
+.opt h2 { font: 700 18px/1.2 var(--display); margin: 0; }
+.tag { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); font-weight: 600; }
+.opt ul { margin: 0; padding-left: 18px; color: var(--text-dim); display: flex; flex-direction: column; gap: 4px; font-size: 13px; }
+.opt ul b { color: var(--text); font-weight: 600; }
+.verdict { font-size: 13px; color: var(--text-dim); border-top: 1px solid var(--border); padding-top: 10px; }
+.verdict b { color: var(--ok); }
+
+/* telefono in orizzontale */
+.scroller { width: 100%; overflow-x: auto; padding-bottom: 6px; }
+.phone { width: 660px; height: 310px; margin: 0 auto; background: #05060a; border: 2px solid var(--border-strong); border-radius: 34px; padding: 9px 12px 9px 9px; box-shadow: 0 20px 50px rgba(0,0,0,.5); display: flex; }
+.notchband { width: 22px; flex: none; display: grid; place-items: center; }
+.notchband i { width: 8px; height: 70px; border-radius: 5px; background: #1a1d24; }
+.screen { position: relative; flex: 1; min-width: 0; height: 100%; border-radius: 22px; overflow: hidden; background: var(--bg); display: flex; flex-direction: column; font-size: 12px; }
+svg.i { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+.top { height: 36px; flex: none; display: flex; align-items: center; gap: 4px; padding: 0 6px; background: var(--surface); border-bottom: 1px solid var(--border); }
+.top .name { flex: 1; min-width: 0; font: 600 12px var(--display); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: flex; align-items: center; gap: 8px; }
+.top .name small { font: 400 10px var(--body); color: var(--text-faint); }
+.ib { width: 44px; height: 44px; display: grid; place-items: center; border-radius: 10px; background: none; border: 0; color: var(--text-dim); flex: none; }
+.ib.sm { width: 36px; height: 36px; }
+.ib[aria-pressed="true"], .ib.on { background: var(--accent-soft); color: var(--accent); }
+.dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); flex: none; }
+.body { flex: 1; min-height: 0; display: flex; }
+.stage { position: relative; flex: 1; min-width: 0; background: #11151c; overflow: hidden; }
+.stage > svg.scene { position: absolute; inset: 0; width: 100%; height: 100%; }
+.rail { width: 52px; flex: none; background: var(--surface); border-right: 1px solid var(--border); display: flex; flex-direction: column; align-items: center; justify-content: space-around; padding: 4px 0; }
+.rail.lab .ib { width: 48px; height: 58px; flex-direction: column; gap: 2px; font: 500 9px var(--body); }
+.panel { width: 210px; flex: none; background: var(--surface); border-left: 1px solid var(--border-strong); padding: 8px 10px; display: flex; flex-direction: column; gap: 8px; overflow: hidden; }
+.panel.over { position: absolute; right: 0; top: 0; bottom: 0; box-shadow: -10px 0 30px rgba(0,0,0,.5); }
+.panel h3 { margin: 0; font: 600 12px var(--display); display: flex; justify-content: space-between; align-items: center; }
+.fl { position: absolute; display: flex; gap: 6px; align-items: center; }
+.glass { background: rgba(23,26,32,.92); border: 1px solid var(--border-strong); }
+.pill { height: 28px; padding: 0 10px; border-radius: 14px; display: inline-flex; align-items: center; gap: 6px; font-size: 11px; color: var(--text); }
+.fld { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.fld label { display: flex; flex-direction: column; gap: 2px; font-size: 10px; color: var(--text-faint); }
+.fld label.w { grid-column: span 2; }
+.fld span { height: 30px; border-radius: 8px; background: var(--surface-2); border: 1px solid var(--border); padding: 0 8px; display: flex; align-items: center; color: var(--text); font-size: 12px; }
+.chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.chip { height: 28px; padding: 0 10px; border-radius: 14px; border: 1px solid var(--border-strong); background: var(--surface-2); color: var(--text-dim); display: inline-flex; align-items: center; white-space: nowrap; font-size: 11px; }
+.chip.on { background: var(--accent-soft); border-color: var(--accent); color: var(--text); }
+.circ { width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; color: var(--text); background: rgba(39,44,54,.95); border: 1px solid var(--border-strong); }
+.circ.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+.col { position: absolute; display: flex; flex-direction: column; gap: 6px; }
+.tabs { display: flex; background: var(--surface-2); border-radius: 9px; padding: 3px; gap: 2px; }
+.tabs button { flex: 1; height: 28px; border: 0; border-radius: 7px; background: none; color: var(--text-dim); font: 500 11px var(--body); }
+.tabs button[aria-selected="true"] { background: var(--surface-3); color: var(--text); box-shadow: 0 0 0 1px var(--border-strong); }
+.tgrid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; }
+.tgrid button { height: 52px; border-radius: 9px; border: 1px solid var(--border); background: var(--surface-2); color: var(--text-dim); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; font: 500 9px var(--body); }
+.tgrid button[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); color: var(--text); }
+.tgrid svg.i { width: 18px; height: 18px; }
+.sub { font-size: 10px; letter-spacing: .08em; text-transform: uppercase; color: var(--text-faint); font-weight: 600; }
+.note { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; margin-bottom: 32px; display: grid; gap: 6px; font-size: 13px; color: var(--text-dim); }
+.note b { color: var(--text); }
+.note h2 { font: 700 15px var(--display); margin: 0 0 4px; color: var(--text); }
+
+.compare { margin-top: 48px; overflow-x: auto; border: 1px solid var(--border); border-radius: 12px; }
+.compare table { border-collapse: collapse; width: 100%; min-width: 620px; font-size: 13px; }
+.compare th, .compare td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--border); vertical-align: top; }
+.compare th { font: 600 11px var(--body); letter-spacing: .08em; text-transform: uppercase; color: var(--text-faint); background: var(--surface); }
+.compare tr:last-child td { border-bottom: 0; }
+.compare td:first-child { color: var(--text-dim); }
+</style>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="scene" viewBox="0 0 600 300" preserveAspectRatio="xMidYMid slice">
+      <rect width="600" height="300" fill="#1a2230"/>
+      <rect y="190" width="600" height="110" fill="#222b3a"/>
+      <rect x="30" y="60" width="130" height="130" rx="4" fill="#2a3547"/>
+      <rect x="420" y="40" width="150" height="150" rx="4" fill="#2f3b50"/>
+      <rect x="250" y="90" width="80" height="100" rx="3" fill="#33425a"/>
+      <g fill="#3b4a63"><rect x="48" y="80" width="26" height="28"/><rect x="92" y="80" width="26" height="28"/><rect x="48" y="126" width="26" height="28"/><rect x="440" y="60" width="26" height="28"/><rect x="490" y="60" width="26" height="28"/><rect x="540" y="60" width="18" height="28"/></g>
+      <path d="M50 240 L180 255 C240 262 300 215 370 235 S500 260 560 225" fill="none" stroke="#4f8cff" stroke-width="3" stroke-linecap="round"/>
+      <path d="M180 255 L160 285" fill="none" stroke="#3ecf8e" stroke-width="3" stroke-linecap="round"/>
+      <g stroke="#111827" stroke-width="2"><circle cx="50" cy="240" r="7" fill="#f5b84a"/><circle cx="180" cy="255" r="7" fill="#4f8cff"/><circle cx="370" cy="235" r="7" fill="#4f8cff"/><circle cx="560" cy="225" r="7" fill="#4f8cff"/><circle cx="160" cy="285" r="7" fill="#3ecf8e"/></g>
+      <circle cx="180" cy="255" r="13" fill="none" stroke="#fff" stroke-width="2"/>
+      <rect x="296" y="150" width="14" height="14" rx="3" fill="#f5b84a"/>
+    </symbol>
+    <symbol id="i-select" viewBox="0 0 24 24"><path d="M5 3l14 8-6 2-2 6z"/></symbol>
+    <symbol id="i-pan" viewBox="0 0 24 24"><path d="M8 12V5a1.5 1.5 0 013 0v6m0-1V4a1.5 1.5 0 013 0v7m0-5a1.5 1.5 0 013 0v8a6 6 0 01-6 6h-1a6 6 0 01-5-3l-3-5a1.5 1.5 0 012.5-1.5L8 14"/></symbol>
+    <symbol id="i-node" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3"/></symbol>
+    <symbol id="i-path" viewBox="0 0 24 24"><circle cx="5" cy="18" r="2"/><circle cx="19" cy="6" r="2"/><path d="M7 18c8 0 2-12 10-12"/></symbol>
+    <symbol id="i-object" viewBox="0 0 24 24"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M12 12l8-4.5M12 12v9M12 12L4 7.5"/></symbol>
+    <symbol id="i-char" viewBox="0 0 24 24"><circle cx="12" cy="7" r="3.5"/><path d="M5 21c0-4 3-7 7-7s7 3 7 7"/></symbol>
+    <symbol id="i-layers" viewBox="0 0 24 24"><path d="M12 3l9 5-9 5-9-5z"/><path d="M3 13l9 5 9-5"/></symbol>
+    <symbol id="i-play" viewBox="0 0 24 24"><path d="M7 4l13 8-13 8z"/></symbol>
+    <symbol id="i-undo" viewBox="0 0 24 24"><path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 010 12h-3"/></symbol>
+    <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+    <symbol id="i-sliders" viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></symbol>
+    <symbol id="i-folder" viewBox="0 0 24 24"><path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></symbol>
+    <symbol id="i-fit" viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></symbol>
+    <symbol id="i-pause" viewBox="0 0 24 24"><path d="M8 5v14M16 5v14"/></symbol>
+    <symbol id="i-more" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></symbol>
+    <symbol id="i-down" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></symbol>
+  </defs>
+</svg>
+
+<div class="wrap">
+  <h1>Environment Builder in orizzontale</h1>
+  <p class="lead">Il telefono si usa soprattutto in landscape. La larghezza non manca (circa 640 px), l'altezza sì: restano 250 px circa dopo la barra in alto, e la tastiera su schermo ne copre più della metà. Le tre proposte spostano quindi barre e pannelli sui lati e lasciano la scena in mezzo.</p>
+
+  <section class="note">
+    <h2>Vincoli che valgono per tutte e tre</h2>
+    <span><b>Altezza.</b> Barre orizzontali al massimo 36 px. Gli strumenti vanno in colonna sul lato, 5 pulsanti da 44 px riempiono già 220 px.</span>
+    <span><b>Notch e bordi.</b> Margini laterali con <code>env(safe-area-inset-left/right)</code>, così nulla finisce sotto la tacca o la barra di navigazione.</span>
+    <span><b>Tastiera.</b> In landscape copre quasi tutto lo schermo. Nome e coordinate si modificano in un piccolo campo a comparsa, non nel pannello.</span>
+    <span><b>Gesti.</b> Due dita per spostare e zoomare, così la Mano non occupa un pulsante. Un dito disegna e trascina.</span>
+  </section>
+
+  <div class="grid">
+    <section class="opt">
+      <div class="head"><span class="tag">Proposta A</span><h2>Colonna strumenti a sinistra, proprietà a comparsa</h2></div>
+      <div class="scroller"><div class="phone"><div class="notchband"><i></i></div><div class="screen">
+        <div class="top">
+          <button class="ib sm" aria-label="Menu"><svg class="i" ><use href="#i-menu"/></svg></button>
+          <div class="name">Porto vecchio <small>Banchina ▾</small></div>
+          <span class="dot"></span>
+          <button class="ib sm" aria-label="Annulla"><svg class="i" ><use href="#i-undo"/></svg></button>
+          <button class="ib sm" aria-label="Livelli"><svg class="i" ><use href="#i-layers"/></svg></button>
+          <button class="ib sm" aria-label="Prova" style="color:var(--ok)"><svg class="i" ><use href="#i-play"/></svg></button>
+        </div>
+        <div class="body">
+          <nav class="rail" aria-label="Strumenti">
+            <button class="ib" aria-pressed="true" aria-label="Seleziona"><svg class="i" ><use href="#i-select"/></svg></button>
+            <button class="ib" aria-label="Nodo"><svg class="i" ><use href="#i-node"/></svg></button>
+            <button class="ib" aria-label="Percorso"><svg class="i" ><use href="#i-path"/></svg></button>
+            <button class="ib" aria-label="Oggetto"><svg class="i" ><use href="#i-object"/></svg></button>
+            <button class="ib" aria-label="Personaggio"><svg class="i" ><use href="#i-char"/></svg></button>
+          </nav>
+          <div class="stage">
+            <svg class="scene"><use href="#scene"/></svg>
+            <div class="fl" style="left:8px;bottom:8px"><span class="pill glass">Due dita: sposta e zoom</span></div>
+            <aside class="panel over" aria-label="Proprietà">
+              <h3>Nodo · Banchina 2 <span class="ib sm" style="width:28px;height:28px"><svg class="i" ><use href="#i-x"/></svg></span></h3>
+              <div class="fld"><label class="w">Nome<span>Banchina 2</span></label><label>Tipo<span>Sosta</span></label><label>Dir.<span>Entrambe</span></label><label>X<span>180</span></label><label>Y<span>255</span></label></div>
+            </aside>
+          </div>
+        </div></div></div></div>
+      <div class="txt">
+        <ul>
+          <li><b>Colonna a sinistra</b> con i cinque strumenti, sotto il pollice sinistro.</li>
+          <li><b>Barra sottile</b> in alto con menu, nome, annulla, livelli e prova.</li>
+          <li><b>Proprietà</b> in un pannello da destra sopra la scena, che si chiude con un tocco fuori.</li>
+        </ul>
+        <p class="verdict"><b>La più semplice da costruire.</b> Quasi uguale al layout desktop attuale. La scena resta intera quando il pannello è chiuso, ma lo copre in parte quando è aperto.</p>
+      </div>
+    </section>
+
+    <section class="opt">
+      <div class="head"><span class="tag">Proposta B</span><h2>Scena a tutto schermo, comandi flottanti e vista divisa</h2></div>
+      <div class="scroller"><div class="phone"><div class="notchband"><i></i></div><div class="screen">
+        <div class="body">
+          <div class="stage">
+            <svg class="scene"><use href="#scene"/></svg>
+            <div class="fl" style="left:8px;top:8px">
+              <button class="ib sm glass" style="border-radius:50%" aria-label="Menu"><svg class="i" ><use href="#i-menu"/></svg></button>
+              <span class="pill glass" style="height:36px;padding:0 12px"><span class="dot"></span>Banchina ▾</span>
+            </div>
+            <div class="col" style="left:8px;top:56px">
+              <span class="circ on"><svg class="i" ><use href="#i-select"/></svg></span>
+              <span class="circ"><svg class="i" ><use href="#i-path"/></svg></span>
+              <span class="circ"><svg class="i" ><use href="#i-object"/></svg></span>
+              <span class="circ"><svg class="i" ><use href="#i-more"/></svg></span>
+            </div>
+            <div class="fl" style="right:8px;top:8px">
+              <button class="ib sm glass" style="border-radius:50%" aria-label="Annulla"><svg class="i" ><use href="#i-undo"/></svg></button>
+              <button class="ib sm glass" style="border-radius:50%;color:var(--ok)" aria-label="Prova"><svg class="i" ><use href="#i-play"/></svg></button>
+            </div>
+          </div>
+          <aside class="panel" aria-label="Proprietà" style="width:200px">
+            <h3>Nodo · Banchina 2 <span style="color:var(--text-faint);font-weight:400;font-size:10px">scorri ›</span></h3>
+            <div class="fld"><label class="w">Nome<span>Banchina 2</span></label><label>Tipo<span>Sosta</span></label><label>Dir.<span>Entrambe</span></label><label>X<span>180</span></label><label>Y<span>255</span></label></div>
+          </aside>
+        </div></div></div></div>
+      <div class="txt">
+        <ul>
+          <li><b>Nessuna barra.</b> Pulsanti tondi flottanti ai bordi, gli strumenti in colonna a sinistra.</li>
+          <li><b>Vista divisa:</b> aprendo le proprietà la scena si restringe invece di essere coperta, e si vede il nodo mentre lo modifichi.</li>
+          <li><b>Pannello</b> che si apre con un tocco sul nodo e si chiude scorrendo verso destra.</li>
+        </ul>
+        <p class="verdict"><b>Il massimo spazio per disegnare.</b> Più lavoro: i pulsanti flottanti non devono coprire la scena, e il tondo «più» nasconde gli strumenti meno usati.</p>
+      </div>
+    </section>
+
+    <section class="opt">
+      <div class="head"><span class="tag">Proposta C</span><h2>Modalità a sinistra, pannello fisso a destra</h2></div>
+      <div class="scroller"><div class="phone"><div class="notchband"><i></i></div><div class="screen">
+        <div class="top">
+          <button class="ib sm" aria-label="Menu"><svg class="i" ><use href="#i-menu"/></svg></button>
+          <div class="name">Porto vecchio <small>Banchina ▾ · Salvato</small></div>
+          <button class="ib sm" aria-label="Annulla"><svg class="i" ><use href="#i-undo"/></svg></button>
+        </div>
+        <div class="body">
+          <nav class="rail lab" aria-label="Modalità">
+            <button class="ib on" aria-label="Percorsi"><svg class="i" ><use href="#i-path"/></svg>Percorsi</button>
+            <button class="ib" aria-label="Oggetti"><svg class="i" ><use href="#i-object"/></svg>Oggetti</button>
+            <button class="ib" aria-label="Persone"><svg class="i" ><use href="#i-char"/></svg>Persone</button>
+            <button class="ib" aria-label="Prova"><svg class="i" ><use href="#i-play"/></svg>Prova</button>
+          </nav>
+          <div class="stage">
+            <svg class="scene"><use href="#scene"/></svg>
+            <div class="fl" style="right:8px;top:8px"><span class="pill glass">5 nodi · 4 percorsi</span></div>
+          </div>
+          <aside class="panel" aria-label="Pannello">
+            <div class="tabs" role="tablist"><button role="tab" aria-selected="true">Strumenti</button><button role="tab" aria-selected="false">Proprietà</button></div>
+            <div class="tgrid">
+              <button aria-pressed="true"><svg class="i" ><use href="#i-select"/></svg>Seleziona</button>
+              <button><svg class="i" ><use href="#i-pan"/></svg>Mano</button>
+              <button><svg class="i" ><use href="#i-node"/></svg>Nodo</button>
+              <button><svg class="i" ><use href="#i-path"/></svg>Percorso</button>
+              <button><svg class="i" ><use href="#i-fit"/></svg>Adatta</button>
+              <button><svg class="i" ><use href="#i-layers"/></svg>Livelli</button>
+            </div>
+            <span class="sub">Movimento</span>
+            <div class="chips"><span class="chip on">Cammina</span><span class="chip">Scala</span><span class="chip">Salto</span></div>
+          </aside>
+        </div></div></div></div>
+      <div class="txt">
+        <ul>
+          <li><b>Quattro modalità</b> con etichetta: Percorsi, Oggetti, Persone, Prova. In landscape c'è spazio per il testo.</li>
+          <li><b>Pannello a destra con schede</b> Strumenti e Proprietà. Le opzioni del tipo (movimento, oggetto) sono chip nello stesso pannello.</li>
+          <li><b>Selezionare un elemento</b> passa da solo alla scheda Proprietà.</li>
+        </ul>
+        <p class="verdict"><b>La più chiara con molte funzioni.</b> Tutto è sempre nello stesso posto. La scena però scende a circa 340 px di larghezza, adatta solo a ritocchi e non al disegno ampio.</p>
+      </div>
+    </section>
+  </div>
+
+  <h2 style="font:700 18px var(--display);margin:56px 0 12px">Confronto</h2>
+  <div class="compare">
+    <table>
+      <thead><tr><th></th><th>A · Colonna e pannello</th><th>B · Flottante e vista divisa</th><th>C · Modalità e pannello fisso</th></tr></thead>
+      <tbody>
+        <tr><td>Scena con pannello chiuso</td><td>~560 × 248 px</td><td>~600 × 284 px</td><td>~340 × 248 px</td></tr>
+        <tr><td>Cambio strumento</td><td>1 tocco</td><td>1 tocco, 2 per quelli nascosti</td><td>1 tocco, a volte 2 (cambio modalità)</td></tr>
+        <tr><td>Scoperta dei comandi</td><td>Alta</td><td>Media</td><td>Alta</td></tr>
+        <tr><td>Rischio di coprire la scena</td><td>Pannello sopra la scena</td><td>Pulsanti flottanti</td><td>Nessuno</td></tr>
+        <tr><td>Lavoro nel codice</td><td>Basso: la griglia attuale ha già strumenti a sinistra</td><td>Medio-alto: pulsanti e vista divisa nuovi</td><td>Medio: raggruppa gli strumenti per modalità</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
