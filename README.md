@@ -23,6 +23,7 @@ L’interfaccia è in **italiano** (stringhe ancora inline nei componenti; un li
 | Esportazione ZIP (project.json + immagini + manifest) e JSON; importazione ZIP/JSON | ✅ |
 | Modalità anteprima senza strumenti (`O`) | ✅ |
 | Touch: selezione, trascinamento nodi, pinch-zoom e pan a due dita, layout responsive | ✅ |
+| Smartphone in orizzontale (altezza ≤ 500 px): scena a tutto schermo, comandi tondi flottanti, menu progetto, pannello proprietà che affianca la scena (mockup in `docs/mockup-mobile.html`, proposta B) | ✅ |
 
 ### Milestone 4 – Estensioni
 

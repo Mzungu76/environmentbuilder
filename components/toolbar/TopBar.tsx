@@ -22,7 +22,7 @@ interface Props {
   canPlaytest: boolean;
 }
 
-function NameField({ value, onCommit, label, className }: { value: string; onCommit: (v: string) => void; label: string; className?: string }) {
+export function NameField({ value, onCommit, label, className }: { value: string; onCommit: (v: string) => void; label: string; className?: string }) {
   const [v, setV] = useState(value);
   useEffect(() => setV(value), [value]);
   const commit = () => { const t = v.trim(); if (t && t !== value) onCommit(t); else setV(value); };
