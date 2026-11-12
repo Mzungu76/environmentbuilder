@@ -21,7 +21,7 @@ const HINT: Record<OccluderTool, string> = {
 export function OccluderBar({ store, onFinish, onCancel, onDelete }: { store: EditorStore; onFinish: () => void; onCancel: () => void; onDelete: () => void }) {
   const st = useSyncExternalStore(store.subscribe, store.getState, store.getState);
   const env = store.env, list = env.occluders ?? [], b = st.occluderBrush;
-  const cur = list.find((o) => o.id === b.occluderId);
+  const cur = list.find((o) => o.id === b.occluderId) ?? (b.occluderId === null && list.length ? list[list.length - 1] : undefined);
   const patchCur = (patch: Partial<NonNullable<typeof cur>>) => cur && store.commitEnv((en) => ({ ...en, occluders: (en.occluders ?? []).map((o) => (o.id === cur.id ? { ...o, ...patch } : o)) }));
   const add = () => {
     const o = newOccluder(list, uid('occ'));
@@ -39,11 +39,13 @@ export function OccluderBar({ store, onFinish, onCancel, onDelete }: { store: Ed
     <div className={styles.zoneBar} role="group" aria-label="Strumenti del primo piano" data-testid="occluder-bar">
       {b.drafting && <button className={`${styles.btn} ${styles.btnPrimary}`} onClick={onFinish} data-testid="occ-close">Chiudi forma</button>}
       {b.drafting && <button className={styles.chip} onClick={onCancel}>Annulla forma</button>}
-      <select className={styles.select} style={{ width: 'auto', maxWidth: 150 }} value={b.occluderId ?? ''} onChange={(e) => store.setOccluderBrush({ occluderId: e.target.value || null, selectedOp: null })} aria-label="Parte da dipingere" data-testid="occbar-select">
-        <option value="">Scegli la parte…</option>
-        {list.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
-      </select>
-      <button className={styles.chip} onClick={add} data-testid="occbar-add">{Icon.plus} Nuova</button>
+      <span className={styles.help}>Disegna sulla scena le zone che nascondono il personaggio (una roccia, un arco). La prima parte si crea da sola.</span>
+      {list.length > 0 && (
+        <select className={styles.select} style={{ width: 'auto', maxWidth: 150 }} value={b.occluderId ?? list[list.length - 1].id} onChange={(e) => store.setOccluderBrush({ occluderId: e.target.value || null, selectedOp: null })} aria-label="Parte su cui disegni" data-testid="occbar-select">
+          {list.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
+        </select>
+      )}
+      <button className={styles.chip} onClick={add} data-testid="occbar-add" title="Una parte separata, per esempio un altro oggetto davanti a cui passare">{Icon.plus} {list.length ? 'Altra parte' : 'Nuova parte'}</button>
       {cur && <input className={styles.input} style={{ width: 130 }} value={cur.name} aria-label="Nome" onChange={(e) => patchCur({ name: e.target.value })} />}
       <div className={styles.occTools} role="group" aria-label="Forma">
         {TOOLS.map((t) => <button key={t.id} className={styles.chip} aria-pressed={b.tool === t.id} onClick={() => pick(t.id)} data-testid={`occtool-${t.id}`}>{t.label}</button>)}

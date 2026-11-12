@@ -62,7 +62,7 @@ Sfondo (obbligatorio) + piani intermedi (sempre dietro ai personaggi). Per ogni 
 
 Lo strumento **Primo piano** dipinge direttamente sullo sfondo le parti che nascondono il personaggio quando ci passa dietro (rocce, archi, pilastri). Non servono immagini separate: dove dipingi, lo sfondo viene ridisegnato sopra il personaggio.
 
-- **Nuova** crea una parte (ne puoi avere quante vuoi, ognuna con nome e colore). **Pennello** aggiunge, **Gomma** toglie; la dimensione è regolabile.
+- Non devi scegliere nulla prima: **disegna e basta**, la prima parte («Primo piano 1») si crea da sola. **Altra parte** ne aggiunge una separata (ognuna con nome e colore) per oggetti diversi, per esempio «Arco» e «Roccia a sinistra»: servirà per decidere, parte per parte, quando il personaggio passa davanti o dietro. **Pennello** aggiunge, **Gomma** toglie; la dimensione è regolabile.
 - **Bordo** rende il margine più morbido (0 = netto).
 - Ogni tratto è un passo di annullamento (`Ctrl+Z`).
 - Oltre al pennello ci sono **Rettangolo** e **Ellisse** (trascina da un angolo all’opposto), **Poligono** e **Spline** (tocca per mettere i punti; tocca il primo punto, premi `Invio` o «Chiudi forma» per finire; la spline è una curva chiusa che passa per i punti). **Aggiungi / Sottrai** vale per tutti: una forma «sottrai» fa un buco in ciò che hai aggiunto prima.

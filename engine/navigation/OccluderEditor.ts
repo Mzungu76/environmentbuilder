@@ -1,9 +1,10 @@
 import type { Graphics } from 'pixi.js';
 import type { EditorStore } from '@/lib/store/editorStore';
 import type { OccluderItem, SceneView, ViewPointerEvent } from '@/engine/rendering/SceneView';
-import type { OccluderOp, OccluderShape, OccluderStroke, Vec2 } from '@/types';
+import type { Occluder, OccluderOp, OccluderShape, OccluderStroke, Vec2 } from '@/types';
+import { uid } from '@/lib/ids';
 import {
-  MIN_POINTS, applyOp, applyStroke, hasCoverage, insertShapePoint, moveShapeHandle, nearestEdge, occGrid, occluderAlpha, occluderCoverage,
+  MIN_POINTS, newOccluder, applyOp, applyStroke, hasCoverage, insertShapePoint, moveShapeHandle, nearestEdge, occGrid, occluderAlpha, occluderCoverage,
   pointInPolygon, removeShapePoint, seedCoverage, shapeHandles, shapePolygon, splinePolygon, translateShape,
 } from './occluders';
 
@@ -46,6 +47,20 @@ export class OccluderEditor {
   private brush() { return this.store.getState().occluderBrush; }
   private sign(): 'add' | 'sub' { return this.brush().mode === 'paint' ? 'add' : 'sub'; }
   private cur() { const env = this.store.env, id = this.brush().occluderId; return env.occluders?.find((o) => o.id === id); }
+
+  /**
+   * The occluder to draw on. Nothing to choose beforehand: with none selected the last one is used, and when the environment has none
+   * the first one ("Primo piano 1") is created by the first stroke or click.
+   */
+  private ensure(): Occluder | undefined {
+    const cur = this.cur(); if (cur) return cur;
+    const list = this.store.env.occluders ?? [];
+    let id: string;
+    if (list.length) id = list[list.length - 1].id;
+    else { const n = newOccluder(list, uid('occ')); id = n.id; this.store.commitEnv((e) => ({ ...e, occluders: [...(e.occluders ?? []), n] })); }
+    this.store.setOccluderBrush({ occluderId: id, selectedOp: null });
+    return this.store.env.occluders?.find((o) => o.id === id);
+  }
 
   /** Coverage grid of an occluder: the live one while a gesture is in progress, else the document's. */
   private coverage(o: { id: string; ops: OccluderOp[] }): Uint8Array {
@@ -207,13 +222,16 @@ export class OccluderEditor {
     const env = this.store.env, b = this.brush();
     if (!env.width || !env.height) return true;
     const o = this.cur();
-    if (e.type === 'move' || e.type === 'down') this.view.setBrush(e.pos.x, e.pos.y, b.tool === 'brush' ? b.radius : 0, b.tool === 'brush' && b.occluderId ? b.mode : null);
-    if (!o) return true;
+    if (e.type === 'move' || e.type === 'down') this.view.setBrush(e.pos.x, e.pos.y, b.tool === 'brush' ? b.radius : 0, b.tool === 'brush' ? b.mode : null);
+    if (!o && b.tool === 'edit') return true;
+    if (!o && e.type !== 'down') return true;
+    const occ = o ?? this.ensure();
+    if (!occ) return true;
     switch (b.tool) {
-      case 'brush': this.brushEvent(e, o.id); break;
-      case 'rect': case 'ellipse': this.boxEvent(e, o.id, b.tool); break;
+      case 'brush': this.brushEvent(e, occ.id); break;
+      case 'rect': case 'ellipse': this.boxEvent(e, occ.id, b.tool); break;
       case 'polygon': case 'spline': this.polyEvent(e); break;
-      case 'edit': this.editEvent(e, o.id); break;
+      case 'edit': this.editEvent(e, occ.id); break;
     }
     return true;
   }
