@@ -6,7 +6,7 @@ import { saveProject } from '@/lib/persistence/db';
 export type ToolId = 'select' | 'pan' | 'node' | 'connect' | 'path' | 'character' | 'object' | 'zones';
 
 /** Brush of the scale-zones tool. */
-export interface ZoneBrush { zoneId: string | null; /** fraction of the image height */ radius: number; mode: 'paint' | 'erase' }
+export interface ZoneBrush { zoneId: string | null; /** fraction of the image height */ radius: number; mode: 'paint' | 'erase'; /** 0 = very soft edge … 1 = hard */ hardness: number; /** show the resulting size map instead of the zone colours */ showResult: boolean }
 export type EditorMode = 'editor' | 'playtest';
 export type Selection = { kind: 'node' | 'edge' | 'character' | 'object'; id: string } | null;
 export type SaveStatus = 'saved' | 'dirty' | 'saving' | 'error';
@@ -49,7 +49,7 @@ export class EditorStore {
 
   constructor(project: Project) {
     this.state = {
-      project, tool: 'select', zoneBrush: { zoneId: null, radius: 0.04, mode: 'paint' }, selection: null, preview: false, mode: 'editor', objectType: 'generic', showPaths: false,
+      project, tool: 'select', zoneBrush: { zoneId: null, radius: 0.05, mode: 'paint', hardness: 0.2, showResult: false }, selection: null, preview: false, mode: 'editor', objectType: 'generic', showPaths: false,
       saveStatus: 'saved', saveError: null, canUndo: false, canRedo: false, revision: 0,
     };
   }

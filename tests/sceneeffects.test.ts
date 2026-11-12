@@ -29,7 +29,7 @@ describe('perspective', () => {
     for (let t = 0; t < 40 && !a.snapshot().nodeId || t < 1; t += 1 / 30) { a.step(1 / 30); const s = a.snapshot(); if (s.edgeId) { scales.push(s.scale); speeds.push(s.speedPx); } if (s.nodeId === far.id) break; }
     expect(scales[0]).toBeGreaterThan(scales[scales.length - 1]); expect(scales[scales.length - 1]).toBeLessThan(0.6);
     expect(speeds[0]).toBeGreaterThan(speeds[speeds.length - 1] * 1.5);                      // smaller steps far away
-    expect(a.snapshot().scale).toBeCloseTo(0.4, 2);
+    expect(a.snapshot().scale).toBeCloseTo(0.4, 1);
   });
   it('the game session hands out the already-scaled height', () => {
     const p = createProject('x'); const e = p.environments[0]; e.width = 2000; e.height = 1000; e.perspective = { topScale: 0.5, bottomScale: 1 };
@@ -92,32 +92,32 @@ describe('scale zones (painted)', () => {
   it('the brush is round on screen (radius = fraction of the height), soft at the edge, and erase removes it', () => {
     const m = paint(0.5, 0.5, 0.2);
     expect(coverageAt(m, grid.w, grid.h, 0.5, 0.5)).toBeGreaterThan(0.95);
-    expect(coverageAt(m, grid.w, grid.h, 0.5, 0.5 + 0.1)).toBeGreaterThan(0.9);                 // inside
-    expect(coverageAt(m, grid.w, grid.h, 0.5 + 0.085, 0.5)).toBeGreaterThan(0.1);           // 0.085 of the WIDTH = 170 px: near the rim, soft
+    expect(coverageAt(m, grid.w, grid.h, 0.5, 0.5 + 0.06)).toBeGreaterThan(0.9);                // well inside
+    expect(coverageAt(m, grid.w, grid.h, 0.5 + 0.085, 0.5)).toBeGreaterThan(0.05);          // 0.085 of the WIDTH = 170 px: near the rim, soft
     expect(coverageAt(m, grid.w, grid.h, 0.5, 0.5 + 0.26)).toBe(0);                              // outside
     stamp(m, grid.w, grid.h, 2, 0.5, 0.5, 0.3, 'erase', 1); expect(coverageAt(m, grid.w, grid.h, 0.5, 0.5)).toBe(0);
   });
   it('inside a zone the scale is the zone’s, outside it is the automatic one, and the edge blends', () => {
-    const e = { ...env, perspective: { topScale: 0.8, bottomScale: 1 }, scaleZones: [{ id: 'z', name: 'Tunnel', scale: 0.3, color: '#fff', mask: encodeMask(paint(0.7, 0.4, 0.15)) }] };
+    const e = { ...env, scaleSoftness: 0, perspective: { topScale: 0.8, bottomScale: 1 }, scaleZones: [{ id: 'z', name: 'Tunnel', scale: 0.3, color: '#fff', mask: encodeMask(paint(0.7, 0.4, 0.15)) }] };
     expect(scaleAt(e, 0.7, 0.4)).toBeCloseTo(0.3, 1);
     expect(scaleAt(e, 0.1, 0.9)).toBeCloseTo(0.98, 2);                                           // untouched: automatic perspective
-    const edge = scaleAt(e, 0.7 + 0.15 * 0.5, 0.4); expect(edge).toBeGreaterThan(0.3); expect(edge).toBeLessThan(0.92);
+    const edge = scaleAt(e, 0.7 + 0.15 * 0.5 * 0.6, 0.4); expect(edge).toBeGreaterThan(0.3); expect(edge).toBeLessThan(0.99);
     e.scaleZones[0].scale = 0.5; expect(scaleAt(e, 0.7, 0.4)).toBeCloseTo(0.5, 1);                 // editable afterwards
   });
   it('several zones: the later one is on top; a node with its own scale wins over the zones', () => {
     const a = { id: 'a', name: 'A', scale: 0.5, color: '#f00', mask: encodeMask(paint(0.5, 0.5, 0.2)) }, b = { id: 'b', name: 'B', scale: 0.2, color: '#0f0', mask: encodeMask(paint(0.5, 0.5, 0.1)) };
-    const e = { ...env, scaleZones: [a, b] };
+    const e = { ...env, scaleSoftness: 0, scaleZones: [a, b] };
     expect(zonesScale(e, 0.5, 0.5, 1)).toBeCloseTo(0.2, 1); expect(zonesScale(e, 0.5 + 0.1 * 0.6 + 0.05, 0.5 + 0.12, 1)).toBeGreaterThan(0.2);
     expect(nodeScale(e, { x: 0.5, y: 0.5, props: { scale: '0.9' } })).toBe(0.9); expect(nodeScale(e, { x: 0.5, y: 0.5, props: {} })).toBeCloseTo(0.2, 1);
   });
   it('walking along a path shrinks the character exactly where the zone is', () => {
     const p = createProject('x'); const e = p.environments[0]; e.width = 2000; e.height = 1000;
-    e.scaleZones = [{ id: 'z', name: 'Z', scale: 0.3, color: '#fff', mask: encodeMask(paint(0.5, 0.5, 0.12)) }];
+    e.scaleSoftness = 0; e.scaleZones = [{ id: 'z', name: 'Z', scale: 0.3, color: '#fff', mask: encodeMask(paint(0.5, 0.5, 0.25)) }];
     let g = emptyGraph(); const n1 = createNode(0.1, 0.5), n2 = createNode(0.9, 0.5); g = addEdge(addNode(addNode(g, n1), n2), createEdge(n1.id, n2.id)); e.navigation = g;
-    const c = createCharacter(0, n1.id); c.behavior.mode = 'manual'; c.speed = 0.4; const a = new Agent(e, c); a.goTo(n2.id);
+    const c = createCharacter(0, n1.id); c.behavior.mode = 'manual'; c.speed = 0.15; const a = new Agent(e, c); a.goTo(n2.id);
     const seen: number[] = [];
-    for (let t = 0; t < 40; t += 1 / 30) { a.step(1 / 30); const s = a.snapshot(); if (s.edgeId) seen.push(s.scale); if (s.nodeId === n2.id) break; }
-    expect(seen[0]).toBeCloseTo(1, 1); expect(Math.min(...seen)).toBeLessThan(0.4); expect(seen[seen.length - 1]).toBeGreaterThan(0.8);   // big → small in the zone → big again
+    for (let t = 0; t < 60; t += 1 / 30) { a.step(1 / 30); const s = a.snapshot(); if (s.edgeId) seen.push(s.scale); if (s.nodeId === n2.id) break; }
+    expect(seen[0]).toBeCloseTo(1, 1); expect(Math.min(...seen)).toBeLessThan(0.45); expect(seen[seen.length - 1]).toBeGreaterThan(0.75);   // big → small in the zone → big again
   });
 });
 
@@ -132,5 +132,40 @@ describe('placing the character on a node', () => {
     const s = a.snapshot(); expect(s.nodeId).toBe(n3.id); expect(s.x).toBeCloseTo(0.9, 6); expect(s.state).toBe('IDLE'); expect(s.edgeId).toBeNull(); expect(s.acting).toBe(false); expect(a.arrivalSeq).toBe(seq);
     for (let i = 0; i < 60; i++) a.step(1 / 30); expect(a.snapshot().nodeId).toBe(n3.id);              // stays there (manual mode)
     expect(a.teleport('nope')).toBe(false);
+  });
+});
+
+describe('smooth size changes', () => {
+  const env0 = { width: 2000, height: 1000 }, g = zoneGrid(env0);
+  const zoneMask = () => { const m = emptyMask(g.w, g.h); stamp(m, g.w, g.h, 2, 0.5, 0.5, 0.25, 'paint', 1); return encodeMask(m); };     // hard-edged disc
+  const mk = (softness: number) => ({ ...env0, perspective: undefined, scaleSoftness: softness, scaleZones: [{ id: 'z', name: 'Z', scale: 0.3, color: '#fff', mask: zoneMask() }] });
+  const row = (e: ReturnType<typeof mk>) => { const v: number[] = []; for (let x = 0.2; x <= 0.8; x += 0.002) v.push(scaleAt(e, x, 0.5)); return v; };
+  const maxStep = (v: number[]) => Math.max(...v.slice(1).map((q, i) => Math.abs(q - v[i])));
+  const width = (v: number[]) => { const lo = v.findIndex((q) => q < 0.95), hi = v.findIndex((q) => q < 0.35); return hi - lo; };     // samples between 'almost normal' and 'almost fully shrunk'
+  it('softness spreads the change over a longer distance and removes the steep step', () => {
+    const hard = row(mk(0)), soft = row(mk(0.5)), softer = row(mk(1));
+    expect(maxStep(soft)).toBeLessThan(maxStep(hard) * 0.5); expect(maxStep(softer)).toBeLessThan(maxStep(soft));
+    expect(width(soft)).toBeGreaterThan(width(hard) * 2); expect(width(softer)).toBeGreaterThan(width(soft));
+    expect(Math.min(...soft)).toBeLessThan(0.45);                                              // the zone is still clearly smaller inside
+    expect(Math.abs(soft[0] - 1)).toBeLessThan(0.02);                                          // and untouched far away
+  });
+  it('a disc is softened evenly in all directions (no steps vertically either)', () => {
+    const e = mk(0.5), col: number[] = []; for (let y = 0.1; y <= 0.9; y += 0.002) col.push(scaleAt(e, 0.5, y));
+    expect(maxStep(col)).toBeLessThan(0.02);
+  });
+  it('even with a sharp zone edge the walking character changes size gradually, frame by frame', () => {
+    const p = createProject('x'); const e = p.environments[0]; e.width = 2000; e.height = 1000; e.scaleSoftness = 0;
+    e.scaleZones = [{ id: 'z', name: 'Z', scale: 0.3, color: '#fff', mask: zoneMask() }];
+    let gr = emptyGraph(); const n1 = createNode(0.1, 0.5), n2 = createNode(0.9, 0.5); gr = addEdge(addNode(addNode(gr, n1), n2), createEdge(n1.id, n2.id)); e.navigation = gr;
+    const c = createCharacter(0, n1.id); c.behavior.mode = 'manual'; c.speed = 0.3; const a = new Agent(e, c); a.goTo(n2.id);
+    const seen: number[] = []; for (let t = 0; t < 60; t += 1 / 60) { a.step(1 / 60); const s = a.snapshot(); seen.push(s.scale); if (s.nodeId === n2.id) break; }
+    expect(maxStep(seen)).toBeLessThan(0.016);                                                   // per 1/60 s frame: at most 0.9 per second
+    expect(Math.min(...seen)).toBeLessThan(0.6); expect(seen[seen.length - 1]).toBeGreaterThan(0.5);
+  });
+  it('teleporting snaps to the size of the place (no slow growth from the old spot)', () => {
+    const p = createProject('x'); const e = p.environments[0]; e.width = 2000; e.height = 1000; e.scaleSoftness = 0; e.perspective = { topScale: 0.3, bottomScale: 1 };
+    let gr = emptyGraph(); const n1 = createNode(0.1, 0.95), n2 = createNode(0.9, 0.05); gr = addEdge(addNode(addNode(gr, n1), n2), createEdge(n1.id, n2.id)); e.navigation = gr;
+    const a = new Agent(e, { ...createCharacter(0, n1.id), behavior: { ...createCharacter(0, n1.id).behavior, mode: 'manual' } });
+    expect(a.snapshot().scale).toBeGreaterThan(0.95); a.teleport(n2.id); expect(a.snapshot().scale).toBeLessThan(0.35);
   });
 });

@@ -108,6 +108,8 @@ export interface Environment {
   perspective?: { topScale: number; bottomScale: number };
   /** Size zones painted on the backdrop (they refine / override the automatic perspective). */
   scaleZones?: ScaleZone[];
+  /** 0–1: how gently the size changes across and around the painted zones (default 0.5). */
+  scaleSoftness?: number;
   /** Light of the scene reproduced on the characters (see engine/game/light). */
   lighting?: { enabled: boolean; strength: number; /** cells across the map (default 256) */ precision?: number };
   lightMap?: LightMapData;

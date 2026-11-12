@@ -37,12 +37,22 @@ export function ZonesPanel({ store, env }: { store: EditorStore; env: Environmen
         );
       })}
       <button className={styles.btn} onClick={add} data-testid="zone-add">+ Nuova zona</button>
+      {zones.length > 0 && (
+        <Field label={`Morbidezza dei passaggi: ${Math.round((env.scaleSoftness ?? 0.5) * 100)}%`} id="zone-soft">
+          <input id="zone-soft" type="range" min={0} max={1} step={0.05} value={env.scaleSoftness ?? 0.5} onChange={(e) => store.commitEnv((en) => ({ ...en, scaleSoftness: Number(e.target.value) }))} aria-label="Morbidezza dei passaggi di dimensione" data-testid="zone-softness" />
+        </Field>
+      )}
+      {zones.length > 0 && <span className={styles.help}>Più alta = i cambi di dimensione si distribuiscono su una distanza maggiore intorno ai bordi delle zone. In più il personaggio non cambia mai taglia di colpo: ci arriva gradualmente mentre cammina.</span>}
       {painting && (
         <div style={{ display: 'grid', gap: 4 }} data-testid="zone-brush">
           <div className={styles.row2}>
             <button className={`${styles.btn} ${brush.mode === 'paint' ? styles.btnPrimary : ''}`} onClick={() => store.setZoneBrush({ mode: 'paint' })}>Pennello</button>
             <button className={`${styles.btn} ${brush.mode === 'erase' ? styles.btnPrimary : ''}`} onClick={() => store.setZoneBrush({ mode: 'erase' })}>Gomma</button>
           </div>
+          <Field label={`Bordo del pennello: ${brush.hardness < 0.2 ? 'molto morbido' : brush.hardness < 0.5 ? 'morbido' : 'netto'}`} id="zone-hard">
+            <input id="zone-hard" type="range" min={0} max={0.9} step={0.05} value={brush.hardness} onChange={(e) => store.setZoneBrush({ hardness: Number(e.target.value) })} aria-label="Durezza del bordo del pennello" />
+          </Field>
+          <label className={styles.help} style={{ display: 'flex', gap: 6, alignItems: 'center' }}><input type="checkbox" checked={brush.showResult} onChange={(e) => store.setZoneBrush({ showResult: e.target.checked })} data-testid="zone-result" />Mostra la dimensione risultante (blu = piccolo, arancio = grande)</label>
           <Field label={`Dimensione del pennello: ${Math.round(brush.radius * 100)}%`} id="zone-radius">
             <input id="zone-radius" type="range" min={0.01} max={0.25} step={0.005} value={brush.radius} onChange={(e) => store.setZoneBrush({ radius: Number(e.target.value) })} aria-label="Dimensione del pennello" />
           </Field>

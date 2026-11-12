@@ -2,6 +2,7 @@ import type { EditorStore } from '@/lib/store/editorStore';
 import type { SceneView, ViewPointerEvent } from '@/engine/rendering/SceneView';
 import type { Vec2 } from '@/types';
 import { decodeMask, emptyMask, encodeMask, stamp, zoneGrid } from './scaleZones';
+import { scaleAt } from './perspective';
 
 /**
  * Brush editor for the scale zones: paints (or erases) the coverage of the zone chosen in the panel. While you drag the stroke is
@@ -31,6 +32,14 @@ export class ZoneEditor {
     if (!this.canvas) this.canvas = document.createElement('canvas');
     if (this.canvas.width !== w || this.canvas.height !== h) { this.canvas.width = w; this.canvas.height = h; }
     const ctx = this.canvas.getContext('2d')!, img = ctx.createImageData(w, h), sel = this.store.getState().zoneBrush.zoneId;
+    if (this.store.getState().zoneBrush.showResult) {       // the size the character will really have, cell by cell (blue = small … orange = large)
+      const live = this.work ? { ...env, scaleZones: (env.scaleZones ?? []).map((z) => (z.id === this.work!.id ? { ...z, mask: encodeMask(this.work!.mask) } : z)) } : env;
+      for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        const sc = scaleAt(live, (x + 0.5) / w, (y + 0.5) / h), t = Math.max(0, Math.min(1, (sc - 0.2) / 1.1)), o = (y * w + x) * 4;
+        img.data[o] = 40 + 215 * t; img.data[o + 1] = 120 + 60 * (1 - Math.abs(t - 0.5) * 2); img.data[o + 2] = 255 - 215 * t; img.data[o + 3] = 150;
+      }
+      ctx.putImageData(img, 0, 0); this.view.setZoneCanvas(this.canvas); return;
+    }
     for (const z of env.scaleZones ?? []) {
       const mask = this.work && this.work.id === z.id ? this.work.mask : decodeMask(z.mask, w, h);
       const r = parseInt(z.color.slice(1, 3), 16), g = parseInt(z.color.slice(3, 5), 16), b = parseInt(z.color.slice(5, 7), 16), k = z.id === sel ? 0.62 : 0.34;
@@ -63,7 +72,7 @@ export class ZoneEditor {
   private paint(p: Vec2) {
     const env = this.store.env, b = this.store.getState().zoneBrush, wk = this.work!, { w, h } = zoneGrid(env), aspect = env.width / env.height;
     const from = this.last ?? p, dist = Math.hypot((p.x - from.x) * aspect, p.y - from.y), step = Math.max(0.002, b.radius * 0.35), n = Math.max(1, Math.ceil(dist / step));
-    for (let i = 1; i <= n; i++) stamp(wk.mask, w, h, aspect, from.x + ((p.x - from.x) * i) / n, from.y + ((p.y - from.y) * i) / n, b.radius, b.mode);
+    for (let i = 1; i <= n; i++) stamp(wk.mask, w, h, aspect, from.x + ((p.x - from.x) * i) / n, from.y + ((p.y - from.y) * i) / n, b.radius, b.mode, b.hardness);
     this.last = p;
     this.refresh();
   }

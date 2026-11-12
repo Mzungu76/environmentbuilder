@@ -14,7 +14,7 @@ export const baseScale = (env: Pick<Environment, 'perspective'>, y: number): num
   return p.topScale + (p.bottomScale - p.topScale) * t;
 };
 
-type Persp = Pick<Environment, 'perspective'> & Partial<Pick<Environment, 'scaleZones' | 'width' | 'height'>>;
+type Persp = Pick<Environment, 'perspective'> & Partial<Pick<Environment, 'scaleZones' | 'width' | 'height' | 'scaleSoftness'>>;
 
 /** Scale at a normalized position: automatic perspective by height, refined by the painted zones. */
 export const scaleAt = (env: Persp, x: number, y: number): number => zonesScale(env, x, y, baseScale(env, y));

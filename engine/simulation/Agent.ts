@@ -83,6 +83,7 @@ export class Agent {
     this.pause = 0; this.decisionTimer = 0; this.state = 'IDLE'; this.stateSince = 0; this.lift = 0; this.actions = []; this.actionLeft = 0; this.speedPx = 0; this.time = 0; this.lastNodeId = null; this.arrivalSeq = 0; this.arrivalFinal = false;
     this.nodeId = start?.id ?? null;
     this.pos = start ? { x: start.x, y: start.y } : { x: 0, y: 0 };
+    this.snapScale();
   }
 
   get hasPosition() { return this.nodeId !== null || this.track !== null; }
@@ -106,14 +107,16 @@ export class Agent {
   get busy() { return this.actions.length > 0 || this.actionLeft > 0; }
 
   private profile() { return { abilities: this.config.abilities, edgeWeights: this.config.behavior.edgeWeights }; }
-  /** Perspective scale at the current position: along a path it blends the scales of its two nodes. */
-  private scaleNow(): number {
+  /** Scale the scene asks for at the current position (zones, perspective, node values). The size actually used follows it smoothly. */
+  private scaleTarget(): number {
     const nav = this.env.navigation;
     if (this.track) { const p = pointAt(this.track, this.s); return scaleAlong(this.env, nav.nodes.find((n) => n.id === this.track!.from), nav.nodes.find((n) => n.id === this.track!.to), this.track.length > 0 ? this.s / this.track.length : 0, { x: p.x / this.env.width, y: p.y / this.env.height }); }
     return nodeScale(this.env, nav.nodes.find((n) => n.id === this.nodeId) ?? { x: this.pos.x, y: this.pos.y, props: {} });
   }
   /** Far away = smaller steps in the picture: the speed follows the scale. */
-  private pxSpeed() { return this.config.speed * this.env.height * this.scaleNow(); }
+  private scaleCur = 1;
+  private scaleNow() { return this.scaleCur; }
+  private pxSpeed() { return this.config.speed * this.env.height * this.scaleCur; }
 
   // --- commands ------------------------------------------------------------------------------
 
@@ -147,13 +150,15 @@ export class Agent {
     return { ok: true };
   }
 
+  private snapScale() { this.scaleCur = this.scaleTarget(); }
+
   /** Puts the character on a node right now (no walking): clears the route, any action in progress and the pause. */
   teleport(nodeId: string): boolean {
     const node = this.env.navigation.nodes.find((n) => n.id === nodeId);
     if (!node) return false;
     this.nodeId = nodeId; this.lastNodeId = null; this.track = null; this.s = 0; this.route = []; this.destination = null; this.moving = false;
     this.pause = 0; this.actions = []; this.actionLeft = 0; this.speedPx = 0; this.lift = 0; this.pos = { x: node.x, y: node.y }; this.arrivalFinal = false;
-    this.setState('IDLE');
+    this.setState('IDLE'); this.snapScale();
     return true;
   }
 
@@ -170,6 +175,8 @@ export class Agent {
 
   step(dt: number) {
     this.time += dt;
+    // the size never jumps: it eases toward what the scene asks for, with the distance walked and with time (sharp zone edges stay gentle)
+    { const lam = Math.max(1, 0.1 * this.env.height), k = 1 - Math.exp(-((this.speedPx * dt) / lam + dt / 0.6)), want = (this.scaleTarget() - this.scaleCur) * k, cap = 0.9 * dt; this.scaleCur += Math.max(-cap, Math.min(cap, want)); }       // …and never faster than 0.9 per second
     const b = this.config.behavior;
     if (this.actionLeft <= 0 && this.actions.length) { const a = this.actions.shift()!; this.actionLeft = a.seconds; this.setState(a.state); }
     if (this.actionLeft > 0) { this.actionLeft -= dt; this.speedPx = 0; this.lift = 0; return; }
