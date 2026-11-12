@@ -45,7 +45,11 @@ describe('paper puppet', () => {
     const a = assemble(extractPieces(sheet()).pieces), b = buildPaperMesh(a), n = b.mesh.vertices.length / 2;
     expect(b.mesh.uvs.length).toBe(n * 2); expect(b.skin.idx.length).toBe(n * 4); expect(Math.max(...b.mesh.indices)).toBeLessThan(n);
     expect(b.mesh.uvs.every((u) => u >= 0 && u <= 1)).toBe(true);
-    for (let i = 0; i < n; i++) { expect(b.skin.w[i * 4]).toBe(1); expect(b.skin.idx[i * 4]).toBeLessThan(BONE_IDS.length); }
+    for (let i = 0; i < n; i++) { expect(b.skin.w[i * 4] + b.skin.w[i * 4 + 1]).toBeCloseTo(1, 6); expect(b.skin.idx[i * 4]).toBeLessThan(BONE_IDS.length); }
+    const rigid = buildPaperMesh(a, 6, 2, 0), soft = buildPaperMesh(a, 6, 2, 0.8);
+    for (let i = 0; i < rigid.mesh.vertices.length / 2; i++) expect(rigid.skin.w[i * 4]).toBe(1);                 // soft = 0 → every vertex follows ONE bone
+    let blended = 0; for (let i = 0; i < soft.mesh.vertices.length / 2; i++) if (soft.skin.w[i * 4 + 1] > 0) { blended++; expect(soft.skin.w[i * 4 + 1]).toBeLessThanOrEqual(0.5); expect(soft.skin.idx[i * 4 + 1]).not.toBe(soft.skin.idx[i * 4]); }
+    expect(blended).toBeGreaterThan(20);                                                                         // and with soft joints the vertices near a joint also follow the parent
     expect(new Set(b.parts.map((p) => p.bone)).size).toBe(15);                           // all bones have a part
     expect(b.atlas.width).toBeLessThanOrEqual(1100);
   });

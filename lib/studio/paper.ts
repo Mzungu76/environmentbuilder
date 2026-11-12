@@ -32,7 +32,7 @@ export async function loadPieces(projectId: string, puppet: Puppet, kind: PaperK
 /** Builds the view for a setup and writes it (images as new assets) into the puppet, keeping the clips and weight settings. */
 export async function commitPaper(store: EditorStore, puppetId: string, pieces: Pieces, setup: PaperSetup, kind: PaperKind = 'side'): Promise<void> {
   const puppet = store.project.puppets.find((p) => p.id === puppetId); if (!puppet) return;
-  const asm = assembleSetup(pieces, setup, kind), built = buildPaperMesh(asm);
+  const asm = assembleSetup(pieces, setup, kind), built = buildPaperMesh(asm, 6, 2, setup.soft ?? 0.5);
   const cut = await storePuppetImage(store, await imgToBlob(asm.cutout), `${puppet.name}-burattino-${kind}.png`, asm.cutout.width, asm.cutout.height);
   const atlas = await storePuppetImage(store, await imgToBlob(built.atlas), `${puppet.name}-burattino-atlante-${kind}.png`, built.atlas.width, built.atlas.height);
   updatePuppet(store, puppetId, (p) => {

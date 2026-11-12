@@ -1,6 +1,7 @@
 import type { CharacterState, Clip, Pose, PuppetView, ViewId } from '@/types';
 import { boneMatrices, buildRig, type Rig } from './skeleton';
 import { phaseRate, samplePose } from './animation';
+import { clampPose } from './limits';
 
 /** Runtime evaluation of a rigged view. No DOM: usable by any host game. */
 
@@ -60,7 +61,7 @@ export function advancePhase(view: PuppetView, state: CharacterState, phase: num
 
 export const poseAt = (view: PuppetView, state: CharacterState, phase: number): Pose => {
   const clip = clipFor(view, state);
-  return clip ? samplePose(clip, phase) : { rot: {}, dx: 0, dy: 0 };
+  return clip ? clampPose(samplePose(clip, phase), view.id) : { rot: {}, dx: 0, dy: 0 };
 };
 
 /** Which view to show: explicit hint (edge `props.view`), else side when moving and the puppet's idle view when still. */

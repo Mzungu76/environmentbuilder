@@ -1,5 +1,6 @@
 import type { BoneId, LandmarkId, Mesh, Skin, Vec2 } from '@/types';
 import { BONE_IDS } from '@/types';
+import { BONE_DEFS } from './skeleton';
 import { components, newImg, type Img } from './imageProc';
 
 /**
@@ -151,7 +152,7 @@ const BONE_OF = (id: PieceId, far: boolean): BoneId => {
   switch (id) { case 'head': return 'head'; case 'torso': case 'accA': case 'accB': return 'torso'; case 'pelvis': return 'pelvis'; case 'uarm': return `uarm${side}`; case 'farm': return `farm${side}`; case 'hand': return `hand${side}`; case 'thigh': return `thigh${side}`; case 'shin': return `shin${side}`; default: return `foot${side}`; }
 };
 
-export interface Placed { id: PieceId; far: boolean; bone: BoneId; img: Img; x: number; y: number }
+export interface Placed { id: PieceId; far: boolean; bone: BoneId; img: Img; x: number; y: number; /** The piece's joint with its parent bone, in the same coordinates as x / y (for soft joints). */ prox?: Vec2 }
 export interface PaperAssembly {
   placed: Placed[];
   landmarks: Partial<Record<LandmarkId, Vec2>>;
@@ -206,7 +207,7 @@ export function assemble(pieces: Pieces, opt: PaperOptions = DEFAULT_PAPER): Pap
   for (const z of zs) {
     if (!pieces[z.id]) continue;
     const base = pos[z.id]!, far = !!z.far;
-    placed.push({ id: z.id, far, bone: BONE_OF(z.id, far), img: far ? darkened(pieces[z.id]!, opt.farShade) : pieces[z.id]!, x: base.x + (far ? dx : 0), y: base.y });
+    placed.push({ id: z.id, far, bone: BONE_OF(z.id, far), img: far ? darkened(pieces[z.id]!, opt.farShade) : pieces[z.id]!, x: base.x + (far ? dx : 0), y: base.y, prox: (PART_IDS as readonly string[]).includes(z.id) ? { x: base.x + (far ? dx : 0) + jp[z.id as PartId].prox.x, y: base.y + jp[z.id as PartId].prox.y } : undefined });
   }
   // canvas
   let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
@@ -229,13 +230,13 @@ export function assemble(pieces: Pieces, opt: PaperOptions = DEFAULT_PAPER): Pap
     shoulderR: W(shoulder), shoulderL: F(shoulder), elbowR: W(elbow), elbowL: F(elbow), wristR: W(wrist), wristL: F(wrist), handR: W(handTip), handL: F(handTip),
     hipR: W(hip), hipL: F(hip), kneeR: W(knee), kneeL: F(knee), ankleR: W(ankle), ankleL: F(ankle), toeR: W(toe), toeL: F(toe),
   };
-  return { placed: placed.map((p) => ({ ...p, x: p.x + ox, y: p.y + oy })), landmarks: lm, cutout: cut, figureHeight: H, pivot: { x: W(ankle).x + (opaqueBox(footImg).w * 0.15), y: footBottom + oy } };
+  return { placed: placed.map((p) => ({ ...p, x: p.x + ox, y: p.y + oy, prox: p.prox && { x: p.prox.x + ox, y: p.prox.y + oy } })), landmarks: lm, cutout: cut, figureHeight: H, pivot: { x: W(ankle).x + (opaqueBox(footImg).w * 0.15), y: footBottom + oy } };
 }
 
 // ---- 4) atlas + rigid-part mesh ---------------------------------------------------------------------------------------------------
 export interface PaperBuild { atlas: Img; mesh: Mesh; skin: Skin; parts: { id: PieceId; bone: BoneId; far: boolean }[] }
 
-export function buildPaperMesh(asm: PaperAssembly, rows = 3, cols = 2): PaperBuild {
+export function buildPaperMesh(asm: PaperAssembly, rows = 6, cols = 2, soft = 0.5): PaperBuild {
   const PAD = 3, MAXW = 1024;
   const order = asm.placed;
   const rects = order.map((p) => ({ w: p.img.width, h: p.img.height, x: 0, y: 0 }));
@@ -251,13 +252,17 @@ export function buildPaperMesh(asm: PaperAssembly, rows = 3, cols = 2): PaperBui
     for (let yy = 0; yy < r.h; yy++) for (let xx = 0; xx < r.w; xx++) { const s = (yy * r.w + xx) * 4, t = ((r.y + yy) * AW + r.x + xx) * 4; for (let c = 0; c < 4; c++) atlas.data[t + c] = p.img.data[s + c]; }
   });
   const vertices: number[] = [], uvs: number[] = [], indices: number[] = [], sIdx: number[] = [], sW: number[] = [];
+  const parentOf = (b: BoneId): number => { const d = BONE_DEFS.find((x) => x.id === b); return d?.parent ? BONE_IDS.indexOf(d.parent) : -1; };
   order.forEach((p, i) => {
-    const r = rects[i], base = vertices.length / 2, bi = BONE_IDS.indexOf(p.bone);
+    const r = rects[i], base = vertices.length / 2, bi = BONE_IDS.indexOf(p.bone), pb = p.prox ? parentOf(p.bone) : -1;
+    const R = Math.max(1, soft * 0.9 * Math.min(p.img.width, p.img.height));       // soft joint: radius around the joint where the piece also follows its parent
     for (let ry = 0; ry <= rows; ry++) for (let cx = 0; cx <= cols; cx++) {
       const u = cx / cols, v = ry / rows;
-      vertices.push(p.x + u * p.img.width, p.y + v * p.img.height);
+      const vx = p.x + u * p.img.width, vy = p.y + v * p.img.height;
+      vertices.push(vx, vy);
       uvs.push((r.x + u * r.w) / AW, (r.y + v * r.h) / AH);
-      sIdx.push(bi, 0, 0, 0); sW.push(1, 0, 0, 0);
+      const wp = pb >= 0 && p.prox && soft > 0.01 ? 0.5 * Math.max(0, 1 - Math.hypot(vx - p.prox.x, vy - p.prox.y) / R) : 0;
+      if (wp > 0.002) { sIdx.push(bi, pb, 0, 0); sW.push(1 - wp, wp, 0, 0); } else { sIdx.push(bi, 0, 0, 0); sW.push(1, 0, 0, 0); }
     }
     for (let ry = 0; ry < rows; ry++) for (let cx = 0; cx < cols; cx++) { const a = base + ry * (cols + 1) + cx, b = a + 1, d = a + cols + 1, e = d + 1; indices.push(a, b, d, b, e, d); }
   });
@@ -303,7 +308,7 @@ export function assembleFrontal(pieces: Pieces, opt: PaperOptions, kind: 'front'
   pos.torso = add(sub(waist, base.torso.prox), off('torso'));
   const tor = pieces.torso!, tb = opaqueBox(tor), shY = tb.y0 + tb.h * 0.2, te = rowExtent(tor, shY - 4, shY + 4), tw = te.x1 - te.x0;
   const neck = add(pos.torso, base.torso.dist);
-  const shoulder = { R: add(pos.torso, { x: te.x1 - tw * 0.14, y: shY }), L: add(pos.torso, { x: te.x0 + tw * 0.14, y: shY }) };
+  const shoulder = { R: add(pos.torso, { x: te.x1 - tw * 0.1, y: shY }), L: add(pos.torso, { x: te.x0 + tw * 0.1, y: shY }) };
   pos.head = add(sub(neck, base.head.prox), off('head'));
   const headTop = add(pos.head, base.head.top ?? base.head.dist);
   const lm: Partial<Record<LandmarkId, Vec2>> = { headTop, neck, pelvis: waist };
@@ -339,7 +344,7 @@ export function assembleFrontal(pieces: Pieces, opt: PaperOptions, kind: 'front'
   for (const o of zs) {
     const img = o.side ? imgs[o.side][o.id] : pieces[o.id];
     if (!img || !pos[o.key]) continue;
-    placed.push({ id: o.id, far: false, bone: (o.side ? `${o.id}${o.side}` : o.id === 'accA' || o.id === 'accB' ? 'torso' : o.id) as BoneId, img, x: pos[o.key].x, y: pos[o.key].y });
+    placed.push({ id: o.id, far: false, bone: (o.side ? `${o.id}${o.side}` : o.id === 'accA' || o.id === 'accB' ? 'torso' : o.id) as BoneId, img, x: pos[o.key].x, y: pos[o.key].y, prox: o.id === 'accA' || o.id === 'accB' ? undefined : { x: pos[o.key].x + (o.side ? jt[o.side][o.id] : base[o.id as PartId]).prox.x, y: pos[o.key].y + (o.side ? jt[o.side][o.id] : base[o.id as PartId]).prox.y } });
   }
   let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
   for (const p of placed) { x0 = Math.min(x0, p.x); y0 = Math.min(y0, p.y); x1 = Math.max(x1, p.x + p.img.width); y1 = Math.max(y1, p.y + p.img.height); }
@@ -348,7 +353,7 @@ export function assembleFrontal(pieces: Pieces, opt: PaperOptions, kind: 'front'
   const W = (p: Vec2): Vec2 => ({ x: p.x + ox, y: p.y + oy });
   for (const k of Object.keys(lm) as LandmarkId[]) lm[k] = W(lm[k]!);
   const cx = W(pos.pelvis).x + pe.x0 + pw / 2;
-  return { placed: placed.map((p) => ({ ...p, x: p.x + ox, y: p.y + oy })), landmarks: lm, cutout: cut, figureHeight: H, pivot: { x: cx, y: footBottom + oy } };
+  return { placed: placed.map((p) => ({ ...p, x: p.x + ox, y: p.y + oy, prox: p.prox && { x: p.prox.x + ox, y: p.prox.y + oy } })), landmarks: lm, cutout: cut, figureHeight: H, pivot: { x: cx, y: footBottom + oy } };
 }
 
 /** Alpha-composites `src` onto `dst` at (px, py). */

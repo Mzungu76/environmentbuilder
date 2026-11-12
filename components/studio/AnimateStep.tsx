@@ -7,6 +7,7 @@ import { apply, boneMatrices, parentRotation, restAngle, buildRig } from '@/engi
 import { updatePuppet } from '@/lib/studio/pipeline';
 import { uid } from '@/lib/ids';
 import { plantFeet } from '@/engine/puppet/ik';
+import { clampPose, limitsFor } from '@/engine/puppet/limits';
 import { buildSequence, SEQUENCES } from '@/engine/puppet/sequences';
 import { activeAttachments, attachmentQuad, QUAD_INDICES, QUAD_UVS } from '@/engine/puppet/attachments';
 import { drawPuppet } from '@/engine/puppet/canvasRenderer';
@@ -68,7 +69,7 @@ export function AnimateStep({ store, puppet, projectId, go }: StepProps) {
 
   const keys = clip?.keys ?? [];
   const nearKey = keys.findIndex((k) => Math.abs(k.t - phase) < 0.02);
-  const pose: Pose = clip ? (nearKey >= 0 ? keys[nearKey].pose : samplePose(clip, phase)) : { rot: {}, dx: 0, dy: 0 };
+  const pose: Pose = clip ? clampPose(nearKey >= 0 ? keys[nearKey].pose : samplePose(clip, phase), vid) : { rot: {}, dx: 0, dy: 0 };   // joint limits keep every pose possible
 
   const addKeyAtPhase = (): number => {
     if (!clip) return -1;
@@ -139,6 +140,7 @@ export function AnimateStep({ store, puppet, projectId, go }: StepProps) {
                 const target = (Math.atan2(e.y - head.y, e.x - head.x) * 180) / Math.PI;
                 let rot = target - restAngle(bone) - parentRotation(rig, key.pose, bone.index);
                 rot = ((rot + 540) % 360) - 180;
+                const lim = limitsFor(vid)[d.bone]; if (lim) rot = Math.min(lim[1], Math.max(lim[0], rot));
                 const np: Pose = { ...key.pose, rot: { ...key.pose.rot, [d.bone]: Math.round(rot * 10) / 10 } };
                 setClips((cs) => ({ clips: cs.map((c) => (c.id === clip.id ? { ...c, keys: ks.map((k, i) => (i === idx ? { ...k, pose: np } : k)) } : c)) }), 'live');
               } else if (e.type === 'up') drag.current = null;

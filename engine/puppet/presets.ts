@@ -65,7 +65,8 @@ export function makeExtraPreset(kind: ExtraKind, pv: PuppetView | undefined, amo
       return mk('Guardati intorno', 3, true);
     }
     case 'wave': {
-      for (let i = 0; i < 8; i++) { const s = Math.sin((2 * Math.PI * i) / 8); at(i / 8, pose({ uarmR: -140, farmR: -35 + 32 * s * a, head: -4, torso: -2 }, 0, 0)); }
+      const frontal = pv?.id === 'front' || pv?.id === 'back';   // from the front the arm opens sideways and the forearm waves in the image plane
+      for (let i = 0; i < 8; i++) { const s = Math.sin((2 * Math.PI * i) / 8); at(i / 8, frontal ? pose({ uarmR: -125, farmR: -10 + 28 * s * a, head: 3 * s, torso: 1.5 * s }, 0, 0) : pose({ uarmR: -140, farmR: -35 + 32 * s * a, head: -4, torso: -2 }, 0, 0)); }
       return mk('Saluta', 1.2, true);
     }
     case 'celebrate': {

@@ -117,6 +117,12 @@ export function PaperStep({ store, puppet, projectId, go }: StepProps) {
           <button className={ed.btn} onClick={() => setLocal((l) => { const a = { ...l.adjust }; delete a[sel]; return { ...l, adjust: a }; })}>Azzera «{labelOf(sel)}»</button>
         </div>
         <div className={ed.section}>
+          <h4>Giunture morbide</h4>
+          <label className={ed.help}>Morbidezza: {Math.round((local.soft ?? 0.5) * 100)}%</label>
+          <input type="range" min={0} max={1} step={0.05} value={local.soft ?? 0.5} onChange={(e) => setLocal((l) => ({ ...l, soft: Number(e.target.value) }))} aria-label="Morbidezza delle giunture" data-testid="paper-soft" />
+          <span className={ed.help}>Vicino a ogni snodo il pezzo segue in parte anche il pezzo a cui è attaccato: spalle, gomiti e ginocchia si piegano senza «strappi». 0 = pezzi rigidi.</span>
+        </div>
+        <div className={ed.section}>
           <h4>Arti lontani</h4>
           <label className={ed.help}>Oscuramento: {Math.round(local.farShade * 100)}%</label>
           <input type="range" min={0} max={0.7} step={0.02} value={local.farShade} onChange={(e) => setLocal((l) => ({ ...l, farShade: Number(e.target.value) }))} aria-label="Oscuramento degli arti lontani" />

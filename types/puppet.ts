@@ -175,7 +175,7 @@ export interface Attachment {
 
 /** Paper puppet: hand corrections of the automatic assembly. Keys are piece ids (head, torso, pelvis, uarm, farm, hand, thigh, shin, foot, accA, accB). */
 export interface PaperAdjust { dx: number; dy: number; /** > 0 draws the piece in front of its default place, < 0 behind */ z: number }
-export interface PaperSetup { sheetAssetId: string; adjust: Record<string, PaperAdjust>; farShade: number }
+export interface PaperSetup { sheetAssetId: string; adjust: Record<string, PaperAdjust>; farShade: number; /** 0 = rigid pieces, 1 = very soft joints (pieces follow their parent near the joint). Default 0.5. */ soft?: number }
 
 export interface Puppet {
   id: string;
