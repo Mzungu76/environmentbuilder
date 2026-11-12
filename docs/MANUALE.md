@@ -67,6 +67,7 @@ Lo strumento **Primo piano** dipinge direttamente sullo sfondo le parti che nasc
 - Ogni tratto è un passo di annullamento (`Ctrl+Z`).
 - Oltre al pennello ci sono **Rettangolo** e **Ellisse** (trascina da un angolo all’opposto), **Poligono** e **Spline** (tocca per mettere i punti; tocca il primo punto, premi `Invio` o «Chiudi forma» per finire; la spline è una curva chiusa che passa per i punti). **Aggiungi / Sottrai** vale per tutti: una forma «sottrai» fa un buco in ciò che hai aggiunto prima.
 - **Modifica**: tocca una forma per selezionarla; trascina i suoi punti (o gli angoli) o la forma intera; doppio tocco su un lato aggiunge un punto, su un punto lo toglie; **Elimina forma** (o `Canc`) la rimuove. Ogni gesto è un passo di annullamento. I tratti di pennello e gomma non si modificano uno per uno: si annullano o si coprono con «Sottrai».
+- Le parti dipinte restano visibili in **rosso tenue** nell’editor anche quando esci dallo strumento (spariscono nel Playtest e con l’anteprima senza strumenti, dove vedi solo l’effetto: il personaggio nascosto).
 - Per ora il personaggio passa **sempre dietro** le parti dipinte. La regola davanti/dietro in base alla profondità arriva nel passo successivo.
 - Nel pacchetto per il gioco ogni parte viaggia come immagine (`assets/occluder-….png`) da disegnare sopra i personaggi, e in `scenario.json` sotto `occluders`.
 

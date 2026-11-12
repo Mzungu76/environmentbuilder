@@ -209,6 +209,8 @@ export class SceneView {
   setEnvironmentSize(w: number, h: number, refit: boolean) {
     const changed = w !== this.envW || h !== this.envH;
     this.envW = Math.max(1, w); this.envH = Math.max(1, h);
+    // overlays created before the size was known (a project that has just been opened) must follow it
+    for (const s of [this.occTintSprite, this.zoneSprite]) if (s) { s.width = this.envW; s.height = this.envH; }
     if (changed || refit) { this.fit(); }
     this.dirty = true;
   }

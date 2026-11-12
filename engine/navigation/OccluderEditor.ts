@@ -30,6 +30,9 @@ export class OccluderEditor {
   private version = 0;
   private cache = new Map<string, { ops: unknown; soft: number; v: number; alpha: Uint8Array | null; empty: boolean }>();
   private liveTimer: ReturnType<typeof setTimeout> | null = null;
+  private tintSig = '';
+  private opsIds = new WeakMap<object, number>();
+  private opsKey(ops: object) { let k = this.opsIds.get(ops); if (!k) { k = ++this.version; this.opsIds.set(ops, k); } return k; }
   private unsub: () => void;
   private shown = false;
 
@@ -101,18 +104,28 @@ export class OccluderEditor {
     this.setGuides();
   }
 
+  /**
+   * Tint over the occluders. Strong while the Primo piano tool is in use; faint in the editor otherwise, so the painted parts never
+   * look lost (the cut-out itself is the backdrop again, invisible by design). Hidden in playtest and in the clean preview.
+   */
   private drawTint() {
-    if (!this.active()) { this.view.setOccluderTint(null); if (this.shown) { this.shown = false; this.view.setBrush(0, 0, 0, null); } return; }
-    this.shown = true;
+    const st = this.store.getState(), act = this.active();
+    if (!act && this.shown) { this.shown = false; this.view.setBrush(0, 0, 0, null); }
+    if (st.mode !== 'editor' || st.preview || !(this.store.env.occluders?.length)) { this.view.setOccluderTint(null); this.tintSig = ''; return; }
+    if (act) this.shown = true;
     const env = this.store.env;
     if (!env.width || !env.height) return;
-    const { w, h } = occGrid(env), sel = this.brush().occluderId;
+    const { w, h } = occGrid(env), sel = act ? this.brush().occluderId : null;
+    const live = this.preview ? ++this.version : 0;
+    const sig = `${act ? 'a' : 'p'}|${sel}|${live}|${(env.occluders ?? []).map((o) => `${o.id}:${this.opsKey(o.ops)}:${o.color}`).join(',')}`;
+    if (!live && sig === this.tintSig && this.canvas) { this.view.setOccluderTint(this.canvas); return; }
+    this.tintSig = sig;
     if (!this.canvas) this.canvas = document.createElement('canvas');
     if (this.canvas.width !== w || this.canvas.height !== h) { this.canvas.width = w; this.canvas.height = h; }
     const ctx = this.canvas.getContext('2d')!, img = ctx.createImageData(w, h);
     for (const o of env.occluders ?? []) {
       const cov = this.coverage(o);
-      const r = parseInt(o.color.slice(1, 3), 16), g = parseInt(o.color.slice(3, 5), 16), b = parseInt(o.color.slice(5, 7), 16), k = o.id === sel ? 0.5 : 0.28;
+      const r = parseInt(o.color.slice(1, 3), 16), g = parseInt(o.color.slice(3, 5), 16), b = parseInt(o.color.slice(5, 7), 16), k = act ? (o.id === sel ? 0.5 : 0.28) : 0.2;
       for (let i = 0; i < w * h; i++) {
         const a = (cov[i] / 255) * k; if (a <= 0) continue;
         const p = i * 4, oa = img.data[p + 3] / 255, na = a + oa * (1 - a);
