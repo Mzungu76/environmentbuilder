@@ -3,7 +3,10 @@ import { duplicateEnvironment, uniqueName } from '@/lib/serialization/clone';
 import { createEnvironment } from '@/lib/serialization/factory';
 import { saveProject } from '@/lib/persistence/db';
 
-export type ToolId = 'select' | 'pan' | 'node' | 'connect' | 'path' | 'character' | 'object';
+export type ToolId = 'select' | 'pan' | 'node' | 'connect' | 'path' | 'character' | 'object' | 'zones';
+
+/** Brush of the scale-zones tool. */
+export interface ZoneBrush { zoneId: string | null; /** fraction of the image height */ radius: number; mode: 'paint' | 'erase' }
 export type EditorMode = 'editor' | 'playtest';
 export type Selection = { kind: 'node' | 'edge' | 'character' | 'object'; id: string } | null;
 export type SaveStatus = 'saved' | 'dirty' | 'saving' | 'error';
@@ -11,6 +14,7 @@ export type SaveStatus = 'saved' | 'dirty' | 'saving' | 'error';
 export interface EditorState {
   project: Project;
   tool: ToolId;
+  zoneBrush: ZoneBrush;
   selection: Selection;
   preview: boolean;
   mode: EditorMode;
@@ -45,7 +49,7 @@ export class EditorStore {
 
   constructor(project: Project) {
     this.state = {
-      project, tool: 'select', selection: null, preview: false, mode: 'editor', objectType: 'generic', showPaths: false,
+      project, tool: 'select', zoneBrush: { zoneId: null, radius: 0.04, mode: 'paint' }, selection: null, preview: false, mode: 'editor', objectType: 'generic', showPaths: false,
       saveStatus: 'saved', saveError: null, canUndo: false, canRedo: false, revision: 0,
     };
   }
@@ -64,6 +68,7 @@ export class EditorStore {
 
   // --- UI state ---------------------------------------------------------------------------
   setTool(tool: ToolId) { this.set({ tool }); }
+  setZoneBrush(patch: Partial<ZoneBrush>) { this.set({ zoneBrush: { ...this.state.zoneBrush, ...patch } }); }
   setSelection(selection: Selection) { this.set({ selection }); }
   setPreview(preview: boolean) { this.set({ preview }); }
   setObjectType(objectType: ObjectType) { this.set({ objectType }); }

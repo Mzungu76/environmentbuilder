@@ -1,4 +1,5 @@
 import type { Environment, NavigationNode } from '@/types';
+import { zonesScale } from './scaleZones';
 
 /**
  * Perspective: where the scene recedes into the depth the character must get smaller.
@@ -13,13 +14,29 @@ export const baseScale = (env: Pick<Environment, 'perspective'>, y: number): num
   return p.topScale + (p.bottomScale - p.topScale) * t;
 };
 
-export function nodeScale(env: Pick<Environment, 'perspective'>, n: Pick<NavigationNode, 'y' | 'props'> | undefined): number {
+type Persp = Pick<Environment, 'perspective'> & Partial<Pick<Environment, 'scaleZones' | 'width' | 'height'>>;
+
+/** Scale at a normalized position: automatic perspective by height, refined by the painted zones. */
+export const scaleAt = (env: Persp, x: number, y: number): number => zonesScale(env, x, y, baseScale(env, y));
+
+const explicit = (n: Pick<NavigationNode, 'props'> | undefined): number | null => {
+  const v = Number.parseFloat(n?.props?.scale ?? '');
+  return Number.isFinite(v) && v > 0 ? v : null;
+};
+
+/** A node's scale: the value set on the node, otherwise whatever the scene gives at its position. */
+export function nodeScale(env: Persp, n: Pick<NavigationNode, 'x' | 'y' | 'props'> | undefined): number {
   if (!n) return 1;
-  const v = Number.parseFloat(n.props?.scale ?? '');
-  return Number.isFinite(v) && v > 0 ? v : baseScale(env, n.y);
+  return explicit(n) ?? scaleAt(env, n.x, n.y);
 }
 
-export const scaleAlong = (env: Pick<Environment, 'perspective'>, a: NavigationNode | undefined, b: NavigationNode | undefined, u: number): number => {
-  const sa = nodeScale(env, a), sb = nodeScale(env, b), t = Math.min(1, Math.max(0, u));
+/**
+ * Scale along a path: between two nodes with their own scale it blends them; otherwise it follows the scene at the actual position
+ * (`pos`, normalized), so a path that crosses a painted zone shrinks exactly where the zone is.
+ */
+export const scaleAlong = (env: Persp, a: NavigationNode | undefined, b: NavigationNode | undefined, u: number, pos?: { x: number; y: number }): number => {
+  const ea = explicit(a), eb = explicit(b), t = Math.min(1, Math.max(0, u));
+  if (ea === null && eb === null && pos) return scaleAt(env, pos.x, pos.y);
+  const sa = nodeScale(env, a), sb = nodeScale(env, b);
   return sa + (sb - sa) * t;
 };

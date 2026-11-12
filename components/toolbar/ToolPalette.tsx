@@ -11,6 +11,7 @@ export const TOOLS: { id: ToolId; label: string; key: string; icon: keyof typeof
   { id: 'connect', label: 'Collega nodi', key: 'C', icon: 'connect', hint: 'Clicca un nodo e poi un altro per collegarli. Esc per annullare.' },
   { id: 'path', label: 'Disegna percorso', key: 'P', icon: 'path', hint: 'Clicca per aggiungere nodi collegati in sequenza. Doppio click o Esc per terminare.' },
   { id: 'object', label: 'Oggetto', key: 'I', icon: 'object', hint: 'Scegli il tipo in alto e clicca sulla scena per inserire un oggetto. Ingressi e uscite si agganciano al nodo più vicino.' },
+  { id: 'zones', label: 'Zone di scala', key: 'Z', icon: 'zones', hint: 'Dipingi sul fondale le zone dove il personaggio si rimpicciolisce; la percentuale si cambia anche dopo.' },
   { id: 'character', label: 'Personaggio', key: 'K', icon: 'character', hint: 'Clicca un nodo per posizionarvi il personaggio selezionato (o crearne uno nuovo).' },
 ];
 
@@ -19,7 +20,7 @@ export function ToolPalette({ tool, onTool, onLayers }: { tool: ToolId; onTool: 
     <nav className={styles.tools} aria-label="Strumenti">
       {TOOLS.map((t, i) => (
         <span key={t.id} style={{ display: 'contents' }}>
-          {(i === 2 || i === 5) && <span className={styles.toolGap} />}
+          {(i === 2 || i === 5 || i === 7) && <span className={styles.toolGap} />}
           <button className={styles.tool} aria-pressed={tool === t.id} aria-label={`${t.label} (${t.key})`} onClick={() => onTool(t.id)} data-testid={`tool-${t.id}`}>
             {Icon[t.icon]}
             <span className={styles.toolHint} role="tooltip">{t.label} <kbd>{t.key}</kbd></span>

@@ -2,6 +2,7 @@ import type { EditorStore } from '@/lib/store/editorStore';
 import type { PlaytestMarkers, SceneView, ViewPointerEvent } from '@/engine/rendering/SceneView';
 import { NavigationEditor } from '@/engine/navigation/NavigationEditor';
 import { ObjectEditor } from '@/engine/interaction/ObjectEditor';
+import { ZoneEditor } from '@/engine/navigation/ZoneEditor';
 
 /**
  * Routes pointer input to the right editor module (objects first, then navigation) and exposes the
@@ -10,10 +11,12 @@ import { ObjectEditor } from '@/engine/interaction/ObjectEditor';
 export class SceneController {
   readonly nav: NavigationEditor;
   readonly objects: ObjectEditor;
+  readonly zones: ZoneEditor;
 
   constructor(private store: EditorStore, private view: SceneView) {
     this.nav = new NavigationEditor(store, view);
     this.objects = new ObjectEditor(store, view);
+    this.zones = new ZoneEditor(store, view);
     this.attach();
   }
 
@@ -23,6 +26,7 @@ export class SceneController {
   private route(e: ViewPointerEvent) {
     const s = this.store.getState();
     if (s.mode === 'playtest' || s.preview) return;
+    if (this.zones.handle(e)) return;
     if (this.objects.handle(e)) { this.nav.refresh(); return; }
     this.nav.handle(e);
   }
@@ -36,5 +40,5 @@ export class SceneController {
     if (this.store.getState().selection?.kind === 'object') this.objects.deleteSelected(); else this.nav.deleteSelection();
     this.nav.refresh();
   }
-  dispose() { this.nav.dispose(); }
+  dispose() { this.zones.dispose(); this.nav.dispose(); }
 }

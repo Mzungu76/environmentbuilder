@@ -15,6 +15,7 @@ export function PlaytestPanel({ store, env, ctrl, showPaths, open }: { store: Ed
   const v = useSyncExternalStore(ctrl.subscribe, ctrl.getView, ctrl.getView);
   const [diag, setDiag] = useState(true);
   const [dest, setDest] = useState('');
+  const [place, setPlace] = useState('');
   const chars = ctrl.listCharacters().filter((c) => v.snapshots[c.id]);
   const visitor = !!v.activeId && ctrl.isVisitor(v.activeId);
   const c = chars.find((x) => x.id === v.activeId);
@@ -96,6 +97,19 @@ export function PlaytestPanel({ store, env, ctrl, showPaths, open }: { store: Ed
                     <button className={styles.btn} onClick={() => ctrl.haltActive()}>{Icon.stop}Ferma il personaggio</button>
                   </>
                 ) : <span className={styles.help}>Sceglie da solo destinazioni raggiungibili, fa soste e può invertire la marcia.</span>}
+                <div style={{ display: 'grid', gap: 4, borderTop: '1px solid var(--border)', paddingTop: 6 }} data-testid="pt-place">
+                  <h4 style={{ margin: 0 }}>Posiziona subito</h4>
+                  <span className={styles.help}>Mette il personaggio su un nodo senza farlo camminare. Anche con <kbd>Maiusc</kbd> + clic su un nodo.</span>
+                  <div className={styles.row2} style={{ gridTemplateColumns: '1fr auto' }}>
+                    <select className={styles.select} aria-label="Nodo dove posizionare" value={place} onChange={(e) => setPlace(e.target.value)} data-testid="pt-place-node">
+                      <option value="">Nodo…</option>
+                      {nodes.map((n) => <option key={n.id} value={n.id}>{n.name}</option>)}
+                    </select>
+                    <button className={styles.btn} disabled={!place} onClick={() => ctrl.teleport(place)} data-testid="pt-place-go">Metti qui</button>
+                  </div>
+                  <CheckField id="pt-placemode" label="Un clic su un nodo posiziona (non cammina)" checked={v.placeMode} onChange={(on) => ctrl.setPlaceMode(on)} />
+                  <button className={styles.btn} onClick={() => ctrl.setStartHere()} disabled={!snap?.nodeId} data-testid="pt-start-here">Usa questo nodo come partenza</button>
+                </div>
               </>
             )}
           </div>

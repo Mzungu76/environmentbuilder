@@ -10,6 +10,7 @@ export const Icon = {
   node: <S><circle cx="12" cy="12" r="4" /><path d="M12 3v3M12 18v3M3 12h3M18 12h3" /></S>,
   connect: <S><circle cx="5" cy="18" r="2.5" /><circle cx="19" cy="6" r="2.5" /><path d="M7 16.5L17 7.5" /></S>,
   path: <S><circle cx="5" cy="18" r="2" /><circle cx="12" cy="9" r="2" /><circle cx="20" cy="15" r="2" /><path d="M6.5 16.5l4-6M13.8 10l4.8 3.6" /></S>,
+  zones: <S><path d="M4 20c0-3 2-4 4-4s3 1 3 3-1 3-4 3z" /><path d="M10 17L20 4l-2-1-9 12" /></S>,
   undo: <S><path d="M9 14L4 9l5-5" /><path d="M4 9h10a6 6 0 010 12h-3" /></S>,
   redo: <S><path d="M15 14l5-5-5-5" /><path d="M20 9H10a6 6 0 000 12h3" /></S>,
   save: <S><path d="M5 3h11l3 3v15H5z" /><path d="M8 3v6h7V3M8 21v-7h8v7" /></S>,

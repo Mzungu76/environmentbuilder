@@ -30,6 +30,12 @@ export type BuiltinProfileId = 'cave' | 'forest' | 'building' | 'ship' | 'indust
 /** Built-in id or the id of a user-defined profile stored in the project (`Project.customProfiles`). */
 export type ProfileId = BuiltinProfileId | (string & {});
 
+/**
+ * A painted area of the backdrop where characters are shown at a different size (perspective by zones). `mask` is a coverage grid
+ * (one byte per cell, base64) with the grid size of the environment (`scaleGrid`); soft brush edges blend smoothly into the neighbours.
+ */
+export interface ScaleZone { id: string; name: string; /** 1 = normal size, 0.4 = 40% */ scale: number; color: string; mask: string }
+
 /** Coarse colour map of the background (RGB bytes, base64): the light the character walks through. */
 export interface LightMapData { w: number; h: number; data: string }
 
@@ -100,7 +106,9 @@ export interface Environment {
   gameplay?: GameplayConfig;
   /** Characters shrink with distance: scale at the top / bottom of the image (see engine/navigation/perspective). */
   perspective?: { topScale: number; bottomScale: number };
+  /** Size zones painted on the backdrop (they refine / override the automatic perspective). */
+  scaleZones?: ScaleZone[];
   /** Light of the scene reproduced on the characters (see engine/game/light). */
-  lighting?: { enabled: boolean; strength: number };
+  lighting?: { enabled: boolean; strength: number; /** cells across the map (default 256) */ precision?: number };
   lightMap?: LightMapData;
 }

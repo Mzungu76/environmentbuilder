@@ -11,7 +11,7 @@ export interface LightSample { brightness: number; tint: string; tintAmount: num
 const b64 = { enc: (u: Uint8Array) => { let s = ''; for (let i = 0; i < u.length; i += 0x8000) s += String.fromCharCode(...u.subarray(i, i + 0x8000)); return btoa(s); }, dec: (t: string) => { const s = atob(t), u = new Uint8Array(s.length); for (let i = 0; i < s.length; i++) u[i] = s.charCodeAt(i); return u; } };
 
 /** Box-averages `rgba` (w×h) into outW × (outW·h/w) cells, then softens it with a 3×3 blur. */
-export function buildLightMap(rgba: ArrayLike<number>, w: number, h: number, outW = 48): LightMapData {
+export function buildLightMap(rgba: ArrayLike<number>, w: number, h: number, outW = 256): LightMapData {
   const ow = Math.max(2, Math.min(outW, w)), oh = Math.max(2, Math.round((ow * h) / w));
   const sum = new Float64Array(ow * oh * 3), cnt = new Float64Array(ow * oh);
   for (let y = 0; y < h; y++) {

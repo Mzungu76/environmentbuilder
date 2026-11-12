@@ -28,6 +28,8 @@ export interface PlaytestView {
   available: { objectId: string; interactionId: string; label: string; objectName: string }[];
   version: number;
   /** Game rules in action: items found so far and how hard the cave is shaking (never the remaining time). */
+  /** Clicking a node places the character there instead of making it walk. */
+  placeMode: boolean;
   game: { points: number; counts: Record<string, number>; collapse: { enabled: boolean; intensity: number; collapsed: boolean } };
 }
 
@@ -74,6 +76,7 @@ export class PlaytestController {
   private collapseView = { enabled: false, intensity: 0, collapsed: false };
   private timers: { at: number; fn: () => void }[] = [];
   private clock = 0;
+  private placeMode = false;
 
   constructor(private store: EditorStore, private view: SceneView, private editor: SceneController, private opts: PlaytestOptions = {}) {
     this.env = store.env;
@@ -104,7 +107,7 @@ export class PlaytestController {
     for (const [id, a] of this.agents) snapshots[id] = a.snapshot();
     const act = this.active, sn = act?.snapshot();
     const available = act && sn?.nodeId && !sn.acting ? availableInteractions(this.env, sn.nodeId, act.config.abilities, this.runtime, 'manual').map((a) => ({ objectId: a.object.id, interactionId: a.interaction.id, label: a.interaction.label, objectName: a.object.name })) : [];
-    return { status: this.status, activeId: this.activeId, message: this.message, snapshots, inventory: { ...this.runtime.inventory }, events: this.runtime.events.slice(-12), available, game: { ...this.gameScore, counts: { ...this.gameScore.counts }, collapse: { ...this.collapseView } }, version: (this.viewState?.version ?? 0) + 1 };
+    return { status: this.status, activeId: this.activeId, message: this.message, snapshots, inventory: { ...this.runtime.inventory }, events: this.runtime.events.slice(-12), available, placeMode: this.placeMode, game: { ...this.gameScore, counts: { ...this.gameScore.counts }, collapse: { ...this.collapseView } }, version: (this.viewState?.version ?? 0) + 1 };
   }
 
   dispose() {
@@ -211,6 +214,24 @@ export class PlaytestController {
     if (r.ok) { this.say(`Destinazione: ${name}`, 'info'); if (this.status !== 'playing') this.status = 'playing'; }
     else this.say(`“${name}” non è raggiungibile seguendo i collegamenti consentiti.`, 'error');
     this.updateMarkers(); this.publish();
+  }
+  /** Puts the active character on a node at once (no walking). */
+  teleport(nodeId: string) {
+    const a = this.active;
+    if (!a) return;
+    const name = this.env.navigation.nodes.find((n) => n.id === nodeId)?.name ?? nodeId;
+    if (!a.teleport(nodeId)) { this.say('Nodo non trovato.', 'error'); return; }
+    this.lastSeq.set(a.config.id, a.arrivalSeq);       // not an arrival: nothing triggers
+    this.say(`${a.config.name} posizionato su ${name}`, 'info');
+    this.updateMarkers(); this.pushRender(); this.publish();
+  }
+  setPlaceMode(on: boolean) { this.placeMode = on; this.hoverId = null; this.updateMarkers(); this.publish(); }
+  /** Makes the node the active character stands on its start node (Reset / Stop return there). */
+  setStartHere() {
+    const a = this.active, node = a?.snapshot().nodeId;
+    if (!a || !node) { this.say('Il personaggio deve essere fermo su un nodo.', 'error'); return; }
+    this.store.commitEnv((e) => ({ ...e, characters: e.characters.map((c) => (c.id === a.config.id ? { ...c, startNodeId: node } : c)) }));
+    this.say('Nodo di partenza aggiornato.', 'info');
   }
   haltActive() { this.active?.halt(); this.updateMarkers(); this.publish(); }
 
@@ -320,7 +341,7 @@ export class PlaytestController {
     const s = a?.snapshot();
     this.editor.markers = {
       nodeIds: manual ? this.env.navigation.nodes.map((n) => n.id) : [],
-      hoverId: manual ? this.hoverId : null, targetId: s?.destinationId ?? null, routeEdgeIds: s?.routeEdgeIds ?? [],
+      hoverId: manual || this.placeMode ? this.hoverId : null, targetId: s?.destinationId ?? null, routeEdgeIds: s?.routeEdgeIds ?? [],
     };
     this.editor.refresh();
   }
@@ -336,16 +357,16 @@ export class PlaytestController {
   }
 
   private onPointer(e: ViewPointerEvent) {
-    const manual = this.active?.config.behavior.mode === 'manual';
+    const manual = this.active?.config.behavior.mode === 'manual', pick = manual || this.placeMode;
     const tol = e.pointerType === 'mouse' ? 16 : 30;
     if (e.type === 'move') {
       if (this.pan) { this.view.panBy(e.screen.x - this.pan.x, e.screen.y - this.pan.y); this.pan = { x: e.screen.x, y: e.screen.y }; return; }
-      const h = manual ? this.nodeAt(e.pos, tol) : null;
+      const h = pick || e.shift ? this.nodeAt(e.pos, tol) : null;
       if (h !== this.hoverId) { this.hoverId = h; this.updateMarkers(); }
       this.view.setCursor(h ? 'pointer' : 'default');
     } else if (e.type === 'down' || e.type === 'dblclick') {
-      const h = manual ? this.nodeAt(e.pos, tol) : null;
-      if (h) this.goTo(h); else this.pan = { x: e.screen.x, y: e.screen.y };
+      const h = pick || e.shift ? this.nodeAt(e.pos, tol) : null;
+      if (h) { if (this.placeMode || e.shift) this.teleport(h); else this.goTo(h); } else this.pan = { x: e.screen.x, y: e.screen.y };
     } else { this.pan = null; }
   }
 }

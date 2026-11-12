@@ -102,6 +102,9 @@ const HANDLE_COLOR = 0xfde047;
 export class SceneView {
   private app!: Application;
   private world = new Container();
+  private zoneSprite: Sprite | null = null;
+  private zoneTex: Texture | null = null;
+  private brushGfx = new Graphics();
   private bgRoot = new Container();   // background + midground
   private objRoot = new Container();  // object images (below characters)
   private fgRoot = new Container();   // foreground (above characters)
@@ -158,7 +161,7 @@ export class SceneView {
     host.appendChild(app.canvas);
     app.canvas.style.touchAction = 'none';
     app.canvas.style.display = 'block';
-    this.world.addChild(this.bgRoot, this.objRoot, this.charRoot, this.charGfx, this.fgRoot, this.overlay);
+    this.world.addChild(this.bgRoot, this.objRoot, this.charRoot, this.charGfx, this.fgRoot, this.overlay, this.brushGfx);
     app.stage.addChild(this.world);
     app.ticker.add((t) => {
       this.onTick(Math.min(0.1, t.deltaMS / 1000));
@@ -304,6 +307,22 @@ export class SceneView {
     this.onCamera(z); this.dirty = true;
   }
   zoomCenter(factor: number) { this.zoomAt(factor, this.vw / 2, this.vh / 2); }
+  /** Shows the painted scale zones as a translucent layer (editor, zones tool). Pass null to hide it. */
+  setZoneCanvas(canvas: HTMLCanvasElement | null) {
+    if (!canvas) { if (this.zoneSprite) this.zoneSprite.visible = false; return; }
+    if (!this.zoneSprite || !this.zoneTex || this.zoneTex.source.resource !== canvas) {
+      this.zoneSprite?.destroy(); this.zoneTex?.destroy(true);
+      this.zoneTex = Texture.from(canvas); this.zoneSprite = new Sprite(this.zoneTex);
+      this.world.addChildAt(this.zoneSprite, this.world.getChildIndex(this.overlay));
+    } else this.zoneTex.source.update();
+    this.zoneSprite.width = this.envW; this.zoneSprite.height = this.envH; this.zoneSprite.visible = true;
+  }
+  /** Brush ring in the scene (normalized centre, radius as a fraction of the image height). */
+  setBrush(x: number, y: number, r: number, mode: 'paint' | 'erase' | null) {
+    const g = this.brushGfx; g.clear();
+    if (!mode) return;
+    g.circle(x * this.envW, y * this.envH, r * this.envH).stroke({ width: 2 / this.zoom, color: mode === 'paint' ? 0xffffff : 0xff6b6b, alpha: 0.95 });
+  }
   /** Camera shake (environment px): the whole scene moves by the opposite offset, without touching pan/zoom. */
   setShake(x: number, y: number) { this.world.pivot.set(x, y); }
   panBy(dx: number, dy: number) { this.world.position.set(this.world.x + dx, this.world.y + dy); }

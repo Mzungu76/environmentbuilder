@@ -4,6 +4,7 @@ import type { Environment } from '@/types';
 import type { EditorStore } from '@/lib/store/editorStore';
 import { CheckField, NumberField } from './fields';
 import { LightControls } from './LightControls';
+import { ZonesPanel } from './ZonesPanel';
 import styles from '../editor/editor.module.css';
 
 /** How the scene affects the characters: perspective (they shrink in the depth) and light (they take the light of the zone they walk through). */
@@ -23,6 +24,7 @@ export function ScenePanel({ store, env }: { store: EditorStore; env: Environmen
           <span className={styles.help}>Scala automatica in base all’altezza dove si trova il personaggio. Dove non basta (un tunnel che si stringe, una scala verso il fondo) imposta la scala di ogni nodo: ha la precedenza e nei percorsi passa gradualmente da un nodo all’altro. Con la distanza anche i passi si accorciano.</span>
         </>
       )}
+      <ZonesPanel store={store} env={env} />
       <LightControls store={store} env={env} />
     </div>
   );

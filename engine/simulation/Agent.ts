@@ -109,8 +109,8 @@ export class Agent {
   /** Perspective scale at the current position: along a path it blends the scales of its two nodes. */
   private scaleNow(): number {
     const nav = this.env.navigation;
-    if (this.track) return scaleAlong(this.env, nav.nodes.find((n) => n.id === this.track!.from), nav.nodes.find((n) => n.id === this.track!.to), this.track.length > 0 ? this.s / this.track.length : 0);
-    return nodeScale(this.env, nav.nodes.find((n) => n.id === this.nodeId) ?? { y: this.pos.y, props: {} });
+    if (this.track) { const p = pointAt(this.track, this.s); return scaleAlong(this.env, nav.nodes.find((n) => n.id === this.track!.from), nav.nodes.find((n) => n.id === this.track!.to), this.track.length > 0 ? this.s / this.track.length : 0, { x: p.x / this.env.width, y: p.y / this.env.height }); }
+    return nodeScale(this.env, nav.nodes.find((n) => n.id === this.nodeId) ?? { x: this.pos.x, y: this.pos.y, props: {} });
   }
   /** Far away = smaller steps in the picture: the speed follows the scale. */
   private pxSpeed() { return this.config.speed * this.env.height * this.scaleNow(); }
@@ -145,6 +145,16 @@ export class Agent {
     else this.route = fwd!.steps;
     this.destination = target; this.pause = 0; this.moving = true;
     return { ok: true };
+  }
+
+  /** Puts the character on a node right now (no walking): clears the route, any action in progress and the pause. */
+  teleport(nodeId: string): boolean {
+    const node = this.env.navigation.nodes.find((n) => n.id === nodeId);
+    if (!node) return false;
+    this.nodeId = nodeId; this.lastNodeId = null; this.track = null; this.s = 0; this.route = []; this.destination = null; this.moving = false;
+    this.pause = 0; this.actions = []; this.actionLeft = 0; this.speedPx = 0; this.lift = 0; this.pos = { x: node.x, y: node.y }; this.arrivalFinal = false;
+    this.setState('IDLE');
+    return true;
   }
 
   /** Stops moving right where the character is (it may stand in the middle of a path). */
