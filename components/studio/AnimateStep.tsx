@@ -19,7 +19,7 @@ import { renderPuppet } from './draw';
 import { ed, st, boneLabel, Slider, useAssetImage, useView, ViewTabs, type StepProps } from './shared';
 import { CheckField, NumberField, TextField } from '../inspector/fields';
 
-const STATES: CharacterState[] = ['IDLE', 'WALK', 'CLIMB', 'INTERACT', 'COLLECT', 'JUMP', 'FALL', 'CUSTOM'];
+const STATES: CharacterState[] = ['IDLE', 'WALK', 'CLIMB', 'INTERACT', 'COLLECT', 'JUMP', 'FALL', 'CELEBRATE', 'CUSTOM'];
 const KINDS = Object.keys(PRESET_LABEL) as PresetKind[];
 
 /** Step 6 — clips made of keyframes: start from a preset, then drag the bones (a key is created where you drag). */

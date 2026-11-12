@@ -10,6 +10,9 @@ import { Agent, type AgentSnapshot } from './Agent';
 import { exitNodeIds, resolveExit } from '@/engine/interaction/objects';
 import { availableInteractions, createRuntimeState, performInteraction, resetRuntimeState, type Available, type GameEvent, type RuntimeState } from '@/engine/interaction/system';
 import { emitHostEvent } from '@/lib/integration/hostBridge';
+import { CollapseTimer } from '@/engine/game/collapse';
+import { defaultGameplay } from '@/engine/game/defaults';
+import { createRng } from './rng';
 
 export type PlayStatus = 'stopped' | 'playing' | 'paused';
 
@@ -23,6 +26,8 @@ export interface PlaytestView {
   /** Manual interactions the active character can run where it stands. */
   available: { objectId: string; interactionId: string; label: string; objectName: string }[];
   version: number;
+  /** Game rules in action: items found so far and how hard the cave is shaking (never the remaining time). */
+  game: { points: number; counts: Record<string, number>; collapse: { enabled: boolean; intensity: number; collapsed: boolean } };
 }
 
 const FIXED_DT = 1 / 60;
@@ -63,11 +68,16 @@ export class PlaytestController {
   private dollPlayers = new Map<string, DollPlayer>();
   private lastRender = performance.now();
   readonly runtime: RuntimeState;
+  private gameScore = { points: 0, counts: {} as Record<string, number> };
+  private collapse: CollapseTimer | null = null;
+  private collapseView = { enabled: false, intensity: 0, collapsed: false };
+  private timers: { at: number; fn: () => void }[] = [];
+  private clock = 0;
 
   constructor(private store: EditorStore, private view: SceneView, private editor: SceneController, private opts: PlaytestOptions = {}) {
     this.env = store.env;
     this.runtime = opts.runtime ?? createRuntimeState();
-    this.rebuild();
+    this.rebuild(); this.resetGame();
     if (opts.message) this.message = { text: opts.message, kind: 'info', at: Date.now() };
     if (opts.autoplay && this.agents.size) this.status = 'playing';
     this.viewState = this.compute();
@@ -93,11 +103,11 @@ export class PlaytestController {
     for (const [id, a] of this.agents) snapshots[id] = a.snapshot();
     const act = this.active, sn = act?.snapshot();
     const available = act && sn?.nodeId && !sn.acting ? availableInteractions(this.env, sn.nodeId, act.config.abilities, this.runtime, 'manual').map((a) => ({ objectId: a.object.id, interactionId: a.interaction.id, label: a.interaction.label, objectName: a.object.name })) : [];
-    return { status: this.status, activeId: this.activeId, message: this.message, snapshots, inventory: { ...this.runtime.inventory }, events: this.runtime.events.slice(-12), available, version: (this.viewState?.version ?? 0) + 1 };
+    return { status: this.status, activeId: this.activeId, message: this.message, snapshots, inventory: { ...this.runtime.inventory }, events: this.runtime.events.slice(-12), available, game: { ...this.gameScore, counts: { ...this.gameScore.counts }, collapse: { ...this.collapseView } }, version: (this.viewState?.version ?? 0) + 1 };
   }
 
   dispose() {
-    this.view.onTick = () => {};
+    this.view.onTick = () => {}; this.view.setShake(0, 0);
     this.view.setCharacters([]);
     this.view.setHiddenObjects(new Set());
     this.editor.markers = null;
@@ -146,10 +156,49 @@ export class PlaytestController {
   /** Reset: back to the initial state (and seed) keeping the current play/pause status. */
   reset() { resetRuntimeState(this.runtime); this.resetAgents(); this.say('Simulazione riportata allo stato iniziale.', 'info'); }
   private resetAgents() {
-    this.rebuild(); this.acc = 0;
+    this.rebuild(); this.acc = 0; this.resetGame();
     for (const a of this.agents.values()) a.reset();
     this.view.setHiddenObjects(this.runtime.collected);
     this.updateMarkers(); this.pushRender(); this.publish();
+  }
+
+  // --- game rules (the same signals the game app receives from the exported scenario) ------------------------------------------
+  private resetGame() {
+    this.gameScore = { points: 0, counts: {} }; this.timers = []; this.clock = 0;
+    const gp = this.env.gameplay, cfg = gp?.collapse;
+    this.collapse = cfg?.enabled ? new CollapseTimer(cfg, createRng(Math.floor(Math.random() * 1e9))) : null;
+    this.collapseView = { enabled: !!cfg?.enabled, intensity: 0, collapsed: false };
+    this.view.setShake(0, 0);
+  }
+
+  private gameStep(dt: number) {
+    this.clock += dt;
+    for (const t of [...this.timers]) if (this.clock >= t.at) { this.timers.splice(this.timers.indexOf(t), 1); t.fn(); }
+    if (!this.collapse) return;
+    const sig = this.collapse.update(dt);
+    this.collapseView = { enabled: true, intensity: sig.intensity, collapsed: sig.collapsed };
+    const amp = 14;
+    this.view.setShake(sig.shake.x * amp, sig.shake.y * amp);
+    for (const f of sig.fired) { this.say(`Fase del crollo: ${f.effect}`, 'info'); emitHostEvent({ t: this.clock, type: 'interaction', character: '', environment: this.env.name, kind: 'collapse-stage', event: f.event || undefined, message: f.effect }); }
+    if (sig.collapsed) { this.status = 'paused'; this.say('La grotta è crollata!', 'error'); this.publish(); }
+  }
+
+  /** Dice came up equal: the active character stops, picks an item up, celebrates and the counter goes up (as the game would do). */
+  triggerCollect(collectibleId?: string) {
+    const a = this.active, gp = { ...defaultGameplay(), ...(this.env.gameplay ?? {}) };
+    if (!a || this.collapseView.collapsed) return;
+    const list = gp.collectibles;
+    const col = list.find((c) => c.id === collectibleId) ?? list[Math.floor(Math.random() * list.length)];
+    if (!col) { this.say('Nessun oggetto da trovare: aggiungine uno nella sezione Gioco.', 'error'); return; }
+    a.queueAction('COLLECT', gp.collectSeconds); a.queueAction('CELEBRATE', gp.celebrateSeconds);
+    this.timers.push({ at: this.clock + gp.collectSeconds * 0.55, fn: () => {
+      this.gameScore.points += col.points; this.gameScore.counts[col.name] = (this.gameScore.counts[col.name] ?? 0) + 1;
+      this.say(`${a.config.name} ha trovato: ${col.name} (+${col.points})`, 'info');
+      emitHostEvent({ t: this.clock, type: 'interaction', character: a.config.name, environment: this.env.name, kind: 'collect', item: col.name, event: 'collect', message: col.name });
+      this.publish();
+    } });
+    if (this.status !== 'playing') this.status = 'playing';
+    this.publish();
   }
 
   /** Manual movement command (also used by the destination list on touch devices). */
@@ -173,7 +222,7 @@ export class PlaytestController {
     if (this.status === 'playing') this.checkExits();
     if (this.status === 'playing') {
       this.acc += dt;
-      while (this.acc >= FIXED_DT) { for (const a of this.agents.values()) a.step(FIXED_DT); this.acc -= FIXED_DT; }
+      while (this.acc >= FIXED_DT) { for (const a of this.agents.values()) a.step(FIXED_DT); this.gameStep(FIXED_DT); this.acc -= FIXED_DT; if (this.collapseView.collapsed) break; }
       this.updateMarkers();
       this.publish(false);
     }

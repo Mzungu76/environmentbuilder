@@ -17,6 +17,7 @@ interface Props {
   onRedo: () => void;
   onExportZip: () => void;
   onExportJson: () => void;
+  onExportGame: () => void;
   onToggleInspector: () => void;
   onMode: (m: 'editor' | 'playtest') => void;
   canPlaytest: boolean;
@@ -72,6 +73,7 @@ export function TopBar(p: Props) {
         {menu && (
           <div className={styles.menu} role="menu">
             <button role="menuitem" onClick={() => { setMenu(false); p.onExportZip(); }} data-testid="export-zip">Esporta pacchetto ZIP<small>project.json + immagini, re-importabile</small></button>
+            <button role="menuitem" onClick={() => { setMenu(false); p.onExportGame(); }} data-testid="export-game">Pacchetto per il gioco<small>scenario + runtime + mini gioco di prova</small></button>
             <button role="menuitem" onClick={() => { setMenu(false); p.onExportJson(); }} data-testid="export-json">Esporta solo JSON<small>configurazione senza immagini</small></button>
           </div>
         )}

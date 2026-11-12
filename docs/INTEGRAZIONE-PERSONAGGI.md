@@ -96,3 +96,49 @@ R.drawDoll(ctx, shapes, { x: feetX, y: feetY, scale: heightPx / R.DOLL_HEIGHT, f
 - Il passo si aggancia alla velocità (`speedPx / heightPx` = altezze al secondo).
 - Da codice: `R.createDoll()`, `R.randomDoll(seed)`, `R.DOLL_PRESETS`; le proprietà di `doll` (proporzioni, colori, parti, accessori, stile, movimento) sono in `types/doll.ts`.
 - Nel progetto (ZIP intero, schema v4) gli omini stanno in `project.dolls` e un personaggio li usa con `dollId`.
+
+---
+
+# Usare uno scenario completo nel gioco (Pacchetto per il gioco)
+
+*Editor → Esporta → «Pacchetto per il gioco»* produce `<ambiente>.scenario.zip`:
+
+```
+project.json              ambiente, grafo di navigazione, oggetti, regole di gioco ("gameplay"), personaggi e puppet usati
+assets/                   immagini
+scenario.json             il contratto (formato, versione, oggetti da trovare, fasi del crollo)
+environment-runtime.mjs   runtime senza dipendenze
+game-example.html         mini gioco completo (doppio click): dadi → oggetto → contatore → crollo
+README.md
+```
+
+Prima di esportare, la sezione **Gioco** dell'editor (Inspector senza selezione) controlla che lo scenario sia «pronto» (nodi collegati, personaggio, oggetti da trovare, animazioni COLLECT / CELEBRATE…).
+
+## Il modello di gioco
+- Il personaggio **vaga da solo** sul grafo (comportamento autonomo del personaggio). Il gioco non gli dà ordini di movimento.
+- Quando i dadi sono uguali il gioco chiama `session.triggerCollect()`: il personaggio si ferma dove si trova, esegue l'animazione di raccolta (stato `COLLECT`), esulta (`CELEBRATE`), poi riprende a vagare. Il **punto si conta a metà raccolta**, quando l'oggetto è in mano.
+- Gli oggetti da trovare (gemme, monete, …) sono definiti per scenario, con punti e frequenza: `scenario.json → collectibles`.
+- **Il crollo** ha la tempistica di una trottola: la durata reale è casuale tra due limiti e **non viene mai esportata né esposta**. Il gioco riceve solo `collapse.intensity` (0–1) e `shake`, che crescono in modo irregolare e sempre più veloce con qualche falso allarme, più gli eventi delle fasi (`stage`) e infine `collapse`.
+
+## API (JavaScript, adatta a PixiJS)
+```js
+import * as R from './environment-runtime.mjs';
+const project = await (await fetch('project.json')).json();
+const session = R.createGameSession(project, { seed: 'partita-1' });      // stesso seed → stessa partita
+
+session.on((e) => { /* e.type: 'collect:start' | 'collect:pick' | 'collect:done' | 'score' | 'stage' | 'collapse' | 'arrival' | 'interaction' */ });
+
+// ogni frame:
+session.update(dt);
+const f = session.frame(dt);
+// f.characters[i] = { id, name, x, y, facing, state, heightPx, lift, puppet }   (x, y in px dell'ambiente)
+//   puppet = { view, positions, over?, attachments? }  → vertici deformati già pronti (vedi sopra per il disegno con PixiJS)
+// f.pickups   = oggetti appena raccolti (per l'animazione verso il contatore)
+// f.collapse  = { intensity, shake: {x, y, angle}, stage, collapsed }
+// f.score     = { points, counts }
+
+session.triggerCollect();                 // oggetto a caso (per peso)
+session.triggerCollect('Gemma');          // per nome o per id
+// risposta: { ok, collectible?, character? }  oppure { ok:false, reason: 'collapsed' | 'no-collectible' | 'no-character' }
+```
+Le richieste fatte durante una raccolta vanno in coda. Dopo `collapse` nessuno si muove più. `game-example.html` è un esempio completo e funzionante da copiare.

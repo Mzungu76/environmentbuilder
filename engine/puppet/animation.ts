@@ -41,7 +41,7 @@ export function phaseRate(clip: Clip, speedInFigureHeights = 0): number {
 // Rotation convention: positive = clockwise on screen. Facing right, a limb hanging down swings FORWARD with negative angles.
 
 export type PresetKind = 'idle' | 'walk' | 'climb' | 'jump' | 'fall' | 'interact' | 'collect' | ExtraKind;
-export const PRESET_STATE: Record<PresetKind, CharacterState> = { idle: 'IDLE', walk: 'WALK', climb: 'CLIMB', jump: 'JUMP', fall: 'FALL', interact: 'INTERACT', collect: 'COLLECT', ...(Object.fromEntries(EXTRA_KINDS.map((k) => [k, 'CUSTOM'])) as Record<ExtraKind, CharacterState>) };
+export const PRESET_STATE: Record<PresetKind, CharacterState> = { idle: 'IDLE', walk: 'WALK', climb: 'CLIMB', jump: 'JUMP', fall: 'FALL', interact: 'INTERACT', collect: 'COLLECT', ...(Object.fromEntries(EXTRA_KINDS.map((k) => [k, 'CUSTOM'])) as Record<ExtraKind, CharacterState>), celebrate: 'CELEBRATE', pickUp: 'COLLECT' };
 export const PRESET_LABEL: Record<PresetKind, string> = { idle: 'Riposo', walk: 'Camminata', climb: 'Arrampicata', jump: 'Salto', fall: 'Caduta', interact: 'Interazione', collect: 'Raccolta', ...EXTRA_LABEL };
 
 const pose = (rot: Partial<Record<BoneId, number>>, dx = 0, dy = 0): Pose => ({ rot, dx, dy });

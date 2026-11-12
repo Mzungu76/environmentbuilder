@@ -60,15 +60,18 @@ export class Agent {
   arrivalSeq = 0;
   arrivalFinal = false;
 
-  constructor(env: Environment, config: Character) {
-    this.env = env; this.config = config;
-    this.rng = createRng(hashString(config.id));
+  private readonly explicitSeed?: string;
+  private get seed() { return this.explicitSeed ?? this.config.id; }
+  /** `seed` makes the autonomous wandering reproducible (defaults to the character id). */
+  constructor(env: Environment, config: Character, seed?: string) {
+    this.env = env; this.config = config; this.explicitSeed = seed;
+    this.rng = createRng(hashString(this.seed));
     this.reset();
   }
 
   /** Back to the start node, RNG re-seeded. */
   reset() {
-    this.rng = createRng(hashString(this.config.id));
+    this.rng = createRng(hashString(this.seed));
     const nav = this.env.navigation;
     const start = nav.nodes.find((n) => n.id === this.config.startNodeId) ?? nav.nodes[0] ?? null;
     this.track = null; this.s = 0; this.moving = false; this.route = []; this.destination = null;

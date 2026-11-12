@@ -9,7 +9,7 @@ import { keyBackground } from '@/engine/puppet/imageProc';
 import { assemble, assembleFrontal, buildPaperMesh, extractPieces, DEFAULT_PAPER, type Pieces } from '@/engine/puppet/paperpuppet';
 import { DEFAULT_MANIKIN } from '@/engine/puppet/manikin';
 import { DEFAULT_WEIGHT_PARAMS } from '@/engine/puppet/mesh';
-import { defaultClips } from '@/engine/puppet/animation';
+import { defaultClips, makePreset } from '@/engine/puppet/animation';
 import { readImageFile } from '@/lib/import-export/image';
 import { putAsset } from '@/lib/persistence/db';
 import { blobToImg, imgToBlob, loadAssetImg, pruneAssets, storePuppetImage, updatePuppet } from './pipeline';
@@ -43,6 +43,12 @@ export async function commitPaper(store: EditorStore, puppetId: string, pieces: 
       manikin: { enabled: true, atlasAssetId: atlas.id, width: built.atlas.width, height: built.atlas.height, mesh: built.mesh, skin: built.skin, params: { ...DEFAULT_MANIKIN } },
       weightParams: old?.weightParams ?? { ...DEFAULT_WEIGHT_PARAMS }, ...(old?.clips?.length ? { clips: old.clips, stateClips: old.stateClips } : defaultClips('side')),
     };
+    // a brand-new view also gets what the game needs: pick up from the ground (COLLECT) and a celebration (CELEBRATE)
+    if (!old?.clips?.length) {
+      const extra = [makePreset('celebrate', kind, 1, view), ...(kind === 'side' ? [makePreset('pickUp', kind, 1, view)] : [])];
+      view.clips = [...view.clips, ...extra];
+      view.stateClips = { ...view.stateClips, CELEBRATE: extra[0].id, ...(kind === 'side' ? { COLLECT: extra[1].id } : {}) };
+    }
     const next = { ...p, assets: [...p.assets, cut, atlas], views: { ...p.views, [kind]: view } };
     if (kind === 'side') return { ...next, paper: setup, idleView: p.views.front ? p.idleView : 'side' };
     return { ...next, paperViews: { ...(p.paperViews ?? {}), [kind]: setup }, idleView: kind === 'front' ? 'front' : p.idleView };

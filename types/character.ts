@@ -1,4 +1,4 @@
-export type CharacterState = 'IDLE' | 'WALK' | 'CLIMB' | 'INTERACT' | 'COLLECT' | 'JUMP' | 'FALL' | 'CUSTOM';
+export type CharacterState = 'IDLE' | 'WALK' | 'CLIMB' | 'INTERACT' | 'COLLECT' | 'JUMP' | 'FALL' | 'CELEBRATE' | 'CUSTOM';
 
 export interface Animation {
   id: string;

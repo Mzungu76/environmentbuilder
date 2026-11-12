@@ -9,6 +9,7 @@ import { migrateProject } from '@/lib/serialization/migrations';
 import { createProject } from '@/lib/serialization/factory';
 import { importBackground } from '@/lib/import-export/background';
 import { downloadBlob, exportProjectJson, exportProjectZip, safeFileName } from '@/lib/import-export/archive';
+import { buildGamePackage } from '@/lib/import-export/gamePackage';
 import { ACCEPTED_IMAGE_TYPES } from '@/lib/import-export/image';
 import { SceneCanvas, type SceneHandle } from '@/components/scene/SceneCanvas';
 import { TopBar } from '@/components/toolbar/TopBar';
@@ -162,6 +163,15 @@ function Editor({ store }: { store: EditorStore }) {
     try { await store.save(); downloadBlob(await exportProjectZip(store.project), `${safeFileName(store.project.name)}.ebproj.zip`); }
     catch (e) { setNotice(`Esportazione non riuscita: ${e instanceof Error ? e.message : e}`); }
   };
+  const onExportGame = async () => {
+    try {
+      await store.save();
+      const { blob, issues } = await buildGamePackage(store.project, store.env.id);
+      downloadBlob(blob, `${safeFileName(store.env.name)}.scenario.zip`);
+      const errs = issues.filter((i) => i.level === 'error');
+      setNotice(errs.length ? `Pacchetto esportato, ma con problemi: ${errs.map((i) => i.text).join(' ')}` : `Pacchetto per il gioco esportato${issues.length ? ` (${issues.length} avvisi nella sezione Gioco)` : ''}.`);
+    } catch (e) { setNotice(`Esportazione non riuscita: ${e instanceof Error ? e.message : e}`); }
+  };
   const onExportJson = () => downloadBlob(exportProjectJson(store.project), `${safeFileName(store.project.name)}.json`);
 
   const hasImage = env.layers.some((l) => l.role === 'background');
@@ -177,7 +187,7 @@ function Editor({ store }: { store: EditorStore }) {
         onProjectName={(n) => store.commitProject((p) => ({ ...p, name: n }))}
         onEnvName={(n) => store.commitEnv((e) => ({ ...e, name: n }))}
         onNew={onNew} onSave={() => void store.save()} onUndo={() => store.undo()} onRedo={() => store.redo()}
-        onExportZip={onExportZip} onExportJson={onExportJson} onToggleInspector={() => setInspectorOpen((o) => !o)}
+        onExportZip={onExportZip} onExportJson={onExportJson} onExportGame={onExportGame} onToggleInspector={() => setInspectorOpen((o) => !o)}
         onMode={(m) => store.setMode(m)} canPlaytest={hasImage}
       />
       <EnvTabs store={store} envs={state.project.environments} activeId={env.id} locked={playtest} />

@@ -14,6 +14,7 @@ import { CheckField, Field, NumberField, PropsField, TextField } from './fields'
 import { CharacterPanel } from './CharacterPanel';
 import { ObjectPanel } from './ObjectPanel';
 import { LayersPanel } from './LayersPanel';
+import { GameplayPanel } from './GameplayPanel';
 import { objectIssues, objectTypeInfo } from '@/engine/interaction/objects';
 import { createCharacter } from '@/engine/characters/factory';
 
@@ -179,6 +180,7 @@ function EnvPanel({ store, env, onFit, onReplaceImage }: { store: EditorStore; e
         <span className={styles.help}>Aggiungili con lo strumento Oggetto (<kbd>I</kbd>).</span>
       </div>
       <ProfilesPanel store={store} env={env} />
+      <GameplayPanel store={store} env={env} />
       <div className={styles.section}>
         <h4>Personaggi ({env.characters.length})</h4>
         <div className={styles.list}>

@@ -13,7 +13,7 @@ import { ed, st, Slider, VIEW_LABEL, type StepProps } from './shared';
 import { CheckField } from '../inspector/fields';
 import { loadAssetImg, imgToCanvas } from '@/lib/studio/pipeline';
 
-const STATES: CharacterState[] = ['IDLE', 'WALK', 'CLIMB', 'INTERACT', 'COLLECT', 'JUMP', 'FALL', 'CUSTOM'];
+const STATES: CharacterState[] = ['IDLE', 'WALK', 'CLIMB', 'INTERACT', 'COLLECT', 'JUMP', 'FALL', 'CELEBRATE', 'CUSTOM'];
 
 /** Step 7 — live preview of every state/view, validation, package export and use in the project's characters. */
 export function ExportStep({ store, puppet, projectId }: StepProps) {

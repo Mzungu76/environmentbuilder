@@ -304,6 +304,8 @@ export class SceneView {
     this.onCamera(z); this.dirty = true;
   }
   zoomCenter(factor: number) { this.zoomAt(factor, this.vw / 2, this.vh / 2); }
+  /** Camera shake (environment px): the whole scene moves by the opposite offset, without touching pan/zoom. */
+  setShake(x: number, y: number) { this.world.pivot.set(x, y); }
   panBy(dx: number, dy: number) { this.world.position.set(this.world.x + dx, this.world.y + dy); }
 
   /** Pixels of environment covered by one screen pixel. */

@@ -30,6 +30,54 @@ export type BuiltinProfileId = 'cave' | 'forest' | 'building' | 'ship' | 'indust
 /** Built-in id or the id of a user-defined profile stored in the project (`Project.customProfiles`). */
 export type ProfileId = BuiltinProfileId | (string & {});
 
+/** Something the character can find (a gem, a coin…): counted by the game, worth points. */
+export interface Collectible {
+  id: string;
+  name: string;
+  points: number;
+  /** Relative probability when the game does not name the item ("a random one"). */
+  weight: number;
+  /** Optional icon / sprite (image asset of the environment). */
+  assetId: string | null;
+  color: string;
+}
+
+/** One step of the collapse: fires when the (hidden) progress of the collapse reaches `at` (0–1). */
+export interface CollapseStage {
+  id: string;
+  at: number;
+  /** Visual / audio cue the game renders: 'tremor' | 'dust' | 'rocks' | 'darken' | 'flash' | 'final' | any custom name. */
+  effect: string;
+  intensity: number;
+  /** Optional event name sent to the game. */
+  event: string;
+}
+
+/**
+ * The environment is about to collapse, but not when: like a spinning top, the end comes after an unpredictable time and the
+ * wobble grows irregularly (with false alarms that subside). The game gets the signals, never the remaining time.
+ */
+export interface CollapseConfig {
+  enabled: boolean;
+  /** The real duration is drawn between these (seconds). */
+  minSeconds: number;
+  maxSeconds: number;
+  /** Strength of the wobble (0–1). */
+  wobble: number;
+  /** Number of early alarms (tremors that die down). */
+  falseAlarms: number;
+  stages: CollapseStage[];
+}
+
+/** What the game does with this environment: items to find, how long the cave holds. */
+export interface GameplayConfig {
+  collectibles: Collectible[];
+  /** Seconds of the "pick up" action and of the celebration that follows. */
+  collectSeconds: number;
+  celebrateSeconds: number;
+  collapse: CollapseConfig;
+}
+
 export interface Environment {
   id: string;
   name: string;
@@ -45,4 +93,6 @@ export interface Environment {
   entrances: Entrance[];
   exits: Exit[];
   characters: Character[];
+  /** Rules of the game for this scenario (optional). */
+  gameplay?: GameplayConfig;
 }
