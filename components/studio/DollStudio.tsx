@@ -81,7 +81,7 @@ export function DollStudio({ store, dolls, selectedId, onSelect }: { store: Edit
         <div className={st.canvasWrap} style={{ display: 'grid', gridTemplateRows: '1fr auto', gap: 8 }}>
           {doll ? <DollPreview doll={doll} state={state} speed={speed} flip={flip} paused={paused} /> : <div className={st.empty}><div><h2 style={{ color: 'var(--text)', margin: '0 0 8px' }}>Omini</h2><p style={{ margin: '0 0 14px' }}>Personaggi procedurali con braccia, gambe, vestiti e accessori che si personalizzano a piacere. Partono da un modello (es. il Minatore) o a caso.</p><button className={`${ed.btn} ${ed.btnPrimary}`} onClick={() => create(DOLL_PRESETS[0].make())} data-testid="new-doll-big">Crea il primo omino</button></div></div>}
           {doll && (
-            <div className={ed.section} style={{ borderRadius: 8, border: '1px solid var(--border)', padding: '8px 12px', gap: 6 }}>
+            <div className={`${ed.section} ${st.dock}`} style={{ borderRadius: 8, border: '1px solid var(--border)', padding: '8px 12px', gap: 6 }}>
               <div className={ed.seg} role="group" aria-label="Stato" style={{ overflowX: 'auto' }}>{STATES.map((s) => <button key={s} aria-pressed={state === s} onClick={() => setState(s)} data-testid={`dstate-${s}`}>{s}</button>)}</div>
               <div className={ed.row2}>
                 <Slider id="d-spd" label="Velocità (altezze/s)" value={speed} min={0} max={2} step={0.05} onChange={setSpeed} fmt={(v) => v.toFixed(2)} />

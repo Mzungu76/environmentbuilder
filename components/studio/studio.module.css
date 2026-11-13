@@ -50,3 +50,30 @@
   .item { min-height: 42px; }
   .step { min-height: 40px; }
 }
+
+.dock { }
+/*
+ * Phone held sideways (little height, plenty of width): the work area and the panel sit side by side and scroll on their own, instead
+ * of the portrait layout (work area pinned on top, panel underneath) which would leave almost no room for either.
+ */
+@media (orientation: landscape) and (max-height: 500px) {
+  .app { padding-left: env(safe-area-inset-left, 0px); padding-right: env(safe-area-inset-right, 0px); --zoom-min: 110px; }
+  .top { flex-wrap: nowrap; gap: 6px; padding: 4px 8px; overflow-x: auto; scrollbar-width: none; }
+  .top > * { flex: none; }
+  .top .hideSm { display: none; }
+  .steps { padding: 3px 8px; }
+  .step { height: 36px; padding: 0 10px; }
+  .main { display: grid; grid-template-columns: minmax(0, 1fr) minmax(250px, 36%); overflow: hidden; min-height: 0; }
+  .stage { position: static; height: auto; padding: 6px 8px; box-shadow: none; z-index: auto; gap: 6px; overflow-y: auto; overscroll-behavior: contain; }
+  .toolbar { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; }
+  .toolbar > * { flex: none; }
+  .toolbar .help { display: none; }
+  .panel { border-left: 1px solid var(--border); border-top: 0; overflow-y: auto; overscroll-behavior: contain; min-height: 0; }
+  .tall { height: auto; }
+  .empty { min-height: 0; padding: 12px; }
+  .keysRow { flex-wrap: nowrap !important; overflow-x: auto; scrollbar-width: none; }
+  .keysRow > * { flex: none; }
+  .timeline { padding: 6px 10px !important; gap: 4px !important; }
+  .dock { padding: 4px 8px !important; gap: 4px !important; }
+  .promptBox { max-height: 110px; }
+}

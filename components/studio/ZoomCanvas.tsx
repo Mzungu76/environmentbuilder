@@ -115,7 +115,7 @@ export function ZoomCanvas({ contentWidth, contentHeight, draw, onPointer, versi
   }, [render]);
 
   return (
-    <div ref={host} style={{ position: 'relative', width: '100%', height: '100%', minHeight: 240, background: '#14161a', borderRadius: 8, overflow: 'hidden', ...style }}>
+    <div ref={host} style={{ position: 'relative', width: '100%', height: '100%', minHeight: 'var(--zoom-min, 240px)', background: '#14161a', borderRadius: 8, overflow: 'hidden', ...style }}>
       <canvas ref={cv} data-testid={testId} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', touchAction: 'none', userSelect: 'none', WebkitUserSelect: 'none', WebkitTouchCallout: 'none', cursor: hand ? 'grab' : cursor ?? 'default' }} />
       {coarse && <button onClick={() => setHand((h) => !h)} aria-pressed={hand} aria-label="Sposta la vista con un dito" title="Sposta la vista con un dito" data-testid="hand-toggle" style={{ position: 'absolute', left: 8, bottom: 8, height: 34, padding: '0 12px', borderRadius: 6, border: `1px solid ${hand ? 'var(--accent)' : 'var(--border)'}`, background: hand ? 'var(--accent-soft)' : 'rgba(23,26,32,.92)', color: 'var(--text)' }}>✋ Sposta</button>}
       <button onClick={fit} aria-label="Adatta alla finestra" title="Adatta alla finestra" style={{ position: 'absolute', right: 8, bottom: 8, height: 30, padding: '0 10px', borderRadius: 6, border: '1px solid var(--border)', background: 'rgba(23,26,32,.92)', color: 'var(--text)' }}>Adatta</button>
