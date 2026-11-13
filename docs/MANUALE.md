@@ -62,10 +62,13 @@ Sfondo (obbligatorio) + piani intermedi (sempre dietro ai personaggi). Per ogni 
 
 Lo strumento **Primo piano** dipinge direttamente sullo sfondo le parti che nascondono il personaggio quando ci passa dietro (rocce, archi, pilastri). Non servono immagini separate: dove dipingi, lo sfondo viene ridisegnato sopra il personaggio.
 
-- **Nuova** crea una parte (ne puoi avere quante vuoi, ognuna con nome e colore). **Pennello** aggiunge, **Gomma** toglie; la dimensione è regolabile.
+- Non devi scegliere nulla prima: **disegna e basta**, la prima parte («Primo piano 1») si crea da sola. **Altra parte** ne aggiunge una separata (ognuna con nome e colore) per oggetti diversi, per esempio «Arco» e «Roccia a sinistra»: servirà per decidere, parte per parte, quando il personaggio passa davanti o dietro. **Pennello** aggiunge, **Gomma** toglie; la dimensione è regolabile.
 - **Bordo** rende il margine più morbido (0 = netto).
 - Ogni tratto è un passo di annullamento (`Ctrl+Z`).
-- Per ora il personaggio passa **sempre dietro** le parti dipinte. Le forme geometriche, le spline e la regola davanti/dietro in base alla profondità arrivano nei passi successivi.
+- Oltre al pennello ci sono **Rettangolo** e **Ellisse** (trascina da un angolo all’opposto), **Poligono** e **Spline** (tocca per mettere i punti; tocca il primo punto, premi `Invio` o «Chiudi forma» per finire; la spline è una curva chiusa che passa per i punti). **Aggiungi / Sottrai** vale per tutti: una forma «sottrai» fa un buco in ciò che hai aggiunto prima.
+- **Modifica**: tocca una forma per selezionarla; trascina i suoi punti (o gli angoli) o la forma intera; doppio tocco su un lato aggiunge un punto, su un punto lo toglie; **Elimina forma** (o `Canc`) la rimuove. Ogni gesto è un passo di annullamento. I tratti di pennello e gomma non si modificano uno per uno: si annullano o si coprono con «Sottrai».
+- Le parti dipinte restano visibili in **rosso tenue** nell’editor anche quando esci dallo strumento (spariscono nel Playtest e con l’anteprima senza strumenti, dove vedi solo l’effetto: il personaggio nascosto).
+- Per ora il personaggio passa **sempre dietro** le parti dipinte. La regola davanti/dietro in base alla profondità arriva nel passo successivo.
 - Nel pacchetto per il gioco ogni parte viaggia come immagine (`assets/occluder-….png`) da disegnare sopra i personaggi, e in `scenario.json` sotto `occluders`.
 
 ## 7. Personaggi

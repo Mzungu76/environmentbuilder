@@ -38,9 +38,10 @@ export class SceneController {
   get markers(): PlaytestMarkers | null { return this.nav.markers; }
   set markers(m: PlaytestMarkers | null) { this.nav.markers = m; }
   refresh() { this.nav.refresh(); }
-  cancelPending() { this.nav.cancelPending(); }
+  cancelPending() { this.nav.cancelPending(); this.occluders.cancelPending(); }
   toggleCurve(id: string) { this.nav.toggleCurve(id); }
   deleteSelection() {
+    if (this.occluders.deleteSelected()) return;
     if (this.store.getState().selection?.kind === 'object') this.objects.deleteSelected(); else this.nav.deleteSelection();
     this.nav.refresh();
   }
