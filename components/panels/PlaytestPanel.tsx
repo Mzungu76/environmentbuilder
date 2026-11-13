@@ -7,14 +7,16 @@ import type { PlaytestController } from '@/engine/simulation/PlaytestController'
 import { BehaviorFields } from '@/components/inspector/CharacterFields';
 import { CheckField, Field } from '@/components/inspector/fields';
 import { Icon } from '@/components/ui/icons';
+import { SheetBar } from '@/components/inspector/Collapsible';
 import styles from '../editor/editor.module.css';
 
 const STATE_IT: Record<string, string> = { IDLE: 'IDLE (fermo)', WALK: 'WALK (cammina)', CLIMB: 'CLIMB (si arrampica)', INTERACT: 'INTERACT', COLLECT: 'COLLECT', JUMP: 'JUMP', FALL: 'FALL', CUSTOM: 'CUSTOM' };
 
-export function PlaytestPanel({ store, env, ctrl, showPaths, open }: { store: EditorStore; env: Environment; ctrl: PlaytestController; showPaths: boolean; open: boolean }) {
+export function PlaytestPanel({ store, env, ctrl, showPaths, open, full, onToggleFull, onClose }: { store: EditorStore; env: Environment; ctrl: PlaytestController; showPaths: boolean; open: boolean; full?: boolean; onToggleFull?: () => void; onClose?: () => void }) {
   const v = useSyncExternalStore(ctrl.subscribe, ctrl.getView, ctrl.getView);
   const [diag, setDiag] = useState(true);
   const [dest, setDest] = useState('');
+  const [place, setPlace] = useState('');
   const chars = ctrl.listCharacters().filter((c) => v.snapshots[c.id]);
   const visitor = !!v.activeId && ctrl.isVisitor(v.activeId);
   const c = chars.find((x) => x.id === v.activeId);
@@ -25,7 +27,8 @@ export function PlaytestPanel({ store, env, ctrl, showPaths, open }: { store: Ed
   const playing = v.status === 'playing';
 
   return (
-    <aside className={`${styles.inspector} ${open ? styles.inspectorOpen : ''}`} aria-label="Pannello Playtest" data-testid="playtest-panel">
+    <aside className={`${styles.inspector} ${open ? styles.inspectorOpen : ''} ${full ? styles.inspectorFull : ''}`} aria-label="Pannello Playtest" data-testid="playtest-panel">
+      <SheetBar title="Playtest" full={!!full} onToggleFull={onToggleFull} onClose={onClose} />
       <div className={styles.inspHead}>
         <h3>Playtest</h3>
         <span className={styles.badge} data-testid="play-status">{v.status === 'playing' ? 'In esecuzione' : v.status === 'paused' ? 'In pausa' : 'Fermo'}</span>
@@ -42,6 +45,22 @@ export function PlaytestPanel({ store, env, ctrl, showPaths, open }: { store: Ed
         <div role="status" aria-live="polite" data-testid="pt-message" style={{ minHeight: 20 }} className={v.message?.kind === 'error' ? styles.warn : styles.help}>{v.message?.text ?? ''}</div>
       </div>
 
+      {!!chars.length && (
+        <div className={styles.section} data-testid="pt-game">
+          <h4>Gioco di prova</h4>
+          <span className={styles.help}>Simula ciò che farà l’app di gioco: quando due dadi sono uguali il personaggio si ferma, raccoglie e esulta.</span>
+          <button className={`${styles.btn} ${styles.btnPrimary}`} onClick={() => ctrl.triggerCollect()} disabled={v.game.collapse.collapsed} data-testid="pt-trigger">🎲 Dadi uguali: trova un oggetto</button>
+          <div data-testid="pt-score" style={{ fontSize: 13 }}>Punti: <strong>{v.game.points}</strong>{Object.keys(v.game.counts).length ? ' — ' + Object.entries(v.game.counts).map(([k, n]) => `${k} ×${n}`).join(', ') : ''}</div>
+          {v.game.collapse.enabled && (
+            <>
+              <div role="progressbar" aria-label="Tremore della grotta" aria-valuenow={Math.round(v.game.collapse.intensity * 100)} style={{ height: 8, borderRadius: 4, background: 'var(--panel-2, #222)', overflow: 'hidden' }}>
+                <div style={{ width: `${Math.round(v.game.collapse.intensity * 100)}%`, height: '100%', background: v.game.collapse.intensity > 0.7 ? '#ef4444' : '#f59e0b' }} />
+              </div>
+              <span className={styles.help} data-testid="pt-collapse">{v.game.collapse.collapsed ? 'La grotta è crollata.' : 'La grotta trema… non si sa quando cederà. Reset = nuova estrazione.'}</span>
+            </>
+          )}
+        </div>
+      )}
       {!chars.length ? (
         <div className={styles.section}>
           <span className={styles.warn}>{nodes.length === 0 ? 'Nessun nodo: disegna almeno un percorso nell’editor.' : 'Nessun personaggio: torna all’editor e aggiungine uno (strumento Personaggio).'}</span>
@@ -80,6 +99,19 @@ export function PlaytestPanel({ store, env, ctrl, showPaths, open }: { store: Ed
                     <button className={styles.btn} onClick={() => ctrl.haltActive()}>{Icon.stop}Ferma il personaggio</button>
                   </>
                 ) : <span className={styles.help}>Sceglie da solo destinazioni raggiungibili, fa soste e può invertire la marcia.</span>}
+                <div style={{ display: 'grid', gap: 4, borderTop: '1px solid var(--border)', paddingTop: 6 }} data-testid="pt-place">
+                  <h4 style={{ margin: 0 }}>Posiziona subito</h4>
+                  <span className={styles.help}>Mette il personaggio su un nodo senza farlo camminare. Anche con <kbd>Maiusc</kbd> + clic su un nodo.</span>
+                  <div className={styles.row2} style={{ gridTemplateColumns: '1fr auto' }}>
+                    <select className={styles.select} aria-label="Nodo dove posizionare" value={place} onChange={(e) => setPlace(e.target.value)} data-testid="pt-place-node">
+                      <option value="">Nodo…</option>
+                      {nodes.map((n) => <option key={n.id} value={n.id}>{n.name}</option>)}
+                    </select>
+                    <button className={styles.btn} disabled={!place} onClick={() => ctrl.teleport(place)} data-testid="pt-place-go">Metti qui</button>
+                  </div>
+                  <CheckField id="pt-placemode" label="Un clic su un nodo posiziona (non cammina)" checked={v.placeMode} onChange={(on) => ctrl.setPlaceMode(on)} />
+                  <button className={styles.btn} onClick={() => ctrl.setStartHere()} disabled={!snap?.nodeId} data-testid="pt-start-here">Usa questo nodo come partenza</button>
+                </div>
               </>
             )}
           </div>

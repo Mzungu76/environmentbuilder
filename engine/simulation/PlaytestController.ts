@@ -3,10 +3,17 @@ import type { EditorStore } from '@/lib/store/editorStore';
 import type { CharacterRenderItem, SceneView, ViewPointerEvent } from '@/engine/rendering/SceneView';
 import type { SceneController } from '@/engine/editor/SceneController';
 import { spriteFor } from '@/engine/characters/sprites';
+import { PuppetPlayer } from '@/engine/puppet/player';
+import { DollPlayer } from '@/engine/doll/player';
+import { flipsWithFacing } from '@/engine/puppet/runtime';
 import { Agent, type AgentSnapshot } from './Agent';
 import { exitNodeIds, resolveExit } from '@/engine/interaction/objects';
 import { availableInteractions, createRuntimeState, performInteraction, resetRuntimeState, type Available, type GameEvent, type RuntimeState } from '@/engine/interaction/system';
 import { emitHostEvent } from '@/lib/integration/hostBridge';
+import { CollapseTimer } from '@/engine/game/collapse';
+import { applyLight, sampleLight } from '@/engine/game/light';
+import { defaultGameplay } from '@/engine/game/defaults';
+import { createRng } from './rng';
 
 export type PlayStatus = 'stopped' | 'playing' | 'paused';
 
@@ -20,6 +27,10 @@ export interface PlaytestView {
   /** Manual interactions the active character can run where it stands. */
   available: { objectId: string; interactionId: string; label: string; objectName: string }[];
   version: number;
+  /** Game rules in action: items found so far and how hard the cave is shaking (never the remaining time). */
+  /** Clicking a node places the character there instead of making it walk. */
+  placeMode: boolean;
+  game: { points: number; counts: Record<string, number>; collapse: { enabled: boolean; intensity: number; collapsed: boolean } };
 }
 
 const FIXED_DT = 1 / 60;
@@ -56,12 +67,21 @@ export class PlaytestController {
   private pan: { x: number; y: number } | null = null;
 
   private lastSeq = new Map<string, number>();
+  private players = new Map<string, PuppetPlayer>();
+  private dollPlayers = new Map<string, DollPlayer>();
+  private lastRender = performance.now();
   readonly runtime: RuntimeState;
+  private gameScore = { points: 0, counts: {} as Record<string, number> };
+  private collapse: CollapseTimer | null = null;
+  private collapseView = { enabled: false, intensity: 0, collapsed: false };
+  private timers: { at: number; fn: () => void }[] = [];
+  private clock = 0;
+  private placeMode = false;
 
   constructor(private store: EditorStore, private view: SceneView, private editor: SceneController, private opts: PlaytestOptions = {}) {
     this.env = store.env;
     this.runtime = opts.runtime ?? createRuntimeState();
-    this.rebuild();
+    this.rebuild(); this.resetGame();
     if (opts.message) this.message = { text: opts.message, kind: 'info', at: Date.now() };
     if (opts.autoplay && this.agents.size) this.status = 'playing';
     this.viewState = this.compute();
@@ -87,11 +107,11 @@ export class PlaytestController {
     for (const [id, a] of this.agents) snapshots[id] = a.snapshot();
     const act = this.active, sn = act?.snapshot();
     const available = act && sn?.nodeId && !sn.acting ? availableInteractions(this.env, sn.nodeId, act.config.abilities, this.runtime, 'manual').map((a) => ({ objectId: a.object.id, interactionId: a.interaction.id, label: a.interaction.label, objectName: a.object.name })) : [];
-    return { status: this.status, activeId: this.activeId, message: this.message, snapshots, inventory: { ...this.runtime.inventory }, events: this.runtime.events.slice(-12), available, version: (this.viewState?.version ?? 0) + 1 };
+    return { status: this.status, activeId: this.activeId, message: this.message, snapshots, inventory: { ...this.runtime.inventory }, events: this.runtime.events.slice(-12), available, placeMode: this.placeMode, game: { ...this.gameScore, counts: { ...this.gameScore.counts }, collapse: { ...this.collapseView } }, version: (this.viewState?.version ?? 0) + 1 };
   }
 
   dispose() {
-    this.view.onTick = () => {};
+    this.view.onTick = () => {}; this.view.setShake(0, 0);
     this.view.setCharacters([]);
     this.view.setHiddenObjects(new Set());
     this.editor.markers = null;
@@ -140,10 +160,49 @@ export class PlaytestController {
   /** Reset: back to the initial state (and seed) keeping the current play/pause status. */
   reset() { resetRuntimeState(this.runtime); this.resetAgents(); this.say('Simulazione riportata allo stato iniziale.', 'info'); }
   private resetAgents() {
-    this.rebuild(); this.acc = 0;
+    this.rebuild(); this.acc = 0; this.resetGame();
     for (const a of this.agents.values()) a.reset();
     this.view.setHiddenObjects(this.runtime.collected);
     this.updateMarkers(); this.pushRender(); this.publish();
+  }
+
+  // --- game rules (the same signals the game app receives from the exported scenario) ------------------------------------------
+  private resetGame() {
+    this.gameScore = { points: 0, counts: {} }; this.timers = []; this.clock = 0;
+    const gp = this.env.gameplay, cfg = gp?.collapse;
+    this.collapse = cfg?.enabled ? new CollapseTimer(cfg, createRng(Math.floor(Math.random() * 1e9))) : null;
+    this.collapseView = { enabled: !!cfg?.enabled, intensity: 0, collapsed: false };
+    this.view.setShake(0, 0);
+  }
+
+  private gameStep(dt: number) {
+    this.clock += dt;
+    for (const t of [...this.timers]) if (this.clock >= t.at) { this.timers.splice(this.timers.indexOf(t), 1); t.fn(); }
+    if (!this.collapse) return;
+    const sig = this.collapse.update(dt);
+    this.collapseView = { enabled: true, intensity: sig.intensity, collapsed: sig.collapsed };
+    const amp = 14;
+    this.view.setShake(sig.shake.x * amp, sig.shake.y * amp);
+    for (const f of sig.fired) { this.say(`Fase del crollo: ${f.effect}`, 'info'); emitHostEvent({ t: this.clock, type: 'interaction', character: '', environment: this.env.name, kind: 'collapse-stage', event: f.event || undefined, message: f.effect }); }
+    if (sig.collapsed) { this.status = 'paused'; this.say('La grotta è crollata!', 'error'); this.publish(); }
+  }
+
+  /** Dice came up equal: the active character stops, picks an item up, celebrates and the counter goes up (as the game would do). */
+  triggerCollect(collectibleId?: string) {
+    const a = this.active, gp = { ...defaultGameplay(), ...(this.env.gameplay ?? {}) };
+    if (!a || this.collapseView.collapsed) return;
+    const list = gp.collectibles;
+    const col = list.find((c) => c.id === collectibleId) ?? list[Math.floor(Math.random() * list.length)];
+    if (!col) { this.say('Nessun oggetto da trovare: aggiungine uno nella sezione Gioco.', 'error'); return; }
+    a.queueAction('COLLECT', gp.collectSeconds); a.queueAction('CELEBRATE', gp.celebrateSeconds);
+    this.timers.push({ at: this.clock + gp.collectSeconds * 0.55, fn: () => {
+      this.gameScore.points += col.points; this.gameScore.counts[col.name] = (this.gameScore.counts[col.name] ?? 0) + 1;
+      this.say(`${a.config.name} ha trovato: ${col.name} (+${col.points})`, 'info');
+      emitHostEvent({ t: this.clock, type: 'interaction', character: a.config.name, environment: this.env.name, kind: 'collect', item: col.name, event: 'collect', message: col.name });
+      this.publish();
+    } });
+    if (this.status !== 'playing') this.status = 'playing';
+    this.publish();
   }
 
   /** Manual movement command (also used by the destination list on touch devices). */
@@ -156,6 +215,24 @@ export class PlaytestController {
     else this.say(`“${name}” non è raggiungibile seguendo i collegamenti consentiti.`, 'error');
     this.updateMarkers(); this.publish();
   }
+  /** Puts the active character on a node at once (no walking). */
+  teleport(nodeId: string) {
+    const a = this.active;
+    if (!a) return;
+    const name = this.env.navigation.nodes.find((n) => n.id === nodeId)?.name ?? nodeId;
+    if (!a.teleport(nodeId)) { this.say('Nodo non trovato.', 'error'); return; }
+    this.lastSeq.set(a.config.id, a.arrivalSeq);       // not an arrival: nothing triggers
+    this.say(`${a.config.name} posizionato su ${name}`, 'info');
+    this.updateMarkers(); this.pushRender(); this.publish();
+  }
+  setPlaceMode(on: boolean) { this.placeMode = on; this.hoverId = null; this.updateMarkers(); this.publish(); }
+  /** Makes the node the active character stands on its start node (Reset / Stop return there). */
+  setStartHere() {
+    const a = this.active, node = a?.snapshot().nodeId;
+    if (!a || !node) { this.say('Il personaggio deve essere fermo su un nodo.', 'error'); return; }
+    this.store.commitEnv((e) => ({ ...e, characters: e.characters.map((c) => (c.id === a.config.id ? { ...c, startNodeId: node } : c)) }));
+    this.say('Nodo di partenza aggiornato.', 'info');
+  }
   haltActive() { this.active?.halt(); this.updateMarkers(); this.publish(); }
 
   private say(text: string, kind: 'info' | 'error') { this.message = { text, kind, at: Date.now() }; this.publish(); }
@@ -167,7 +244,7 @@ export class PlaytestController {
     if (this.status === 'playing') this.checkExits();
     if (this.status === 'playing') {
       this.acc += dt;
-      while (this.acc >= FIXED_DT) { for (const a of this.agents.values()) a.step(FIXED_DT); this.acc -= FIXED_DT; }
+      while (this.acc >= FIXED_DT) { for (const a of this.agents.values()) a.step(FIXED_DT); this.gameStep(FIXED_DT); this.acc -= FIXED_DT; if (this.collapseView.collapsed) break; }
       this.updateMarkers();
       this.publish(false);
     }
@@ -217,11 +294,43 @@ export class PlaytestController {
     this.publish();
   }
 
+  /** The character's own look plus the light of the zone of the background it stands in (if the scene has light enabled). */
+  private lookFor(c: Character, x: number, y: number, scale: number) {
+    const L = this.env.lighting, m = this.env.lightMap;
+    if (!L?.enabled || !m) return c.look;
+    return applyLight(c.look, sampleLight(m, x, Math.max(0, y - c.height * scale * 0.4), L.strength));
+  }
+
+  private puppetFor(c: Character, s: AgentSnapshot, dt: number): CharacterRenderItem['puppet'] {
+    const puppet = c.puppetId ? this.store.project.puppets.find((p) => p.id === c.puppetId) : undefined;
+    if (!puppet) return null;
+    let pl = this.players.get(c.id); if (!pl) { pl = new PuppetPlayer(); this.players.set(c.id, pl); }
+    const figurePx = Math.max(1, c.height * s.scale * this.env.height);
+    const hint = s.edgeId ? this.env.navigation.edges.find((e) => e.id === s.edgeId)?.props.view : undefined;
+    const f = pl.frame(puppet, s.state, dt, s.speedPx / figurePx, hint, { clip: s.edgeId ? this.env.navigation.edges.find((e) => e.id === s.edgeId)?.props.clip : undefined, progress: s.edgeProgress });
+    const assetId = f?.view.cutoutAssetId;
+    if (!f || !assetId || !f.view.mesh) return null;
+    return { assetId, positions: f.positions, uvs: f.view.mesh.uvs, indices: f.view.mesh.indices, pivot: f.view.pivot, figureHeight: f.view.figureHeight, flip: flipsWithFacing(f.view) && s.facing < 0, viewKey: `${puppet.id}:${f.viewId}:${assetId}`,
+      attachments: f.attachments?.map((q) => ({ id: q.id, assetId: q.assetId, positions: q.positions, uvs: q.uvs, indices: q.indices, front: q.front })),
+      over: f.over?.view.cutoutAssetId && f.over.view.mesh ? { assetId: f.over.view.cutoutAssetId, positions: f.over.positions, uvs: f.over.view.mesh.uvs, indices: f.over.view.mesh.indices, pivot: f.over.view.pivot, figureHeight: f.over.view.figureHeight, alpha: f.over.alpha, viewKey: `${puppet.id}:${f.over.view.id}:${f.over.view.cutoutAssetId}` } : undefined };
+  }
+
+  private dollFor(c: Character, s: AgentSnapshot, dt: number): CharacterRenderItem['doll'] {
+    if (c.puppetId && this.store.project.puppets.some((p) => p.id === c.puppetId)) return null;
+    const doll = c.dollId ? this.store.project.dolls.find((d) => d.id === c.dollId) : undefined;
+    if (!doll) return null;
+    let pl = this.dollPlayers.get(c.id); if (!pl) { pl = new DollPlayer(); this.dollPlayers.set(c.id, pl); }
+    const figurePx = Math.max(1, c.height * s.scale * this.env.height);
+    return { shapes: pl.frame(doll, s.state, dt, s.speedPx / figurePx), outline: doll.colors.outline, outlineWidth: doll.style.outline * 1000, flip: s.facing < 0 };
+  }
+
   private pushRender() {
+    const now = performance.now(), dt = this.status === 'playing' ? Math.min(0.1, (now - this.lastRender) / 1000) : 0;
+    this.lastRender = now;
     const items: CharacterRenderItem[] = [];
     for (const [id, a] of this.agents) {
       const c = a.config, s = a.snapshot();
-      items.push({ id, x: s.x, y: s.y, width: c.width, height: c.height, color: c.color, facing: s.facing, state: s.state, shadow: c.shadow, selected: false, lift: s.lift, sprite: spriteFor(c, s.state), stateTime: s.stateTime, liveClock: false });
+      items.push({ id, x: s.x, y: s.y, width: c.width * s.scale, height: c.height * s.scale, color: c.color, facing: s.facing, state: s.state, shadow: c.shadow, selected: false, lift: s.lift, sprite: spriteFor(c, s.state), stateTime: s.stateTime, liveClock: false, puppet: this.puppetFor(c, s, dt), doll: this.dollFor(c, s, dt), look: this.lookFor(c, s.x, s.y, s.scale) });
     }
     this.view.setCharacters(items);
   }
@@ -232,7 +341,7 @@ export class PlaytestController {
     const s = a?.snapshot();
     this.editor.markers = {
       nodeIds: manual ? this.env.navigation.nodes.map((n) => n.id) : [],
-      hoverId: manual ? this.hoverId : null, targetId: s?.destinationId ?? null, routeEdgeIds: s?.routeEdgeIds ?? [],
+      hoverId: manual || this.placeMode ? this.hoverId : null, targetId: s?.destinationId ?? null, routeEdgeIds: s?.routeEdgeIds ?? [],
     };
     this.editor.refresh();
   }
@@ -248,16 +357,16 @@ export class PlaytestController {
   }
 
   private onPointer(e: ViewPointerEvent) {
-    const manual = this.active?.config.behavior.mode === 'manual';
+    const manual = this.active?.config.behavior.mode === 'manual', pick = manual || this.placeMode;
     const tol = e.pointerType === 'mouse' ? 16 : 30;
     if (e.type === 'move') {
       if (this.pan) { this.view.panBy(e.screen.x - this.pan.x, e.screen.y - this.pan.y); this.pan = { x: e.screen.x, y: e.screen.y }; return; }
-      const h = manual ? this.nodeAt(e.pos, tol) : null;
+      const h = pick || e.shift ? this.nodeAt(e.pos, tol) : null;
       if (h !== this.hoverId) { this.hoverId = h; this.updateMarkers(); }
       this.view.setCursor(h ? 'pointer' : 'default');
     } else if (e.type === 'down' || e.type === 'dblclick') {
-      const h = manual ? this.nodeAt(e.pos, tol) : null;
-      if (h) this.goTo(h); else this.pan = { x: e.screen.x, y: e.screen.y };
+      const h = pick || e.shift ? this.nodeAt(e.pos, tol) : null;
+      if (h) { if (this.placeMode || e.shift) this.teleport(h); else this.goTo(h); } else this.pan = { x: e.screen.x, y: e.screen.y };
     } else { this.pan = null; }
   }
 }

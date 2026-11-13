@@ -1,0 +1,423 @@
+{
+ "canvas": {
+  "width": 2048,
+  "height": 1536
+ },
+ "unitPx": 1.0,
+ "standingHeightPx": 1000,
+ "parts": {
+  "head": {
+   "label": "TESTA (con cappello o capelli), di nuca",
+   "bone": "head",
+   "shape": "head",
+   "slot": {
+    "x": 40,
+    "y": 110,
+    "w": 255,
+    "h": 368
+   },
+   "piece": {
+    "x": 70,
+    "y": 174,
+    "w": 195,
+    "h": 240
+   },
+   "proximal": {
+    "x": 167,
+    "y": 379
+   },
+   "distal": {
+    "x": 167,
+    "y": 182
+   }
+  },
+  "torso": {
+   "label": "BUSTO (senza braccia)",
+   "bone": "torso",
+   "shape": "torso",
+   "slot": {
+    "x": 315,
+    "y": 110,
+    "w": 310,
+    "h": 478
+   },
+   "piece": {
+    "x": 345,
+    "y": 174,
+    "w": 250,
+    "h": 350
+   },
+   "proximal": {
+    "x": 470,
+    "y": 479
+   },
+   "distal": {
+    "x": 470,
+    "y": 214
+   }
+  },
+  "pelvis": {
+   "label": "BACINO",
+   "bone": "pelvis",
+   "shape": "torso",
+   "slot": {
+    "x": 645,
+    "y": 110,
+    "w": 300,
+    "h": 268
+   },
+   "piece": {
+    "x": 675,
+    "y": 174,
+    "w": 240,
+    "h": 140
+   },
+   "proximal": {
+    "x": 795,
+    "y": 229
+   },
+   "distal": {
+    "x": 795,
+    "y": 279
+   }
+  },
+  "accA": {
+   "label": "ZAINO (visibile da dietro)",
+   "bone": null,
+   "shape": "free",
+   "slot": {
+    "x": 965,
+    "y": 110,
+    "w": 290,
+    "h": 388
+   },
+   "piece": {
+    "x": 995,
+    "y": 174,
+    "w": 230,
+    "h": 260
+   },
+   "proximal": null,
+   "distal": null
+  },
+  "accB": {
+   "label": "ACCESSORIO (facoltativo)",
+   "bone": null,
+   "shape": "free",
+   "slot": {
+    "x": 1275,
+    "y": 110,
+    "w": 215,
+    "h": 428
+   },
+   "piece": {
+    "x": 1307,
+    "y": 174,
+    "w": 150,
+    "h": 300
+   },
+   "proximal": null,
+   "distal": null
+  },
+  "uarm": {
+   "label": "BRACCIO dx (solo spalla-gomito)",
+   "bone": "uarmR",
+   "shape": "limb",
+   "slot": {
+    "x": 40,
+    "y": 628,
+    "w": 215,
+    "h": 338
+   },
+   "piece": {
+    "x": 107,
+    "y": 692,
+    "w": 80,
+    "h": 210
+   },
+   "proximal": {
+    "x": 147,
+    "y": 732
+   },
+   "distal": {
+    "x": 147,
+    "y": 867
+   }
+  },
+  "farm": {
+   "label": "AVAMBRACCIO dx (solo gomito-polso)",
+   "bone": "farmR",
+   "shape": "limb",
+   "slot": {
+    "x": 275,
+    "y": 628,
+    "w": 215,
+    "h": 328
+   },
+   "piece": {
+    "x": 347,
+    "y": 692,
+    "w": 70,
+    "h": 200
+   },
+   "proximal": {
+    "x": 382,
+    "y": 727
+   },
+   "distal": {
+    "x": 382,
+    "y": 857
+   }
+  },
+  "hand": {
+   "label": "MANO dx (solo la mano)",
+   "bone": "handR",
+   "shape": "limb",
+   "slot": {
+    "x": 510,
+    "y": 628,
+    "w": 215,
+    "h": 228
+   },
+   "piece": {
+    "x": 577,
+    "y": 692,
+    "w": 80,
+    "h": 100
+   },
+   "proximal": {
+    "x": 617,
+    "y": 717
+   },
+   "distal": {
+    "x": 617,
+    "y": 784
+   }
+  },
+  "thigh": {
+   "label": "COSCIA dx (solo anca-ginocchio)",
+   "bone": "thighR",
+   "shape": "limb",
+   "slot": {
+    "x": 745,
+    "y": 628,
+    "w": 215,
+    "h": 398
+   },
+   "piece": {
+    "x": 796,
+    "y": 692,
+    "w": 112,
+    "h": 270
+   },
+   "proximal": {
+    "x": 852,
+    "y": 744
+   },
+   "distal": {
+    "x": 852,
+    "y": 912
+   }
+  },
+  "shin": {
+   "label": "GAMBA dx (solo ginocchio-caviglia)",
+   "bone": "shinR",
+   "shape": "limb",
+   "slot": {
+    "x": 980,
+    "y": 628,
+    "w": 215,
+    "h": 398
+   },
+   "piece": {
+    "x": 1041,
+    "y": 692,
+    "w": 92,
+    "h": 270
+   },
+   "proximal": {
+    "x": 1087,
+    "y": 736
+   },
+   "distal": {
+    "x": 1087,
+    "y": 922
+   }
+  },
+  "foot": {
+   "label": "PIEDE dx (da dietro)",
+   "bone": "footR",
+   "shape": "limb",
+   "slot": {
+    "x": 1215,
+    "y": 628,
+    "w": 215,
+    "h": 258
+   },
+   "piece": {
+    "x": 1272,
+    "y": 692,
+    "w": 100,
+    "h": 130
+   },
+   "proximal": {
+    "x": 1322,
+    "y": 722
+   },
+   "distal": {
+    "x": 1322,
+    "y": 807
+   }
+  },
+  "uarmL": {
+   "label": "BRACCIO sx (solo spalla-gomito)",
+   "bone": "uarmL",
+   "shape": "limb",
+   "slot": {
+    "x": 40,
+    "y": 1066,
+    "w": 215,
+    "h": 338
+   },
+   "piece": {
+    "x": 107,
+    "y": 1130,
+    "w": 80,
+    "h": 210
+   },
+   "proximal": {
+    "x": 147,
+    "y": 1170
+   },
+   "distal": {
+    "x": 147,
+    "y": 1305
+   }
+  },
+  "farmL": {
+   "label": "AVAMBRACCIO sx (solo gomito-polso)",
+   "bone": "farmL",
+   "shape": "limb",
+   "slot": {
+    "x": 275,
+    "y": 1066,
+    "w": 215,
+    "h": 328
+   },
+   "piece": {
+    "x": 347,
+    "y": 1130,
+    "w": 70,
+    "h": 200
+   },
+   "proximal": {
+    "x": 382,
+    "y": 1165
+   },
+   "distal": {
+    "x": 382,
+    "y": 1295
+   }
+  },
+  "handL": {
+   "label": "MANO sx (solo la mano)",
+   "bone": "handL",
+   "shape": "limb",
+   "slot": {
+    "x": 510,
+    "y": 1066,
+    "w": 215,
+    "h": 228
+   },
+   "piece": {
+    "x": 577,
+    "y": 1130,
+    "w": 80,
+    "h": 100
+   },
+   "proximal": {
+    "x": 617,
+    "y": 1155
+   },
+   "distal": {
+    "x": 617,
+    "y": 1222
+   }
+  },
+  "thighL": {
+   "label": "COSCIA sx (solo anca-ginocchio)",
+   "bone": "thighL",
+   "shape": "limb",
+   "slot": {
+    "x": 745,
+    "y": 1066,
+    "w": 215,
+    "h": 398
+   },
+   "piece": {
+    "x": 796,
+    "y": 1130,
+    "w": 112,
+    "h": 270
+   },
+   "proximal": {
+    "x": 852,
+    "y": 1182
+   },
+   "distal": {
+    "x": 852,
+    "y": 1350
+   }
+  },
+  "shinL": {
+   "label": "GAMBA sx (solo ginocchio-caviglia)",
+   "bone": "shinL",
+   "shape": "limb",
+   "slot": {
+    "x": 980,
+    "y": 1066,
+    "w": 215,
+    "h": 398
+   },
+   "piece": {
+    "x": 1041,
+    "y": 1130,
+    "w": 92,
+    "h": 270
+   },
+   "proximal": {
+    "x": 1087,
+    "y": 1174
+   },
+   "distal": {
+    "x": 1087,
+    "y": 1360
+   }
+  },
+  "footL": {
+   "label": "PIEDE sx (da dietro)",
+   "bone": "footL",
+   "shape": "limb",
+   "slot": {
+    "x": 1215,
+    "y": 1066,
+    "w": 215,
+    "h": 258
+   },
+   "piece": {
+    "x": 1272,
+    "y": 1130,
+    "w": 100,
+    "h": 130
+   },
+   "proximal": {
+    "x": 1322,
+    "y": 1160
+   },
+   "distal": {
+    "x": 1322,
+    "y": 1245
+   }
+  }
+ }
+}

@@ -1,6 +1,8 @@
-import { Application, Container, Graphics, Rectangle, Sprite, Texture } from 'pixi.js';
+import { bakeCutout } from './occluderBake';
+import { Application, BlurFilter, ColorMatrixFilter, Container, Graphics, MeshSimple, Rectangle, Sprite, Texture } from 'pixi.js';
 import type { SpriteDraw } from '@/engine/characters/sprites';
-import type { CharacterState, InteractiveObject, NavigationGraph, SceneLayer, Vec2 } from '@/types';
+import type { DollShape } from '@/engine/doll/shapes';
+import type { CharacterLook, CharacterState, InteractiveObject, NavigationGraph, SceneLayer, Vec2 } from '@/types';
 import { objectTypeInfo } from '@/engine/interaction/objects';
 import { EDGE_COLOR } from '@/engine/movement/movementTypes';
 import { edgePolyline } from '@/engine/navigation/geometry';
@@ -49,6 +51,25 @@ export interface PlaytestMarkers {
   routeEdgeIds: string[];
 }
 
+/** A rigged character frame: skinned vertices in cut-out pixels + the static mesh data. */
+export interface PuppetDraw {
+  assetId: string;
+  positions: Float32Array;
+  uvs: number[];
+  indices: number[];
+  pivot: { x: number; y: number };
+  figureHeight: number;
+  flip: boolean;
+  viewKey: string;
+  /** Key-pose playback: the neighbouring key drawn on top, cross-faded. */
+  over?: Omit<PuppetDraw, 'over' | 'flip' | 'attachments'> & { alpha: number };
+  /** Tools / objects held by the character. */
+  attachments?: { id: string; assetId: string; positions: Float32Array; uvs: number[]; indices: number[]; front: boolean }[];
+}
+
+/** A procedural "omino" frame: posed shapes in doll units (feet at the origin, 1000 tall). */
+export interface DollDraw { shapes: DollShape[]; outline: string; outlineWidth: number; flip: boolean }
+
 export interface CharacterRenderItem {
   id: string;
   /** Feet position, normalized. */
@@ -66,6 +87,9 @@ export interface CharacterRenderItem {
   /** Seconds since the state started; ignored when `liveClock` (editor: idle animation plays on its own). */
   stateTime: number;
   liveClock: boolean;
+  puppet?: PuppetDraw | null;
+  doll?: DollDraw | null;
+  look?: CharacterLook;
 }
 
 export interface LayerSource { layer: SceneLayer; blobLoader: () => Promise<Blob | undefined> }
@@ -76,12 +100,25 @@ const NODE_COLORS: Record<string, number> = {
 const SELECT_COLOR = 0xffffff;
 const HANDLE_COLOR = 0xfde047;
 
+/** One occluder ready to draw: alpha grid (w×h cells, 0–255) of the cut-out. */
+export interface OccluderItem { id: string; alpha: Uint8Array; w: number; h: number; version: number }
+
 export class SceneView {
   private app!: Application;
   private world = new Container();
+  private zoneSprite: Sprite | null = null;
+  private zoneTex: Texture | null = null;
+  private brushGfx = new Graphics();
   private bgRoot = new Container();   // background + midground
   private objRoot = new Container();  // object images (below characters)
-  private fgRoot = new Container();   // foreground (above characters)
+  private occRoot = new Container();  // occluders: cut-outs of the backdrop drawn above the characters
+  private occEntries = new Map<string, { sprite: Sprite; tex: Texture | null; canvas: HTMLCanvasElement | null; version: number }>();
+  private occItems: OccluderItem[] = [];
+  private bgInfo: { tex: Texture; x: number; y: number } | null = null;
+  private occGfx = new Graphics();
+  private guideFn: ((g: Graphics, px: number, envW: number, envH: number) => void) | null = null;
+  private occTintSprite: Sprite | null = null;
+  private occTintTex: Texture | null = null;
   private objSprites = new Map<string, Sprite>();
   /** Objects consumed at runtime (e.g. collected in the playtest): hidden but still part of the document. */
   private hiddenObjects = new Set<string>();
@@ -103,12 +140,16 @@ export class SceneView {
   private chars: CharacterRenderItem[] = [];
   private charRoot = new Container();
   private charSprites = new Map<string, Sprite>();
+  private puppetMeshes = new Map<string, { mesh: MeshSimple; key: string }>();
+  private typed = new WeakMap<object, Float32Array | Uint32Array>();
   private frameTex = new Map<string, Texture>();
   /** Loads the binary of an image asset (set by the host component). */
   assetLoader: (assetId: string) => Promise<Blob | undefined> = async () => undefined;
 
   /** When true, single-pointer drag pans the camera (pan tool / space held). */
   panMode = false;
+  /** True while the camera is still the one set by fit(): a window resize then re-fits instead of just re-centring. */
+  private autoFit = false;
   onPointer: (e: ViewPointerEvent) => void = () => {};
   onCamera: (zoom: number) => void = () => {};
   onAssetError: (assetId: string, message: string) => void = () => {};
@@ -133,11 +174,11 @@ export class SceneView {
     host.appendChild(app.canvas);
     app.canvas.style.touchAction = 'none';
     app.canvas.style.display = 'block';
-    this.world.addChild(this.bgRoot, this.objRoot, this.charRoot, this.charGfx, this.fgRoot, this.overlay);
+    this.world.addChild(this.bgRoot, this.objRoot, this.charRoot, this.charGfx, this.occRoot, this.overlay, this.occGfx, this.brushGfx);
     app.stage.addChild(this.world);
     app.ticker.add((t) => {
       this.onTick(Math.min(0.1, t.deltaMS / 1000));
-      if (this.dirty) { this.dirty = false; this.drawOverlay(); }
+      if (this.dirty) { this.dirty = false; this.drawOverlay(); this.drawGuides(); }
       this.drawCharacters();
     });
     this.bindInput(app.canvas);
@@ -145,7 +186,10 @@ export class SceneView {
     this.resizeObs = new ResizeObserver(() => {
       // keep the view centred on the same point when the viewport changes size
       const w = host.clientWidth, h = host.clientHeight;
-      if (lastW && lastH) this.world.position.set(this.world.x + (w - lastW) / 2, this.world.y + (h - lastH) / 2);
+      // browser bars and fullscreen change the size without a reliable window 'resize': always resync the canvas
+      this.app?.resize();
+      if (this.autoFit && this.envW && this.envH) this.fit();
+      else if (lastW && lastH) this.world.position.set(this.world.x + (w - lastW) / 2, this.world.y + (h - lastH) / 2);
       lastW = w; lastH = h; this.dirty = true;
     });
     this.resizeObs.observe(host);
@@ -154,6 +198,8 @@ export class SceneView {
   destroy() {
     this.destroyed = true;
     this.resizeObs?.disconnect();
+    for (const e of this.occEntries.values()) e.tex?.destroy(true);
+    this.occEntries.clear();
     for (const t of this.textures.values()) t.destroy(true);
     this.textures.clear();
     if (this.app) this.app.destroy(true, { children: true });
@@ -163,8 +209,17 @@ export class SceneView {
   setEnvironmentSize(w: number, h: number, refit: boolean) {
     const changed = w !== this.envW || h !== this.envH;
     this.envW = Math.max(1, w); this.envH = Math.max(1, h);
+    // overlays created before the size was known (a project that has just been opened) must follow it
+    for (const s of [this.occTintSprite, this.zoneSprite]) if (s) { s.width = this.envW; s.height = this.envH; }
     if (changed || refit) { this.fit(); }
     this.dirty = true;
+  }
+
+  /** Mip-mapped trilinear sampling for big textures drawn small, only when the GPU can really build the mip chain for this size. */
+  private applyMip(tex: Texture) {
+    const gl = (this.app?.renderer as unknown as { context?: { supports?: { nonPowOf2mipmaps?: boolean } } } | undefined)?.context;
+    const canMip = !!(gl?.supports?.nonPowOf2mipmaps || tex.source.isPowerOfTwo) && Math.max(tex.source.pixelWidth, tex.source.pixelHeight) <= 4096;
+    if (canMip) { tex.source.autoGenerateMipmaps = true; tex.source.style.scaleMode = 'linear'; tex.source.style.mipmapFilter = 'linear'; }
   }
 
   /** Texture cache keyed by asset id (shared by layers and objects); concurrent loads are de-duplicated. */
@@ -178,6 +233,9 @@ export class SceneView {
           const blob = await loader();
           if (!blob) throw new Error('dati immagine mancanti nell’archivio locale');
           const tex = Texture.from(await createImageBitmap(blob));
+          // mip-mapped, trilinear sampling for big textures drawn small (characters in a wide scene). Only when the GPU can really build the
+          // mip chain for this size: asking for mipmap filtering without mipmaps makes the texture "incomplete" and some phones draw nothing.
+          this.applyMip(tex);
           this.textures.set(assetId, tex);
           return tex;
         } catch (err) {
@@ -190,18 +248,18 @@ export class SceneView {
     return p;
   }
 
-  /** Synchronizes layer sprites. Draw order: background/midground → objects → characters → foreground. */
+  /** Synchronizes layer sprites. Draw order: background/midground → objects → characters → occluders. */
   async setLayers(sources: LayerSource[]) {
     const version = ++this.layerVersion;
     const wanted = new Set(sources.map((s) => s.layer.id));
     for (const [id, sp] of this.sprites) if (!wanted.has(id)) { sp.destroy(); this.sprites.delete(id); }
 
-    const roleOrder = { background: 0, midground: 1, foreground: 2 } as const;
+    const roleOrder = { background: 0, midground: 1 } as const;
     const ordered = sources.map((s, i) => ({ s, i })).sort((a, b) => roleOrder[a.s.layer.role] - roleOrder[b.s.layer.role] || a.i - b.i);
     const texs = await Promise.all(ordered.map(({ s }) => this.texture(s.layer.assetId, s.blobLoader)));
     if (this.destroyed || version !== this.layerVersion) return; // superseded by a newer call
 
-    const counts = { bg: 0, fg: 0 };
+    let bgCount = 0, bgInfo: SceneView['bgInfo'] = null;
     ordered.forEach(({ s }, k) => {
       const tex = texs[k];
       const { layer } = s;
@@ -210,10 +268,12 @@ export class SceneView {
       if (!sp) { sp = new Sprite(tex); this.sprites.set(layer.id, sp); } else if (sp.texture !== tex) sp.texture = tex;
       sp.visible = layer.visible; sp.alpha = layer.opacity;
       sp.position.set(layer.offsetX * this.envW, layer.offsetY * this.envH);
-      const root = layer.role === 'foreground' ? this.fgRoot : this.bgRoot;
-      if (sp.parent !== root) root.addChild(sp);
-      root.setChildIndex(sp, layer.role === 'foreground' ? counts.fg++ : counts.bg++);
+      if (sp.parent !== this.bgRoot) this.bgRoot.addChild(sp);
+      this.bgRoot.setChildIndex(sp, bgCount++);
+      if (layer.role === 'background' && !bgInfo) bgInfo = { tex, x: sp.x, y: sp.y };
     });
+    this.bgInfo = bgInfo;
+    this.rebuildOccluders();
     this.dirty = true;
   }
 
@@ -260,7 +320,7 @@ export class SceneView {
     if (!this.app) return;
     const pad = 0.94;
     const z = Math.min(this.vw / this.envW, this.vh / this.envH) * pad;
-    this.zoom = z;
+    this.zoom = z; this.autoFit = true;
     this.world.scale.set(z);
     this.world.position.set((this.vw - this.envW * z) / 2, (this.vh - this.envH * z) / 2);
     this.onCamera(z); this.dirty = true;
@@ -272,12 +332,67 @@ export class SceneView {
     const z = Math.min(32, Math.max(0.02, this.zoom * factor));
     const k = z / this.zoom;
     this.world.position.set(sx - (sx - this.world.x) * k, sy - (sy - this.world.y) * k);
-    this.zoom = z;
+    this.zoom = z; this.autoFit = false;
     this.world.scale.set(z);
     this.onCamera(z); this.dirty = true;
   }
   zoomCenter(factor: number) { this.zoomAt(factor, this.vw / 2, this.vh / 2); }
-  panBy(dx: number, dy: number) { this.world.position.set(this.world.x + dx, this.world.y + dy); }
+  /**
+   * Occluders to draw over the characters: the backdrop cut by each alpha grid. `version` changes whenever the grid changes
+   * (the grid may be edited in place while painting). Entries missing from the list are removed.
+   */
+  setOccluders(items: OccluderItem[]) { this.occItems = items; this.rebuildOccluders(); }
+  private rebuildOccluders() {
+    const wanted = new Set(this.occItems.map((o) => o.id));
+    for (const [id, e] of this.occEntries) if (!wanted.has(id)) { e.sprite.destroy(); e.tex?.destroy(true); this.occEntries.delete(id); }
+    const bg = this.bgInfo, img = bg?.tex.source.resource as (CanvasImageSource & { width: number; height: number }) | undefined;
+    if (!bg || !img || !img.width) { for (const e of this.occEntries.values()) e.sprite.visible = false; return; }
+    for (const it of this.occItems) {
+      let e = this.occEntries.get(it.id);
+      if (e && e.version === it.version && e.sprite.visible) { e.sprite.position.set(bg.x, bg.y); continue; }
+      if (!e) { e = { sprite: new Sprite(), tex: null, canvas: null, version: -1 }; this.occEntries.set(it.id, e); this.occRoot.addChild(e.sprite); }
+      try {
+        const { canvas, scale } = bakeCutout(img, it.alpha, it.w, it.h, e.canvas ?? undefined);
+        if (!e.tex || e.canvas !== canvas) { e.tex?.destroy(true); e.tex = Texture.from(canvas); this.applyMip(e.tex); e.sprite.texture = e.tex; } else e.tex.source.update();
+        e.canvas = canvas; e.version = it.version;
+        e.sprite.scale.set(scale); e.sprite.position.set(bg.x, bg.y); e.sprite.visible = true;
+      } catch { e.sprite.visible = false; }
+    }
+    this.dirty = true;
+  }
+  /** Lines and handles drawn by the occluders tool (shapes being drawn / edited). The callback gets one screen pixel in environment pixels. */
+  setOccluderGuides(fn: ((g: Graphics, px: number, envW: number, envH: number) => void) | null) { this.guideFn = fn; this.dirty = true; }
+  private drawGuides() { this.occGfx.clear(); this.guideFn?.(this.occGfx, 1 / this.zoom, this.envW, this.envH); }
+  /** Translucent tint of the occluder being painted (editor, Primo piano tool). Pass null to hide it. */
+  setOccluderTint(canvas: HTMLCanvasElement | null) {
+    if (!canvas) { if (this.occTintSprite) this.occTintSprite.visible = false; return; }
+    if (!this.occTintSprite || !this.occTintTex || this.occTintTex.source.resource !== canvas) {
+      this.occTintSprite?.destroy(); this.occTintTex?.destroy(true);
+      this.occTintTex = Texture.from(canvas); this.occTintSprite = new Sprite(this.occTintTex);
+      this.world.addChildAt(this.occTintSprite, this.world.getChildIndex(this.overlay));
+    } else this.occTintTex.source.update();
+    this.occTintSprite.width = this.envW; this.occTintSprite.height = this.envH; this.occTintSprite.visible = true;
+  }
+
+  /** Shows the painted scale zones as a translucent layer (editor, zones tool). Pass null to hide it. */
+  setZoneCanvas(canvas: HTMLCanvasElement | null) {
+    if (!canvas) { if (this.zoneSprite) this.zoneSprite.visible = false; return; }
+    if (!this.zoneSprite || !this.zoneTex || this.zoneTex.source.resource !== canvas) {
+      this.zoneSprite?.destroy(); this.zoneTex?.destroy(true);
+      this.zoneTex = Texture.from(canvas); this.zoneSprite = new Sprite(this.zoneTex);
+      this.world.addChildAt(this.zoneSprite, this.world.getChildIndex(this.overlay));
+    } else this.zoneTex.source.update();
+    this.zoneSprite.width = this.envW; this.zoneSprite.height = this.envH; this.zoneSprite.visible = true;
+  }
+  /** Brush ring in the scene (normalized centre, radius as a fraction of the image height). */
+  setBrush(x: number, y: number, r: number, mode: 'paint' | 'erase' | null) {
+    const g = this.brushGfx; g.clear();
+    if (!mode) return;
+    g.circle(x * this.envW, y * this.envH, r * this.envH).stroke({ width: 2 / this.zoom, color: mode === 'paint' ? 0xffffff : 0xff6b6b, alpha: 0.95 });
+  }
+  /** Camera shake (environment px): the whole scene moves by the opposite offset, without touching pan/zoom. */
+  setShake(x: number, y: number) { this.world.pivot.set(x, y); }
+  panBy(dx: number, dy: number) { this.autoFit = false; this.world.position.set(this.world.x + dx, this.world.y + dy); }
 
   /** Pixels of environment covered by one screen pixel. */
   get pxPerScreenPx() { return 1 / this.zoom; }
@@ -494,11 +609,13 @@ export class SceneView {
     g.clear();
     const t = performance.now() / 1000;
     const H = this.envH, W = this.envW;
-    const seen = new Set<string>();
+    const seen = new Set<string>(), seenMesh = new Set<string>();
     for (const c of this.chars) {
       const h = c.height * H, w = c.width * H;
       const cx = c.x * W, cy = c.y * H;
       const lift = c.lift;
+      // --- rigged puppet (skinned mesh) when available
+      if (c.puppet && this.drawPuppetMesh(g, c, cx, cy, h, w, lift)) { seenMesh.add(c.id); if (c.puppet.over) seenMesh.add(c.id + '#over'); if (c.look && c.look.halo > 0.01) seenMesh.add(c.id + '#halo'); (c.puppet.attachments ?? []).forEach((_, i) => seenMesh.add(`${c.id}#att${i}`)); continue; }
       // --- sprite (image / sprite sheet) when available; procedural placeholder otherwise
       if (c.sprite) {
         const base = this.textures.get(c.sprite.assetId);
@@ -519,9 +636,105 @@ export class SceneView {
           continue;
         }
       }
+      if (c.doll) { this.drawDollShapes(g, c, cx, cy - lift, h, w, lift); continue; }
       this.drawProcedural(g, c, cx, cy, w, h, lift, t);
     }
     for (const [id, sp] of this.charSprites) if (!seen.has(id)) { sp.destroy(); this.charSprites.delete(id); }
+    for (const [id, m] of this.puppetMeshes) if (!seenMesh.has(id)) { m.mesh.destroy(); this.puppetMeshes.delete(id); }
+  }
+
+  /** Draws the shapes of an "omino" (polygons, then outlines) with Pixi graphics. */
+  private drawDollShapes(g: Graphics, c: CharacterRenderItem, cx: number, cy: number, h: number, w: number, lift: number) {
+    const d = c.doll!, sc = h / 1000, f = d.flip ? -1 : 1;
+    if (c.shadow) g.ellipse(cx, cy + lift, w * 0.55, Math.max(2, h * 0.05)).fill({ color: 0x000000, alpha: 0.35 });
+    const ow = d.outlineWidth * sc;
+    for (const s of d.shapes) {
+      const n = s.pts.length;
+      if (n < 4) continue;
+      const pts = new Array<number>(n);
+      for (let i = 0; i < n; i += 2) { pts[i] = cx + s.pts[i] * sc * f; pts[i + 1] = cy + s.pts[i + 1] * sc; }
+      if (s.kind === 'line') { g.poly(pts, !!s.closed).stroke({ width: (s.w ?? 8) * sc, color: s.fill, cap: 'round', join: 'round' }); continue; }
+      g.poly(pts, true).fill(s.fill);
+      if (!s.bare && ow > 0) g.poly(pts, true).stroke({ width: ow, color: d.outline, join: 'round' });
+    }
+    if (c.selected) g.ellipse(cx, cy + lift, w * 0.8, Math.max(3, h * 0.09)).stroke({ width: 2 / this.zoom, color: 0xffffff, alpha: 0.9 });
+  }
+
+  /** Draws a skinned puppet with a Pixi mesh; false while its texture is still loading (placeholder is used meanwhile). */
+  private drawPuppetMesh(g: Graphics, c: CharacterRenderItem, cx: number, cy: number, h: number, w: number, lift: number): boolean {
+    const pd = c.puppet!, look = c.look;
+    if (!this.placeMesh(c.id, pd, pd.flip, 1, cx, cy - lift, h)) return false;
+    const main = this.puppetMeshes.get(c.id)!.mesh;
+    this.applyLook(main, look);
+    const ov = pd.over && pd.over.alpha > 0.003 ? pd.over : null;
+    if (ov) {
+      if (this.placeMesh(c.id + '#over', ov, pd.flip, ov.alpha, cx, cy - lift, h)) {
+        const m = this.puppetMeshes.get(c.id + '#over')!.mesh; this.charRoot.addChild(m);   // always above the main layer
+        this.applyLook(m, look);
+      }
+    }
+    // tools / objects: in front of the body or behind it
+    (pd.attachments ?? []).forEach((a, i) => {
+      const slot = `${c.id}#att${i}`;
+      if (!this.placeMesh(slot, { assetId: a.assetId, positions: a.positions, uvs: a.uvs, indices: a.indices, pivot: pd.pivot, figureHeight: pd.figureHeight, viewKey: `att:${a.assetId}:${i}` }, pd.flip, 1, cx, cy - lift, h)) return;
+      const m = this.puppetMeshes.get(slot)!.mesh;
+      if (a.front) this.charRoot.addChild(m);
+      else { const mi = this.charRoot.getChildIndex(main); if (this.charRoot.getChildIndex(m) > mi) this.charRoot.setChildIndex(m, mi); }
+    });
+    // soft light halo behind the figure (separates it from busy backgrounds)
+    if (look && look.halo > 0.01 && this.placeMesh(c.id + '#halo', pd, pd.flip, Math.min(1, look.halo), cx, cy - lift, h)) {
+      const hm = this.puppetMeshes.get(c.id + '#halo')!.mesh;
+      hm.tint = parseInt(look.haloColor.replace('#', ''), 16) || 0xffffff;
+      if (!hm.filters || !(hm.filters[0] instanceof BlurFilter)) hm.filters = [new BlurFilter({ strength: 6, quality: 2, resolution: 'inherit' })];
+      const mi = this.charRoot.getChildIndex(main);
+      if (this.charRoot.getChildIndex(hm) > mi) this.charRoot.setChildIndex(hm, mi);
+    }
+    const sa = look ? look.shadow : 0.35;
+    if (c.shadow) g.ellipse(cx, cy, w * 0.55, Math.max(2, h * 0.05)).fill({ color: 0x000000, alpha: sa });
+    if (c.selected) g.ellipse(cx, cy, w * 0.8, Math.max(3, h * 0.09)).stroke({ width: 2 / this.zoom, color: 0xffffff, alpha: 0.9 });
+    return true;
+  }
+
+  /** Brightness / contrast / saturation / ambient tint as one colour-matrix filter (removed when everything is neutral). */
+  private applyLook(mesh: MeshSimple, look?: CharacterLook) {
+    const neutral = !look || (Math.abs(look.brightness - 1) < 0.01 && Math.abs(look.contrast - 1) < 0.01 && Math.abs(look.saturation - 1) < 0.01 && look.tintAmount < 0.01);
+    if (neutral) { if (mesh.filters && mesh.filters[0] instanceof ColorMatrixFilter) mesh.filters = null; return; }
+    const key = `${look.brightness.toFixed(2)}|${look.contrast.toFixed(2)}|${look.saturation.toFixed(2)}|${look.tint}|${look.tintAmount.toFixed(2)}`;
+    const holder = mesh as MeshSimple & { __lookKey?: string };
+    const existing = mesh.filters && mesh.filters[0] instanceof ColorMatrixFilter ? (mesh.filters[0] as ColorMatrixFilter) : null;
+    if (holder.__lookKey === key && existing) return;
+    // Pixi renders a filter at resolution 1 by default: on a phone (DPR 2+) the filtered figure came out blurry. 'inherit' = the canvas resolution.
+    const f = existing ?? new ColorMatrixFilter({ resolution: 'inherit' });       // reused: the light changes continuously while the character walks
+    f.reset();
+    f.brightness(look.brightness, false); f.contrast(look.contrast - 1, true); f.saturate(look.saturation - 1, true);
+    if (look.tintAmount > 0.01) {
+      const col = parseInt(look.tint.replace('#', ''), 16) || 0xffffff, r = ((col >> 16) & 255) / 255, gr = ((col >> 8) & 255) / 255, b = (col & 255) / 255, k = look.tintAmount;
+      const m = f.matrix; // multiply the RGB rows by the tint, blended by the amount
+      for (let row = 0; row < 3; row++) { const t = [r, gr, b][row], mix = 1 - k + k * t; for (let c2 = 0; c2 < 5; c2++) m[row * 5 + c2] *= mix; }
+    }
+    if (!existing) mesh.filters = [f];
+    holder.__lookKey = key;
+  }
+
+  private placeMesh(slot: string, pd: Omit<PuppetDraw, 'over' | 'flip' | 'attachments'>, flip: boolean, alpha: number, x: number, y: number, h: number): boolean {
+    const base = this.textures.get(pd.assetId);
+    if (!base) { void this.texture(pd.assetId, () => this.assetLoader(pd.assetId)); return false; }
+    const cached = (arr: number[], Ctor: typeof Float32Array | typeof Uint32Array) => { let t = this.typed.get(arr); if (!t) { t = Ctor.from(arr); this.typed.set(arr, t); } return t; };
+    let entry = this.puppetMeshes.get(slot);
+    if (!entry || entry.key !== pd.viewKey) {
+      entry?.mesh.destroy();
+      const mesh = new MeshSimple({ texture: base, vertices: new Float32Array(pd.positions), uvs: cached(pd.uvs, Float32Array) as Float32Array, indices: cached(pd.indices, Uint32Array) as Uint32Array });
+      this.charRoot.addChild(mesh);
+      entry = { mesh, key: pd.viewKey }; this.puppetMeshes.set(slot, entry);
+    }
+    const m = entry.mesh;
+    m.vertices = pd.positions;
+    m.alpha = alpha;
+    const s = h / pd.figureHeight;
+    m.pivot.set(pd.pivot.x, pd.pivot.y);
+    m.scale.set(s * (flip ? -1 : 1), s);
+    m.position.set(x, y);
+    return true;
   }
 
   private drawProcedural(g: Graphics, c: CharacterRenderItem, cx: number, cy: number, w: number, h: number, lift: number, t: number) {

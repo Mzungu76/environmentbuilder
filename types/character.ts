@@ -1,4 +1,4 @@
-export type CharacterState = 'IDLE' | 'WALK' | 'CLIMB' | 'INTERACT' | 'COLLECT' | 'JUMP' | 'FALL' | 'CUSTOM';
+export type CharacterState = 'IDLE' | 'WALK' | 'CLIMB' | 'INTERACT' | 'COLLECT' | 'JUMP' | 'FALL' | 'CELEBRATE' | 'CUSTOM';
 
 export interface Animation {
   id: string;
@@ -34,6 +34,19 @@ export interface CharacterBehavior {
  * a procedural placeholder is drawn when no asset is set.
  * `width`/`height` are fractions of the ENVIRONMENT HEIGHT; `speed` is environment-heights per second.
  */
+/** How a rigged character is drawn in the scene so that it blends with (or stands out from) the background. */
+export interface CharacterLook {
+  /** 1 = unchanged. */
+  brightness: number; contrast: number; saturation: number;
+  /** Ambient tint (colour + amount 0–1) multiplied over the character. */
+  tint: string; tintAmount: number;
+  /** Soft light halo behind the figure (0 = none) to separate it from busy backgrounds. */
+  halo: number; haloColor: string;
+  /** Opacity of the contact shadow (0–1). */
+  shadow: number;
+}
+export const DEFAULT_LOOK: CharacterLook = { brightness: 1, contrast: 1, saturation: 1, tint: '#7fa8d8', tintAmount: 0, halo: 0, haloColor: '#fff2c8', shadow: 0.35 };
+
 export interface Character {
   id: string;
   name: string;
@@ -46,6 +59,12 @@ export interface Character {
   speed: number;
   shadow: boolean;
   startNodeId: string | null;
+  /** Rigged character from the Studio used instead of sprite/placeholder (schema v3). */
+  puppetId?: string | null;
+  /** Procedural "omino" used when no puppet is set (schema v4). */
+  dollId?: string | null;
+  /** Scene integration of the rigged character (optional). */
+  look?: CharacterLook;
   /** Abilities matched against edge requirements (e.g. "can-climb"). */
   abilities: string[];
   behavior: CharacterBehavior;

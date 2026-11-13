@@ -1,0 +1,273 @@
+{
+ "canvas": {
+  "width": 2048,
+  "height": 1536
+ },
+ "unitPx": 1.3,
+ "standingHeightPx": 1300,
+ "parts": {
+  "head": {
+   "label": "TESTA (con cappello o capelli)",
+   "bone": "head",
+   "shape": "head",
+   "slot": {
+    "x": 40,
+    "y": 110,
+    "w": 320,
+    "h": 440
+   },
+   "piece": {
+    "x": 70,
+    "y": 174,
+    "w": 260,
+    "h": 312
+   },
+   "proximal": {
+    "x": 194,
+    "y": 440
+   },
+   "distal": {
+    "x": 200,
+    "y": 184
+   }
+  },
+  "torso": {
+   "label": "BUSTO (senza braccia)",
+   "bone": "torso",
+   "shape": "torso",
+   "slot": {
+    "x": 380,
+    "y": 110,
+    "w": 307,
+    "h": 583
+   },
+   "piece": {
+    "x": 410,
+    "y": 174,
+    "w": 247,
+    "h": 455
+   },
+   "proximal": {
+    "x": 534,
+    "y": 570
+   },
+   "distal": {
+    "x": 534,
+    "y": 226
+   }
+  },
+  "pelvis": {
+   "label": "BACINO",
+   "bone": "pelvis",
+   "shape": "torso",
+   "slot": {
+    "x": 707,
+    "y": 110,
+    "w": 294,
+    "h": 310
+   },
+   "piece": {
+    "x": 737,
+    "y": 174,
+    "w": 234,
+    "h": 182
+   },
+   "proximal": {
+    "x": 854,
+    "y": 246
+   },
+   "distal": {
+    "x": 854,
+    "y": 310
+   }
+  },
+  "accA": {
+   "label": "ZAINO (dietro al busto)",
+   "bone": null,
+   "shape": "free",
+   "slot": {
+    "x": 1021,
+    "y": 110,
+    "w": 320,
+    "h": 466
+   },
+   "piece": {
+    "x": 1051,
+    "y": 174,
+    "w": 260,
+    "h": 338
+   },
+   "proximal": null,
+   "distal": null
+  },
+  "accB": {
+   "label": "BRETELLA (sul busto)",
+   "bone": null,
+   "shape": "free",
+   "slot": {
+    "x": 1361,
+    "y": 110,
+    "w": 203,
+    "h": 518
+   },
+   "piece": {
+    "x": 1391,
+    "y": 174,
+    "w": 143,
+    "h": 390
+   },
+   "proximal": null,
+   "distal": null
+  },
+  "uarm": {
+   "label": "BRACCIO",
+   "bone": "uarmR",
+   "shape": "limb",
+   "slot": {
+    "x": 40,
+    "y": 733,
+    "w": 190,
+    "h": 401
+   },
+   "piece": {
+    "x": 89,
+    "y": 797,
+    "w": 91,
+    "h": 273
+   },
+   "proximal": {
+    "x": 135,
+    "y": 843
+   },
+   "distal": {
+    "x": 135,
+    "y": 1025
+   }
+  },
+  "farm": {
+   "label": "AVAMBRACCIO",
+   "bone": "farmR",
+   "shape": "limb",
+   "slot": {
+    "x": 250,
+    "y": 733,
+    "w": 190,
+    "h": 388
+   },
+   "piece": {
+    "x": 304,
+    "y": 797,
+    "w": 81,
+    "h": 260
+   },
+   "proximal": {
+    "x": 344,
+    "y": 837
+   },
+   "distal": {
+    "x": 344,
+    "y": 1011
+   }
+  },
+  "hand": {
+   "label": "MANO",
+   "bone": "handR",
+   "shape": "limb",
+   "slot": {
+    "x": 460,
+    "y": 733,
+    "w": 190,
+    "h": 258
+   },
+   "piece": {
+    "x": 509,
+    "y": 797,
+    "w": 91,
+    "h": 130
+   },
+   "proximal": {
+    "x": 555,
+    "y": 829
+   },
+   "distal": {
+    "x": 555,
+    "y": 917
+   }
+  },
+  "thigh": {
+   "label": "COSCIA",
+   "bone": "thighR",
+   "shape": "limb",
+   "slot": {
+    "x": 670,
+    "y": 733,
+    "w": 190,
+    "h": 479
+   },
+   "piece": {
+    "x": 700,
+    "y": 797,
+    "w": 130,
+    "h": 351
+   },
+   "proximal": {
+    "x": 765,
+    "y": 862
+   },
+   "distal": {
+    "x": 765,
+    "y": 1083
+   }
+  },
+  "shin": {
+   "label": "GAMBA (stinco)",
+   "bone": "shinR",
+   "shape": "limb",
+   "slot": {
+    "x": 880,
+    "y": 733,
+    "w": 190,
+    "h": 479
+   },
+   "piece": {
+    "x": 923,
+    "y": 797,
+    "w": 104,
+    "h": 351
+   },
+   "proximal": {
+    "x": 975,
+    "y": 849
+   },
+   "distal": {
+    "x": 975,
+    "y": 1096
+   }
+  },
+  "foot": {
+   "label": "PIEDE (punta a destra)",
+   "bone": "footR",
+   "shape": "foot",
+   "slot": {
+    "x": 1090,
+    "y": 733,
+    "w": 281,
+    "h": 219
+   },
+   "piece": {
+    "x": 1120,
+    "y": 797,
+    "w": 221,
+    "h": 91
+   },
+   "proximal": {
+    "x": 1178,
+    "y": 829
+   },
+   "distal": {
+    "x": 1328,
+    "y": 869
+   }
+  }
+ }
+}

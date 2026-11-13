@@ -1,0 +1,64 @@
+=== BURATTINO DI CARTA: FOGLIO DEI PEZZI ======================================
+Ordine di lavoro:
+ 1. Definisci prima il personaggio con l'AI (stile, volto, abiti, colori) fino a un'immagine di riferimento approvata.
+ 2. Poi, nella stessa conversazione o con un nuovo prompt, allega:
+      (1) l'immagine di RIFERIMENTO del personaggio;
+      (2) la guida "guida-burattino-pulita.png" (solo sagome: è quella da usare con l'AI).
+    "guida-burattino.png" (con scritte e misure) è per te: se la dai all'AI tende a ricopiare le scritte nel risultato.
+ 3. Usa il prompt qui sotto. Formato della tela: 2048 x 1536 (4:3), come la guida.
+Se l'AI cambia le proporzioni, chiedi di rispettare "ESATTAMENTE le dimensioni e le posizioni delle sagome".
+
+=== PROMPT (inglese) ==========================================================
+
+Create a "paper puppet" PARTS SHEET of the SAME character shown in the first reference image (face, hair, outfit, accessories,
+colors, materials and art style identical): {{STILE}}.
+
+The second reference image is a LAYOUT GUIDE made of grey silhouettes. Draw ONE body part of the character inside each silhouette,
+at the same position and the same size and proportions as the silhouette. The guide is only a layout: do NOT draw its outlines,
+its grey fill, any numbers, labels, crosses or boxes.
+
+The sheet is a cut-out kit that will be re-assembled as a jointed puppet, seen from the SIDE, facing RIGHT. The parts are:
+head (with hat/hair, profile facing right), torso (chest, profile), pelvis (hips, profile), upper arm, forearm, hand,
+thigh, lower leg (shin), foot (toes pointing right). Only ONE arm and ONE leg are needed (the near ones): they will be duplicated
+for the far side.
+The last two boxes are for carried gear, each drawn ALONE as a separate piece, in side view:
+- BACKPACK box: only the backpack body (with its tool/pickaxe if attached), seen from the side, WITHOUT its shoulder strap.
+- STRAP box: only the shoulder strap(s) as they lie over the chest and shoulder of the torso (a long band, as if peeled off the torso).
+Leave a gear box EMPTY if the character has no such item.
+
+THE TORSO IS DRAWN WITHOUT ARMS: only the shirt body (chest, back, collar/neck opening, the empty round armhole at the
+shoulder, the hem). NO sleeve, NO arm, NO hand, NO strap, NO backpack on the torso piece: those are separate pieces.
+The upper arm piece carries the sleeve on its own.
+
+RULES FOR EVERY PART
+- Each part is drawn straight (limbs vertical, not bent, not rotated), isolated, fully inside its silhouette area, never touching
+  the edges of the sheet or other parts.
+- Each part must be COMPLETE as if it were a separate physical cut-out piece: the ends that connect to the next part are fully
+  drawn, rounded and extend PAST the joint, so the part can rotate behind or over its neighbour without leaving a gap.
+  (e.g. the upper arm continues under where the forearm attaches; the thigh continues under where the shin attaches;
+  the torso continues under the neck and under the pelvis.)
+- Clothing is drawn on each part separately: sleeves on the arm and forearm, trousers on the thigh and shin, boots on the foot,
+  gloves on the hand, belt on the pelvis. Do not paint one part over another.
+- The same art style, outline thickness, colors and level of detail on all parts. Same size relation as in the guide.
+- Flat, even lighting. NO cast shadows, NO contact shadows, NO soft ambient occlusion between parts, no glow, no motion blur.
+- Clean, crisp edges on a transparent-looking flat background.
+- Background: solid flat uniform {{SFONDO}} everywhere between and around the parts. No ground, no scenery, no text.
+
+NEGATIVE: arms or sleeves painted on the torso, straps or backpack painted on the torso, bent or rotated limbs, parts overlapping each other, parts cut off by the canvas, a whole assembled body, perspective,
+3/4 view, front view, different outfit, different face, different colors between parts, drop shadows, text, labels, numbers,
+grey silhouettes visible, guide outlines visible, extra parts, background gradient.
+
+=== NOTE ======================================================================
+- Cosa controllo dopo la generazione (l'app tollera piccoli scostamenti e permette ritocchi):
+    · ogni pezzo dentro la propria casella e nell'ordine giusto;
+    · lunghezze coerenti (il braccio non molto più lungo della gamba…);
+    · estremità arrotondate che proseguono oltre lo snodo;
+    · nessuna ombra dipinta sopra un altro pezzo.
+- Se la tavola esce sbagliata prova una delle due varianti:
+    A) genera pochi pezzi per volta (busto+testa+bacino / braccio+avambraccio+mano / coscia+stinco+piede), sempre con la stessa
+       guida ritagliata e lo stesso riferimento;
+    B) chiedi di rigenerare solo i pezzi sbagliati e sostituiscili a mano.
+- Arti lontani: per ora si duplicano e si scuriscono nell'app. Se vuoi arti lontani disegnati a parte, genera un secondo foglio
+  con lo stesso prompt (cambia solo "near" in "far", colori un po' più scuri).
+- Zaino (con il piccone) e bretella vanno nelle due ultime caselle: lo zaino sta DIETRO al busto, la bretella SOPRA il busto.
+  Il busto deve essere senza braccia, senza maniche e senza bretelle (nel foglio precedente erano dipinte sopra).

@@ -1,0 +1,26 @@
+=== POSE EXTRA: ARRAMPICATA E SALTO ==========================================
+Si generano DOPO il foglio di rotazione, passando come riferimento (1) la guida "guida-pose-extra.png" e
+(2) il personaggio già approvato (il profilo del foglio di rotazione), così abiti e stile restano identici.
+
+=== PROMPT (inglese) ==========================================================
+
+Two full-body poses of the SAME character as the reference character image, side by side in one image:
+LEFT: climbing pose. RIGHT: jumping pose. Both seen from the SIDE, facing RIGHT.
+Follow the attached silhouette reference closely: same two equal columns, each figure centered in its half of the canvas.
+LEFT (climbing): body upright, both hands reaching up and forward as if gripping a rope or ladder above the head,
+near knee raised forward, far leg extended below.
+RIGHT (jumping): mid-air, torso slightly leaning forward, both arms stretched up and forward, both knees tucked up.
+
+Keep the exact same face, hair, outfit, accessories, colors, proportions and art style as the reference character:
+{{STILE}}.
+Clean, crisp outline, flat even lighting, no motion blur, no cast shadows, no scenery, no ground, no rope/ladder/wall drawn.
+Background: solid flat uniform {{SFONDO}}. Canvas aspect ratio 4:3 (2048x1536).
+
+NEGATIVE: different outfit, different face, extra limbs, cropped hands or feet, text, watermark, scenery, ground, ladder,
+rope, perspective distortion, background gradient.
+
+=== NOTE ======================================================================
+- Se il tuo strumento non rispetta il foglio a due figure, generale una alla volta (stessa guida, ritagliando la metà
+  corrispondente) e importale separatamente: nello Studio il passo 3 ha un pulsante per ciascuna pose.
+- Il personaggio deve guardare a DESTRA in entrambe (nel gioco si specchia per l'altra direzione).
+- Per un salto più o meno raccolto, cambia le ginocchia: "knees tucked" oppure "legs stretched, one forward".

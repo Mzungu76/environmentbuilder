@@ -17,8 +17,10 @@ export async function exportProjectZip(project: Project): Promise<Blob> {
   const zip = new JSZip();
   const assetFiles: Record<string, string> = {};
   const missing: string[] = [];
-  for (const env of project.environments) {
-    for (const a of env.assets) {
+  const groups = [...project.environments.map((e) => e.assets), ...project.puppets.map((p) => p.assets)];
+  for (const assets of groups) {
+    for (const a of assets) {
+      if (assetFiles[a.id]) continue;
       const blob = await getAsset(project.id, a.id);
       if (!blob) { missing.push(a.fileName); continue; }
       const path = `assets/${a.id}.${extOf(a.mime)}`;
@@ -49,8 +51,8 @@ export async function importProjectZip(file: Blob): Promise<Project> {
   const project = migrateProject(raw);
   project.id = uid('proj');
   project.updatedAt = Date.now();
-  for (const env of project.environments) {
-    for (const a of env.assets) {
+  for (const assets of [...project.environments.map((e) => e.assets), ...project.puppets.map((p) => p.assets)]) {
+    for (const a of assets) {
       const f = zip.file(new RegExp(`^assets/${a.id}\\.`))[0];
       if (!f) continue; // reported at load time as a missing asset
       const buf = await f.async('blob');

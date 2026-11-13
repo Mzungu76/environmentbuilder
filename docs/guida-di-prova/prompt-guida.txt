@@ -1,0 +1,42 @@
+=== PROMPT (inglese — di solito funziona meglio) =============================
+
+Character turnaround sheet, three full-body views of the SAME character in a single image:
+LEFT: front view. CENTER: side view facing RIGHT. RIGHT: back view.
+Follow the attached silhouette reference EXACTLY: same layout, same three equal columns,
+same body proportions (about 7.5 heads tall), same neutral A-pose with arms slightly away
+from the body and legs slightly apart, same feet baseline for all three figures,
+each figure centered in its own third of the canvas. Do not add text, labels, props on the floor or shadows.
+
+CHARACTER: {{PERSONAGGIO}}
+OUTFIT (head to toe): {{VESTITI}}
+COLOR PALETTE: {{PALETTE}}
+ART STYLE: {{STILE}}
+
+Consistency: identical face, hair, outfit, colors and proportions in all three views.
+Clean, crisp outline; flat even lighting (no strong cast shadows); no motion blur.
+Background: solid flat uniform {{SFONDO}} (no gradient, no floor, no scenery).
+Canvas aspect ratio 2:1 (3072x1536).
+
+NEGATIVE: extra limbs, cropped feet, different outfit between views, text, watermark,
+perspective distortion, dynamic pose, crossed arms, background scenery, cast shadow.
+
+=== PARAMETRI DA COMPILARE =====================================================
+{{PERSONAGGIO}}  es.: "male cave explorer, mid 30s, short curly brown hair, light stubble, friendly smile"
+{{VESTITI}}      es.: "yellow hard hat with headlamp, beige rolled-sleeve shirt, red neckerchief, olive cargo pants with knee pads,
+                  brown hiking boots, fingerless black gloves, leather belt with carabiner, canvas backpack with pickaxe"
+{{PALETTE}}      es.: "warm earthy tones: beige, olive green, brown, accents of yellow and red"
+{{STILE}}        es.: "hand-painted cartoon illustration, thick clean outline, soft cel shading, game character art"
+{{SFONDO}}       es.: "magenta (#FF00FF)"   oppure   "white"
+
+=== VERSIONE ITALIANA (per capire / adattare) ================================
+Foglio di rotazione del personaggio: tre viste a figura intera dello STESSO personaggio in un'unica immagine:
+SINISTRA fronte, CENTRO profilo verso DESTRA, DESTRA retro. Segui ESATTAMENTE la sagoma di riferimento allegata:
+stesso layout a tre colonne uguali, stesse proporzioni (circa 7,5 teste), stessa posa neutra "A" con braccia leggermente
+staccate e gambe leggermente divaricate, stessa linea dei piedi, ogni figura centrata nel suo terzo.
+Niente testi, etichette o ombre. Stesso volto, capelli, abiti e colori nelle tre viste. Contorno netto, luce uniforme,
+sfondo piatto di un solo colore. Formato 2:1.
+
+=== SE IL TUO STRUMENTO NON REGGE IL FOGLIO UNICO (modalità B) ==============
+1) Genera solo il FRONTE: usa solo la cella sinistra della guida (ritaglia 1024x1536) e lo stesso prompt con "single front view".
+2) Poi genera il PROFILO destro e il RETRO passando come riferimenti: la cella corrispondente della guida + il fronte già
+   generato, con la frase: "same character as the reference image, same outfit and colors, now in side view facing right".

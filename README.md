@@ -4,7 +4,7 @@ Editor 2D universale per trasformare illustrazioni (prodotte esternamente, es. c
 
 Tutto gira nel browser: nessun backend, nessun database remoto, nessun servizio a pagamento. I dati sono salvati in **IndexedDB**.
 
-## Stato: Milestone 1 (Editor base) ✅ · Milestone 2 (Simulazione) ✅ · Milestone 3 (Gestione ambienti) ✅ · Milestone 4 (Estensioni) ✅
+## Stato: Milestone 1 (Editor base) ✅ · Milestone 2 (Simulazione) ✅ · Milestone 3 (Gestione ambienti) ✅ · Milestone 4 (Estensioni) ✅ · **Studio personaggi** ✅ · **Omini** ✅
 
 📘 **Manuale operativo:** [docs/MANUALE.md](docs/MANUALE.md)
 
@@ -23,6 +23,28 @@ L’interfaccia è in **italiano** (stringhe ancora inline nei componenti; un li
 | Esportazione ZIP (project.json + immagini + manifest) e JSON; importazione ZIP/JSON | ✅ |
 | Modalità anteprima senza strumenti (`O`) | ✅ |
 | Touch: selezione, trascinamento nodi, pinch-zoom e pan a due dita, layout responsive | ✅ |
+| Smartphone in orizzontale (altezza ≤ 500 px): scena a tutto schermo, comandi tondi flottanti, menu progetto, pannello proprietà che affianca la scena (mockup in `docs/mockup-mobile.html`, proposta B) | ✅ |
+| **Primo piano**: parti dello sfondo dipinte (pennello/gomma, bordo morbido) che nascondono il personaggio; sostituisce il vecchio livello «primo piano» (schema v5, migrazione automatica) | ✅ (passi 1–2: pennello, forme e spline modificabili) |
+
+### Studio personaggi (modellini con scheletro) — sezione `/studio`
+
+Pipeline guidata in 7 passi per trasformare un **foglio di rotazione** (fronte, profilo, retro; generato con una guida inclusa) in un personaggio animato: rimozione sfondo con tolleranze, ritaglio delle viste con rettangoli regolabili, ritocco (gomma/ripristina), scheletro di 19 giunti con posizionamento automatico e correzione manuale, mesh e **pesi automatici + pennello**, copie degli arti lontani nel profilo, animazioni a chiavi con preset, anteprima ed **esportazione ZIP** (puppet.json + texture + runtime + `demo.html`). Nel Playtest il personaggio cammina con passo sincronizzato alla velocità e vista fronte/retro per collegamento. Dati: schema **v3** (`Project.puppets`, `Character.puppetId`), migrazione da v2 automatica. Guida all'integrazione: [docs/INTEGRAZIONE-PERSONAGGI.md](docs/INTEGRAZIONE-PERSONAGGI.md). Utilizzabile anche da smartphone/tablet (area di lavoro fissa in alto, modalità «mano», bersagli touch più grandi).
+
+### Burattino di carta — Studio personaggi → passo *Importa*
+Foglio di pezzi separati disegnati dall'AI → ritrovamento dei pezzi, snodi dai pixel, montaggio di profilo, atlante e mesh rigida sullo scheletro esistente (`engine/puppet/paperpuppet.ts`, `lib/studio/paper.ts`). Guide e prompt in `docs/guida-di-prova/` (`tools/make-puppet-guide.py` rigenera le guide e il layout).
+
+### Fronte/retro, attrezzi e animazioni del burattino
+Viste frontali con arti specchiati (`assembleFrontal`), attrezzi agganciati alle ossa (`engine/puppet/attachments.ts`), IK per i piedi a terra (`ik.ts`), preset (`presets.ts`) e sequenze (`sequences.ts`).
+
+### Sequenze di pose (arrampicata) — passo *Viste*
+Foglio con N pose → ritaglio, scheletro automatico per adattamento della sagoma (`engine/puppet/fit.ts`), scala uniforme, riproduzione chiave→chiave con deformazione e dissolvenza (`engine/puppet/keyposes.ts`). Esportato nel pacchetto (`puppet.json → poseSets`) con `sampleSet` nel runtime.
+
+### Manichino a parti (prototipo) — Studio personaggi → passo *Manichino*
+Mesh separata per ogni osso con texture cotta dalle viste (`engine/puppet/manikin.ts`): movimenti ampi senza strappare l'immagine unica; confronto affiancato e pose di prova.
+
+### Omini (personaggi procedurali) — Studio personaggi → *Omini*
+
+Evoluzione del piccolo personaggio disegnato dal programma: ora ha **braccia**, vestiti e accessori e si personalizza interamente (proporzioni, colori, capelli, volto, maglia, pantaloni, scarpe, 10 accessori tra cui casco con lampada, zaino e piccone), con modelli di partenza (Minatore, Esploratrice, Piccolo, Slanciato) e generatore **Casuale**. Lo scheletro e le animazioni sono gli stessi dei modellini (passo sincronizzato, arrampicata, salto…). Geometria pura (`engine/doll/`): una lista di poligoni disegnabile con Pixi, Canvas o qualunque motore; esportazione ZIP con `doll.json` + runtime + `demo.html`. Schema **v4** (`Project.dolls`, `Character.dollId`), migrazione automatica.
 
 ### Milestone 4 – Estensioni
 
@@ -112,6 +134,8 @@ engine/
   interaction/          Object & Interaction Editor: oggetti, ingressi/uscite (risoluzione dei passaggi), ObjectEditor
   scene/                Operazioni sui livelli grafici
   editor/SceneController  Instrada l'input agli editor (oggetti → navigazione)
+  puppet/               Studio personaggi: imageProc (sfondo/ritaglio), skeleton, mesh+pesi, animation, runtime, player, canvasRenderer
+  doll/                 Omini: proporzioni → scheletro → poligoni (shapes), player, renderer Canvas
   characters/           Factory e valori predefiniti dei personaggi
   navigation/           Navigation Editor: grafo (funzioni pure e immutabili), geometria Bézier, hit-testing,
                         NavigationEditor (controller strumenti → comandi sullo store)

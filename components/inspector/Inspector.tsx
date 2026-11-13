@@ -14,14 +14,18 @@ import { CheckField, Field, NumberField, PropsField, TextField } from './fields'
 import { CharacterPanel } from './CharacterPanel';
 import { ObjectPanel } from './ObjectPanel';
 import { LayersPanel } from './LayersPanel';
+import { GameplayPanel } from './GameplayPanel';
+import { ScenePanel } from './ScenePanel';
+import { Collapsible, SheetBar } from './Collapsible';
+import { nodeScale } from '@/engine/navigation/perspective';
 import { objectIssues, objectTypeInfo } from '@/engine/interaction/objects';
 import { createCharacter } from '@/engine/characters/factory';
 
 /* ---- inspector -------------------------------------------------------------------------------- */
 
-interface Props { store: EditorStore; env: Environment; selection: Selection; revision: number; open?: boolean; onFit: () => void; onReplaceImage: () => void; onToggleCurve: (id: string) => void; onDeleteSelection: () => void }
+interface Props { /** controls of the active tool, shown at the top (e.g. Primo piano) */ top?: React.ReactNode; store: EditorStore; env: Environment; selection: Selection; revision: number; open?: boolean; full?: boolean; onToggleFull?: () => void; onClose?: () => void; onFit: () => void; onReplaceImage: () => void; onToggleCurve: (id: string) => void; onDeleteSelection: () => void }
 
-export function Inspector({ store, env, selection, open, onFit, onReplaceImage, onToggleCurve, onDeleteSelection }: Props) {
+export function Inspector({ top, store, env, selection, open, full, onToggleFull, onClose, onFit, onReplaceImage, onToggleCurve, onDeleteSelection }: Props) {
   const nav = env.navigation;
   const node = selection?.kind === 'node' ? nav.nodes.find((n) => n.id === selection.id) : undefined;
   const edge = selection?.kind === 'edge' ? nav.edges.find((e) => e.id === selection.id) : undefined;
@@ -30,7 +34,9 @@ export function Inspector({ store, env, selection, open, onFit, onReplaceImage, 
   const select = (s: Selection) => store.setSelection(s);
 
   return (
-    <aside className={`${styles.inspector} ${open ? styles.inspectorOpen : ''}`} aria-label="Inspector" data-testid="inspector">
+    <aside className={`${styles.inspector} ${open ? styles.inspectorOpen : ''} ${full ? styles.inspectorFull : ''}`} aria-label="Inspector" data-testid="inspector">
+      <SheetBar title={node ? 'Nodo' : edge ? 'Percorso' : chr ? 'Personaggio' : obj ? 'Oggetto' : 'Impostazioni'} full={!!full} onToggleFull={onToggleFull} onClose={onClose} />
+      {top && <div className={styles.inspTop}>{top}</div>}
       <div className={styles.inspHead}>
         <h3>{node ? 'Nodo' : edge ? 'Percorso' : chr ? 'Personaggio' : obj ? 'Oggetto' : 'Ambiente'}</h3>
         {(node || edge || chr || obj) && <button className={`${styles.btn} ${styles.btnDanger}`} onClick={onDeleteSelection} title="Elimina (Canc)" data-testid="delete-selected">{Icon.trash}Elimina</button>}
@@ -69,6 +75,12 @@ function NodePanel({ store, env, node, select }: { store: EditorStore; env: Envi
           <NumberField id="n-y" label="Y" value={Math.round(node.y * env.height)} min={0} max={env.height} onCommit={(v) => move(node.x, v / env.height)} />
         </div>
         <span className={styles.help}>Normalizzate: {node.x.toFixed(4)}, {node.y.toFixed(4)}</span>
+      </div>
+      <div className={styles.section}>
+        <NumberField id="n-scale" label="Scala del personaggio qui (%)" value={Math.round(nodeScale(env, node) * 100)} min={5} max={300} step={5}
+          onCommit={(v) => { const props = { ...node.props }; props.scale = String(v / 100); edit({ props }); }}
+          help="Per la prospettiva: più piccolo dove la scena va in profondità. Lungo i percorsi la scala passa gradualmente da un nodo all’altro." />
+        {node.props.scale && <button className={styles.btn} onClick={() => { const props = { ...node.props }; delete props.scale; edit({ props }); }}>Usa la scala automatica</button>}
       </div>
       <div className={styles.section}>
         <h4>Collegamenti ({links.length})</h4>
@@ -130,8 +142,39 @@ function EdgePanel({ store, env, edge, select, onToggleCurve }: { store: EditorS
         <TextField id="e-req" label="Requisiti" value={edge.requirements.join(', ')} onCommit={(v) => edit({ requirements: v.split(',').map((s) => s.trim()).filter(Boolean) })} />
         <span className={styles.help}>Abilità richieste, separate da virgola (es. can-climb). Un personaggio senza tutte le abilità non può percorrere il collegamento.</span>
       </div>
+      <div className={styles.section}>
+        <Field label="Vista del personaggio con scheletro" id="e-view" help="Per i personaggi creati nello Studio: su questo collegamento mostra il profilo, il fronte o il retro (es. scale verso lo spettatore). Automatico = profilo mentre cammina.">
+          <select id="e-view" className={styles.select} value={edge.props.view ?? ''} data-testid="edge-view"
+            onChange={(ev) => { const props = { ...edge.props }; if (ev.target.value) props.view = ev.target.value; else delete props.view; edit({ props }); }}>
+            <option value="">Automatica</option><option value="side">Profilo</option><option value="front">Fronte</option><option value="back">Retro</option>
+          </select>
+        </Field>
+      </div>
+      <ClipSelect store={store} env={env} edge={edge} edit={edit} />
       <div className={styles.section}><PropsField id="e-props" value={edge.props} onCommit={(p) => edit({ props: p })} /></div>
     </>
+  );
+}
+
+/** Animation of the rigged character on this segment: any clip of its puppet (also the ones made in the Studio), or automatic. */
+function ClipSelect({ store, env, edge, edit }: { store: EditorStore; env: Environment; edge: NavigationEdge; edit: (p: Partial<NavigationEdge>) => void }) {
+  const ids = new Set(env.characters.map((c) => c.puppetId).filter(Boolean) as string[]);
+  const puppets = store.project.puppets.filter((p) => ids.has(p.id));
+  if (!puppets.length) return null;
+  const names = new Map<string, string>();      // name → which views have it
+  for (const p of puppets) for (const v of Object.values(p.views)) for (const c of v?.clips ?? []) names.set(c.name, (names.get(c.name) ? names.get(c.name) + ', ' : '') + `${p.name}/${v!.id}`);
+  const cur = edge.props.clip ?? '';
+  return (
+    <div className={styles.section}>
+      <Field label="Animazione su questo tratto" id="e-clip" help="Automatica = quella dello stato del tipo di collegamento (camminata, arrampicata…). Altrimenti scegli una qualsiasi animazione del personaggio, anche quelle create da te: se non dura in ciclo viene distribuita lungo tutto il tratto.">
+        <select id="e-clip" className={styles.select} value={cur} data-testid="edge-clip"
+          onChange={(ev) => { const props = { ...edge.props }; if (ev.target.value) props.clip = ev.target.value; else delete props.clip; edit({ props }); }}>
+          <option value="">Automatica</option>
+          {cur && !names.has(cur) && <option value={cur}>{cur} (non trovata)</option>}
+          {[...names.keys()].sort((a, b) => a.localeCompare(b)).map((n) => <option key={n} value={n}>{n}</option>)}
+        </select>
+      </Field>
+    </div>
   );
 }
 
@@ -170,7 +213,9 @@ function EnvPanel({ store, env, onFit, onReplaceImage }: { store: EditorStore; e
         {objectIssues(store.project, env).map((i, k) => <span key={k} className={styles.warn}>{i.message}</span>)}
         <span className={styles.help}>Aggiungili con lo strumento Oggetto (<kbd>I</kbd>).</span>
       </div>
-      <ProfilesPanel store={store} env={env} />
+      <Collapsible title="Profili" id="profiles"><ProfilesPanel store={store} env={env} /></Collapsible>
+      <Collapsible title="Prospettiva, zone di scala e luce" id="scene"><ScenePanel store={store} env={env} /></Collapsible>
+      <Collapsible title="Gioco: oggetti e crollo" id="gameplay"><GameplayPanel store={store} env={env} /></Collapsible>
       <div className={styles.section}>
         <h4>Personaggi ({env.characters.length})</h4>
         <div className={styles.list}>

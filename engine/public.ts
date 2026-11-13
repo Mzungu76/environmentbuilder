@@ -28,3 +28,24 @@ export {
 export { getMovementType, registerMovementType, movementTypes, type MovementType } from '@/engine/movement/movementTypes';
 export { spriteFor, parseFrames, type SpriteDraw } from '@/engine/characters/sprites';
 export { allProfiles, suggestedTypes } from '@/engine/profiles';
+
+// --- rigged characters ("puppets") ---------------------------------------------------------------------------------
+export { buildLightMap, sampleLight, applyLight } from '@/engine/game/light';
+export { baseScale, nodeScale, scaleAlong } from '@/engine/navigation/perspective';
+export { GameSession, createGameSession, type SessionEvent, type SessionFrame, type CharacterFrame, type CollectResult, type SessionOptions } from '@/engine/game/session';
+export { CollapseTimer } from '@/engine/game/collapse';
+export { defaultGameplay, defaultCollapse, newCollectible } from '@/engine/game/defaults';
+export { clampPose, limitsFor } from '@/engine/puppet/limits';
+export { activeAttachments, attachmentQuad } from '@/engine/puppet/attachments';
+export { sampleSet, posePartway, frameQualities } from '@/engine/puppet/keyposes';
+export { rigOf, skinVertices, clipFor, advancePhase, poseAt, chooseView, chooseViewForState, flipsWithFacing, resolveView } from '@/engine/puppet/runtime';
+export { samplePose, phaseRate, makePreset, defaultClips } from '@/engine/puppet/animation';
+export { buildRig, boneMatrices, BONE_DEFS } from '@/engine/puppet/skeleton';
+export { drawPuppet, type DrawOptions } from '@/engine/puppet/canvasRenderer';
+export { buildManikin, DEFAULT_MANIKIN } from '@/engine/puppet/manikin';
+
+// --- procedural characters ("omini") ---------------------------------------------------------------------------------
+export { buildDollShapes, dollLandmarks, DOLL_HEIGHT, type DollShape } from '@/engine/doll/shapes';
+export { DollPlayer, dollClips } from '@/engine/doll/player';
+export { drawDoll, shapesBounds, type DollDrawOptions } from '@/engine/doll/render';
+export { createDoll, randomDoll, DOLL_PRESETS, ACCESSORY_LABEL } from '@/engine/doll/defaults';

@@ -10,7 +10,10 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "build:standalone": "node tools/build-standalone.mjs",
-    "build:runtime": "node tools/build-runtime.mjs"
+    "build:runtime": "node tools/build-runtime.mjs",
+    "predev": "node tools/build-runtime.mjs",
+    "prebuild": "node tools/build-runtime.mjs",
+    "prebuild:standalone": "node tools/build-runtime.mjs"
   },
   "dependencies": {
     "jszip": "^3.10.2",

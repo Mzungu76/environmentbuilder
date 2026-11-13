@@ -27,9 +27,10 @@ export function renderMarkdown(md: string): { html: string; headings: Heading[];
     const line = lines[i];
     if (!line.trim()) { i++; continue; }
 
-    if (line.startsWith('```')) {
-      const buf: string[] = []; i++;
-      while (i < lines.length && !lines[i].startsWith('```')) buf.push(lines[i++]);
+    const fence = line.match(/^(\s{0,6})```/);
+    if (fence) {
+      const indent = fence[1].length, buf: string[] = []; i++;
+      while (i < lines.length && !/^\s{0,6}```/.test(lines[i])) buf.push(lines[i++].slice(Math.min(indent, lines[i - 1].length - lines[i - 1].trimStart().length)));
       i++;
       out.push(`<pre><code>${esc(buf.join('\n'))}</code></pre>`);
       continue;
@@ -52,16 +53,27 @@ export function renderMarkdown(md: string): { html: string; headings: Heading[];
     if (ul.test(line) || ol.test(line)) {
       const ordered = ol.test(line), re = ordered ? ol : ul, items: string[] = [];
       while (i < lines.length && re.test(lines[i])) {
-        let t = lines[i++].replace(re, '');
-        while (i < lines.length && lines[i].trim() && /^\s{2,}\S/.test(lines[i]) && !re.test(lines[i])) t += ' ' + lines[i++].trim();
-        items.push(`<li>${inline(t)}</li>`);
-        // indented code block belonging to the item is rendered after the list
+        let text = lines[i++].replace(re, '');
+        let html = '';
+        // continuation lines (indented): text and fenced code blocks belong to the item
+        while (i < lines.length && lines[i].trim() && /^\s{2,}\S/.test(lines[i]) && !re.test(lines[i])) {
+          const f = lines[i].match(/^(\s+)```/);
+          if (f) {
+            const indent = f[1].length, code: string[] = []; i++;
+            while (i < lines.length && !/^\s*```/.test(lines[i])) code.push(lines[i++].slice(indent));
+            i++;
+            if (text) { html += inline(text); text = ''; }
+            html += `<pre><code>${esc(code.join('\n'))}</code></pre>`;
+          } else text += (text ? ' ' : '') + lines[i++].trim();
+        }
+        if (text) html += inline(text);
+        items.push(`<li>${html}</li>`);
       }
       out.push(`<${ordered ? 'ol' : 'ul'}>${items.join('')}</${ordered ? 'ol' : 'ul'}>`);
       continue;
     }
     const buf: string[] = [];
-    while (i < lines.length && lines[i].trim() && !/^(#{1,4}\s|```|\s*[-*]\s|\s*\d+\.\s)/.test(lines[i]) && !lines[i].trim().startsWith('|')) buf.push(lines[i++].trim());
+    while (i < lines.length && lines[i].trim() && !/^(#{1,4}\s|\s{0,6}```|\s*[-*]\s|\s*\d+\.\s)/.test(lines[i]) && !lines[i].trim().startsWith('|')) buf.push(lines[i++].trim());
     if (!buf.length) { buf.push(line.trim()); i++; }
     out.push(`<p>${inline(buf.join(' '))}</p>`);
   }

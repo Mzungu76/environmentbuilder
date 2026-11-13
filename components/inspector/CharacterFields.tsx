@@ -1,6 +1,7 @@
 'use client';
 
 import type { Character, CharacterBehavior } from '@/types';
+import { DEFAULT_LOOK } from '@/types';
 import type { EditorStore } from '@/lib/store/editorStore';
 import { allEdgeTypes } from '@/engine/profiles';
 import { getMovementType } from '@/engine/movement/movementTypes';
@@ -48,6 +49,35 @@ export function AppearanceFields({ store, c, idp }: { store: EditorStore; c: Cha
         <input id={`${idp}-col`} type="color" className={styles.input} style={{ padding: 2, height: 34 }} value={c.color} onChange={(e) => set({ color: e.target.value })} />
       </Field>
       <CheckField id={`${idp}-shadow`} label="Ombra" checked={c.shadow} onChange={(v) => set({ shadow: v })} />
+      {c.puppetId && <LookFields store={store} c={c} idp={idp} />}
     </>
+  );
+}
+
+/** Scene integration of a rigged character: colour grading, ambient tint, halo and shadow (so it blends with, or stands out from, the background). */
+export function LookFields({ store, c, idp }: { store: EditorStore; c: Character; idp: string }) {
+  const look = { ...DEFAULT_LOOK, ...(c.look ?? {}) };
+  const setL = (patch: Partial<typeof look>) => store.commitEnv((e) => ({ ...e, characters: e.characters.map((x) => (x.id === c.id ? { ...x, look: { ...look, ...patch } } : x)) }));
+  const pct = (v: number) => Math.round(v * 100);
+  return (
+    <Field label="Resa nella scena" id={`${idp}-look`} help="Per far spiccare o integrare il personaggio nello sfondo: correggi luce e colori, aggiungi una tinta d’ambiente e un alone chiaro.">
+      <div className={styles.row2}>
+        <NumberField id={`${idp}-lb`} label="Luminosità (%)" value={pct(look.brightness)} min={40} max={200} step={5} onCommit={(v) => setL({ brightness: v / 100 })} />
+        <NumberField id={`${idp}-lc`} label="Contrasto (%)" value={pct(look.contrast)} min={40} max={200} step={5} onCommit={(v) => setL({ contrast: v / 100 })} />
+      </div>
+      <div className={styles.row2}>
+        <NumberField id={`${idp}-ls`} label="Saturazione (%)" value={pct(look.saturation)} min={0} max={200} step={5} onCommit={(v) => setL({ saturation: v / 100 })} />
+        <NumberField id={`${idp}-lsh`} label="Ombra a terra (%)" value={pct(look.shadow)} min={0} max={100} step={5} onCommit={(v) => setL({ shadow: v / 100 })} />
+      </div>
+      <div className={styles.row2}>
+        <NumberField id={`${idp}-lta`} label="Tinta d’ambiente (%)" value={pct(look.tintAmount)} min={0} max={100} step={5} onCommit={(v) => setL({ tintAmount: v / 100 })} />
+        <Field label="Colore tinta" id={`${idp}-lt`}><input id={`${idp}-lt`} type="color" className={styles.input} style={{ padding: 2, height: 34 }} value={look.tint} onChange={(e) => setL({ tint: e.target.value })} /></Field>
+      </div>
+      <div className={styles.row2}>
+        <NumberField id={`${idp}-lh`} label="Alone chiaro (%)" value={pct(look.halo)} min={0} max={100} step={5} onCommit={(v) => setL({ halo: v / 100 })} />
+        <Field label="Colore alone" id={`${idp}-lhc`}><input id={`${idp}-lhc`} type="color" className={styles.input} style={{ padding: 2, height: 34 }} value={look.haloColor} onChange={(e) => setL({ haloColor: e.target.value })} /></Field>
+      </div>
+      <button className={styles.btn} onClick={() => store.commitEnv((e) => ({ ...e, characters: e.characters.map((x) => (x.id === c.id ? { ...x, look: undefined } : x)) }))}>Ripristina</button>
+    </Field>
   );
 }
