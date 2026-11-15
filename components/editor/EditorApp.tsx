@@ -18,6 +18,7 @@ import { PlayTransport } from '@/components/panels/PlayTransport';
 import { PlaytestPanel } from '@/components/panels/PlaytestPanel';
 import { ZoneBar } from './ZoneBar';
 import { OccluderBar } from './OccluderBar';
+import { SearchBar } from './SearchBar';
 import { EnvTabs } from '@/components/panels/EnvTabs';
 import { OBJECT_TYPES } from '@/engine/interaction/objects';
 import type { Character } from '@/types';
@@ -143,8 +144,8 @@ function Editor({ store }: { store: EditorStore }) {
   // phones: the settings panel is a bottom sheet — it opens by itself when something is selected, and gets out of the way while painting zones
   const selKey = state.selection ? `${state.selection.kind}:${state.selection.id}` : null;
   useEffect(() => { if (selKey && (compact || (typeof window !== 'undefined' && window.innerWidth < 900))) setInspectorOpen(true); }, [selKey, compact]);
-  useEffect(() => { if (state.tool === 'occluders' && !compact && typeof window !== 'undefined' && window.innerWidth < 900) setInspectorOpen(true); }, [state.tool, compact]);
-  useEffect(() => { if ((state.tool === 'zones' && (compact || (typeof window !== 'undefined' && window.innerWidth < 900))) || (state.tool === 'occluders' && compact)) { setInspectorOpen(false); setInspectorFull(false); } }, [state.tool, compact]);
+  useEffect(() => { if ((state.tool === 'occluders' || state.tool === 'search') && !compact && typeof window !== 'undefined' && window.innerWidth < 900) setInspectorOpen(true); }, [state.tool, compact]);
+  useEffect(() => { if ((state.tool === 'zones' && (compact || (typeof window !== 'undefined' && window.innerWidth < 900))) || (state.tool === 'occluders' && compact) || (state.tool === 'search' && compact)) { setInspectorOpen(false); setInspectorFull(false); } }, [state.tool, compact]);
   const closeSheet = useCallback(() => { setInspectorOpen(false); setInspectorFull(false); }, []);
   const openLayers = useCallback(() => { store.setSelection(null); store.setTool('select'); setInspectorOpen(true); }, [store]);
 
@@ -169,6 +170,7 @@ function Editor({ store }: { store: EditorStore }) {
       if (mod || e.altKey) return;
       if (e.key === ' ' && !spaceHeld) { spaceHeld = true; if (handle.current) handle.current.view.panMode = true; e.preventDefault(); return; }
       if (e.key === 'Enter' && store.getState().tool === 'occluders') { handle.current?.editor.occluders.finishDraft(); return; }
+      if (e.key === 'Enter' && store.getState().tool === 'search') { handle.current?.editor.search.finishDraft(); return; }
       const tool = TOOLS.find((t) => t.key.toLowerCase() === k);
       if (tool) { setTool(tool.id); return; }
       if (e.key === 'Delete' || e.key === 'Backspace') { handle.current?.editor.deleteSelection(); e.preventDefault(); }
@@ -205,6 +207,7 @@ function Editor({ store }: { store: EditorStore }) {
   const onAssetError = useCallback((id: string, msg: string) => setNotice(`Impossibile caricare l’immagine (${id}): ${msg}`), []);
   const stableOnReady = useCallback((h: SceneHandle | null) => { handle.current = h; setSceneReady(!!h); }, []);
   const memoEnvName = useMemo(() => env.name, [env.name]);
+  const searchCmds = { onFinish: () => handle.current?.editor.search.finishDraft(), onCancel: () => handle.current?.editor.search.cancelDraft(), onDelete: () => handle.current?.editor.search.deleteSelected() };
   const occCmds = { onFinish: () => handle.current?.editor.occluders.finishDraft(), onCancel: () => handle.current?.editor.occluders.cancelDraft(), onDelete: () => handle.current?.editor.deleteSelection() };
   const typeBar = hasImage && !state.preview && !playtest && state.tool === 'object' ? (
     <div className={styles.typeBar} role="group" aria-label="Tipo di oggetto">
@@ -212,7 +215,7 @@ function Editor({ store }: { store: EditorStore }) {
     </div>
   ) : null;
   // phone in landscape: tool options live in a side column next to the scene, never on top of the illustration
-  const showOptions = compact && hasImage && !state.preview && !playtest && !inspectorOpen && (state.tool === 'zones' || state.tool === 'occluders' || state.tool === 'object');
+  const showOptions = compact && hasImage && !state.preview && !playtest && !inspectorOpen && (state.tool === 'zones' || state.tool === 'occluders' || state.tool === 'search' || state.tool === 'object');
 
   return (
     <div className={`${styles.app} ${compact ? styles.compact : ''}`}>
@@ -243,7 +246,7 @@ function Editor({ store }: { store: EditorStore }) {
           )}
           {!compact && typeBar}
           {!compact && hasImage && !state.preview && !playtest && state.tool === 'zones' && <ZoneBar store={store} />}
-          {hasImage && !state.preview && !playtest && state.tool !== 'zones' && state.tool !== 'occluders' && <div className={styles.hint} style={state.tool === 'object' ? { top: 64 } : undefined}>{toolInfo.hint}</div>}
+          {hasImage && !state.preview && !playtest && state.tool !== 'zones' && state.tool !== 'occluders' && state.tool !== 'search' && <div className={styles.hint} style={state.tool === 'object' ? { top: 64 } : undefined}>{toolInfo.hint}</div>}
           {!compact && playtest && ctrl && <PlayTransport ctrl={ctrl} />}
           {notice && <div className={styles.banner} role="alert">{notice}<button onClick={() => setNotice(null)}>Chiudi</button></div>}
           {compact && <CompactControls store={store} state={state} envName={memoEnvName} envId={env.id} canPlaytest={hasImage}
@@ -257,8 +260,8 @@ function Editor({ store }: { store: EditorStore }) {
             {!playtest && <button className={`${styles.btn} ${styles.iconBtn}`} aria-pressed={state.preview} onClick={() => store.setPreview(!state.preview)} aria-label="Anteprima senza strumenti" title="Anteprima senza strumenti (O)" style={state.preview ? { borderColor: 'var(--accent)' } : undefined} data-testid="preview">{state.preview ? Icon.eyeOff : Icon.eye}</button>}
           </div>
         </div>
-        {showOptions && <aside className={styles.cOptions} aria-label="Opzioni dello strumento" data-testid="c-options">{state.tool === 'zones' ? <ZoneBar store={store} /> : state.tool === 'occluders' ? <OccluderBar store={store} {...occCmds} /> : typeBar}</aside>}
-        {playtest ? (ctrl && <PlaytestPanel store={store} env={env} ctrl={ctrl} showPaths={state.showPaths} open={inspectorOpen} full={inspectorFull} onToggleFull={() => setInspectorFull((f) => !f)} onClose={closeSheet} />) : <Inspector top={!compact && hasImage && !state.preview && state.tool === 'occluders' ? <OccluderBar store={store} {...occCmds} /> : undefined} store={store} env={env} selection={state.selection} revision={state.revision} open={inspectorOpen} full={inspectorFull} onToggleFull={() => setInspectorFull((f) => !f)} onClose={closeSheet}
+        {showOptions && <aside className={styles.cOptions} aria-label="Opzioni dello strumento" data-testid="c-options">{state.tool === 'zones' ? <ZoneBar store={store} /> : state.tool === 'occluders' ? <OccluderBar store={store} {...occCmds} /> : state.tool === 'search' ? <SearchBar store={store} {...searchCmds} /> : typeBar}</aside>}
+        {playtest ? (ctrl && <PlaytestPanel store={store} env={env} ctrl={ctrl} showPaths={state.showPaths} open={inspectorOpen} full={inspectorFull} onToggleFull={() => setInspectorFull((f) => !f)} onClose={closeSheet} />) : <Inspector top={!compact && hasImage && !state.preview ? (state.tool === 'occluders' ? <OccluderBar store={store} {...occCmds} /> : state.tool === 'search' ? <SearchBar store={store} {...searchCmds} /> : undefined) : undefined} store={store} env={env} selection={state.selection} revision={state.revision} open={inspectorOpen} full={inspectorFull} onToggleFull={() => setInspectorFull((f) => !f)} onClose={closeSheet}
           onFit={() => handle.current?.view.fit()} onReplaceImage={() => fileInput.current?.click()}
           onToggleCurve={(id) => handle.current?.editor.toggleCurve(id)} onDeleteSelection={() => handle.current?.editor.deleteSelection()} />}
       </div>

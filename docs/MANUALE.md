@@ -58,6 +58,14 @@ Proprietà di un collegamento: **direzione** (entrambi i sensi / solo Da→A / s
 
 Sfondo (obbligatorio) + piani intermedi (sempre dietro ai personaggi). Per ogni livello: mostra/nascondi, avanti/indietro, spostamento X/Y, opacità. Per le parti che **nascondono il personaggio** non si usano più i livelli: vedi lo strumento Primo piano (`G`).
 
+### Zone di ricerca (`R`)
+
+Disegna sulla scena i punti dove il giocatore può **cercare le gemme** (grattando la polvere sulla carta). Ogni zona ha un **nome** e un **peso** da 0 a 10: è la probabilità relativa che la zona riceva una gemma all'inizio della partita (peso 0 = sempre vuota; serve a rendere la ricerca rischiosa).
+
+- **Poligono**: tocca i punti, chiudi toccando il primo o con «Chiudi zona» / Invio. **Ellisse** e **Rettangolo**: trascina. **Modifica**: sposta zona e punti; doppio tocco su un lato aggiunge un punto, su un punto lo toglie.
+- Le zone **non devono sovrapporsi**; ne servono almeno tre, di cui qualcuna a peso 0. La verifica «pronto per il gioco» te lo segnala.
+- Lo scenario non decide mai dove sono le gemme: esporta solo contorni e pesi (`scenario.json → searchZones`, coordinate normalizzate 0–1). Le gemme le nasconde il server a ogni partita.
+
 ### Primo piano (`G`)
 
 Lo strumento **Primo piano** dipinge direttamente sullo sfondo le parti che nascondono il personaggio quando ci passa dietro (rocce, archi, pilastri). Non servono immagini separate: dove dipingi, lo sfondo viene ridisegnato sopra il personaggio.

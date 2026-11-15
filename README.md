@@ -25,6 +25,7 @@ L’interfaccia è in **italiano** (stringhe ancora inline nei componenti; un li
 | Touch: selezione, trascinamento nodi, pinch-zoom e pan a due dita, layout responsive | ✅ |
 | Smartphone in orizzontale (altezza ≤ 500 px): scena a tutto schermo, comandi tondi flottanti, menu progetto, pannello proprietà che affianca la scena (mockup in `docs/mockup-mobile.html`, proposta B) | ✅ |
 | **Primo piano**: parti dello sfondo dipinte (pennello/gomma, bordo morbido) che nascondono il personaggio; sostituisce il vecchio livello «primo piano» (schema v5, migrazione automatica) | ✅ (passi 1–2: pennello, forme e spline modificabili) |
+| **Zone di ricerca** (`R`): zone disegnate sulla scena (poligono, ellisse, rettangolo) con un peso = probabilità che ricevano una gemma (0 = sempre vuota); esportate in `scenario.json → searchZones` per il gioco a zone | ✅ |
 
 ### Studio personaggi (modellini con scheletro) — sezione `/studio`
 

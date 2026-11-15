@@ -4,6 +4,7 @@ import { SCHEMA_VERSION } from '@/types';
 import { getAsset } from '@/lib/persistence/db';
 import { RUNTIME_SOURCE } from '@/lib/generated/runtimeSource';
 import { gameReadiness } from '@/engine/game/validate';
+import { searchZonesExport } from '@/engine/search/zones';
 import { computeLightMap } from '@/lib/studio/lightmap';
 import { hasCoverage, occGrid, occluderAlpha, occluderCoverage } from '@/engine/navigation/occluders';
 import { bakeCutout, cutoutBlob } from '@/engine/rendering/occluderBake';
@@ -33,6 +34,8 @@ export function scenarioManifest(project: Project, environmentId: string) {
     collectibles: (g?.collectibles ?? []).map((c) => ({ id: c.id, name: c.name, points: c.points, weight: c.weight, color: c.color })),
     collectSeconds: g?.collectSeconds ?? 1.4, celebrateSeconds: g?.celebrateSeconds ?? 1.2,
     collapse: g?.collapse.enabled ? { stages: g.collapse.stages.map((s) => ({ at: s.at, effect: s.effect, intensity: s.intensity, event: s.event })) } : null,
+    // where the player can search (outlines normalized to the image + weights). The gems themselves are hidden by the game, never listed here.
+    searchZones: searchZonesExport(env),
     events: ['collect:start', 'collect:pick', 'collect:done', 'score', 'stage', 'collapse', 'arrival', 'interaction'],
   };
 }
@@ -80,7 +83,7 @@ function readme(name: string) {
 Contenuto
 - project.json              progetto completo dello scenario (ambiente, grafo, oggetti, regole di gioco, personaggi)
 - assets/                   immagini (sfondi, oggetti, texture dei personaggi)
-- scenario.json             il contratto: formato, versione, oggetti da trovare, fasi del crollo
+- scenario.json             il contratto: formato, versione, oggetti da trovare, fasi del crollo, zone di ricerca
 - environment-runtime.mjs   runtime senza dipendenze (nessuna build)
 - game-example.html         mini gioco completo (doppio click): dadi → oggetto → contatore → crollo
 
@@ -106,6 +109,9 @@ Contenuto
     // quando i dadi escono uguali:
     session.triggerCollect();                // oggetto a caso (per peso)  |  triggerCollect('Gemma')  |  triggerCollect(idOggetto)
     // il personaggio si ferma, raccoglie, esulta; il punto si conta a metà raccolta; poi riprende a vagare
+
+## Zone di ricerca
+\`scenario.json → searchZones\` elenca le zone dove il giocatore può cercare le gemme: \`{ id, name, weight, color, polygon }\` con il contorno normalizzato (0–1) rispetto all'immagine. Il \`weight\` è la quota di gemme che la zona riceve (0 = sempre vuota). Le gemme vere le nasconde il gioco, mai lo scenario.
 
 ## Regole importanti
 - Il personaggio si muove SEMPRE da solo (percorso casuale sul grafo); il gioco non gli dà ordini di movimento.
