@@ -4,6 +4,7 @@ import { NavigationEditor } from '@/engine/navigation/NavigationEditor';
 import { ObjectEditor } from '@/engine/interaction/ObjectEditor';
 import { OccluderEditor } from '@/engine/navigation/OccluderEditor';
 import { ZoneEditor } from '@/engine/navigation/ZoneEditor';
+import { SearchZoneEditor } from '@/engine/search/SearchZoneEditor';
 
 /**
  * Routes pointer input to the right editor module (objects first, then navigation) and exposes the
@@ -14,12 +15,14 @@ export class SceneController {
   readonly objects: ObjectEditor;
   readonly zones: ZoneEditor;
   readonly occluders: OccluderEditor;
+  readonly search: SearchZoneEditor;
 
   constructor(private store: EditorStore, private view: SceneView) {
     this.nav = new NavigationEditor(store, view);
     this.objects = new ObjectEditor(store, view);
     this.zones = new ZoneEditor(store, view);
     this.occluders = new OccluderEditor(store, view);
+    this.search = new SearchZoneEditor(store, view);
     this.attach();
   }
 
@@ -29,6 +32,7 @@ export class SceneController {
   private route(e: ViewPointerEvent) {
     const s = this.store.getState();
     if (s.mode === 'playtest' || s.preview) return;
+    if (this.search.handle(e)) return;
     if (this.zones.handle(e)) return;
     if (this.occluders.handle(e)) return;
     if (this.objects.handle(e)) { this.nav.refresh(); return; }
@@ -38,12 +42,13 @@ export class SceneController {
   get markers(): PlaytestMarkers | null { return this.nav.markers; }
   set markers(m: PlaytestMarkers | null) { this.nav.markers = m; }
   refresh() { this.nav.refresh(); }
-  cancelPending() { this.nav.cancelPending(); this.occluders.cancelPending(); }
+  cancelPending() { this.nav.cancelPending(); this.occluders.cancelPending(); this.search.cancelPending(); }
   toggleCurve(id: string) { this.nav.toggleCurve(id); }
   deleteSelection() {
+    if (this.search.deleteSelected()) return;
     if (this.occluders.deleteSelected()) return;
     if (this.store.getState().selection?.kind === 'object') this.objects.deleteSelected(); else this.nav.deleteSelection();
     this.nav.refresh();
   }
-  dispose() { this.zones.dispose(); this.occluders.dispose(); this.nav.dispose(); }
+  dispose() { this.zones.dispose(); this.occluders.dispose(); this.search.dispose(); this.nav.dispose(); }
 }

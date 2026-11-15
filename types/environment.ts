@@ -105,6 +105,21 @@ export type OccluderOp = OccluderStroke | OccluderShape;
  */
 export interface Occluder { id: string; name: string; color: string; softness: number; ops: OccluderOp[] }
 
+/**
+ * A place of the card where the player can search for gems (the game "At The Limit" makes the player scratch the dust there, roll dice and
+ * use the lens). The author only draws the zones and gives each a weight: the game decides in secret where the gems really are, so
+ * every match is different. Weight 0 = a zone that is always empty (a decoy). Coordinates are normalized like the rest of the environment.
+ */
+export interface SearchZone {
+  id: string;
+  name: string;
+  /** Relative share of the hidden gems this zone gets (0–10). 0 = always empty. */
+  weight: number;
+  color: string;
+  /** Same shapes as the occluders: rect, ellipse, polygon, spline (`mode` is always 'add'). */
+  shape: OccluderShape;
+}
+
 export interface Environment {
   id: string;
   name: string;
@@ -128,6 +143,8 @@ export interface Environment {
   scaleZones?: ScaleZone[];
   /** Parts of the backdrop drawn over the characters (painted like the scale zones). */
   occluders?: Occluder[];
+  /** Where the player can search for gems (optional; see SearchZone). Does not change the schema version: older files simply have none. */
+  searchZones?: SearchZone[];
   /** 0–1: how gently the size changes across and around the painted zones (default 0.5). */
   scaleSoftness?: number;
   /** Light of the scene reproduced on the characters (see engine/game/light). */

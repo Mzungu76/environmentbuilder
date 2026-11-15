@@ -116,6 +116,8 @@ export class SceneView {
   private occItems: OccluderItem[] = [];
   private bgInfo: { tex: Texture; x: number; y: number } | null = null;
   private occGfx = new Graphics();
+  private searchGfx = new Graphics();
+  private searchFn: ((g: Graphics, px: number, envW: number, envH: number) => void) | null = null;
   private guideFn: ((g: Graphics, px: number, envW: number, envH: number) => void) | null = null;
   private occTintSprite: Sprite | null = null;
   private occTintTex: Texture | null = null;
@@ -174,7 +176,7 @@ export class SceneView {
     host.appendChild(app.canvas);
     app.canvas.style.touchAction = 'none';
     app.canvas.style.display = 'block';
-    this.world.addChild(this.bgRoot, this.objRoot, this.charRoot, this.charGfx, this.occRoot, this.overlay, this.occGfx, this.brushGfx);
+    this.world.addChild(this.bgRoot, this.objRoot, this.charRoot, this.charGfx, this.occRoot, this.overlay, this.occGfx, this.searchGfx, this.brushGfx);
     app.stage.addChild(this.world);
     app.ticker.add((t) => {
       this.onTick(Math.min(0.1, t.deltaMS / 1000));
@@ -362,7 +364,8 @@ export class SceneView {
   }
   /** Lines and handles drawn by the occluders tool (shapes being drawn / edited). The callback gets one screen pixel in environment pixels. */
   setOccluderGuides(fn: ((g: Graphics, px: number, envW: number, envH: number) => void) | null) { this.guideFn = fn; this.dirty = true; }
-  private drawGuides() { this.occGfx.clear(); this.guideFn?.(this.occGfx, 1 / this.zoom, this.envW, this.envH); }
+  setSearchGuides(fn: ((g: Graphics, px: number, envW: number, envH: number) => void) | null) { this.searchFn = fn; this.dirty = true; }
+  private drawGuides() { this.occGfx.clear(); this.guideFn?.(this.occGfx, 1 / this.zoom, this.envW, this.envH); this.searchGfx.clear(); this.searchFn?.(this.searchGfx, 1 / this.zoom, this.envW, this.envH); }
   /** Translucent tint of the occluder being painted (editor, Primo piano tool). Pass null to hide it. */
   setOccluderTint(canvas: HTMLCanvasElement | null) {
     if (!canvas) { if (this.occTintSprite) this.occTintSprite.visible = false; return; }

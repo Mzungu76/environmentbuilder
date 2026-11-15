@@ -1,6 +1,7 @@
 import type { Environment, Project } from '@/types';
 import { reachableNodes } from '@/engine/simulation/routing';
 import { defaultGameplay } from './defaults';
+import { searchZoneIssues } from '@/engine/search/zones';
 
 export interface ReadinessIssue { level: 'error' | 'warn'; text: string }
 
@@ -36,6 +37,7 @@ export function gameReadiness(project: Project, env: Environment): ReadinessIssu
     if (g.collapse.minSeconds < 5) out.push({ level: 'warn', text: 'Il crollo può arrivare in meno di 5 secondi: il giocatore non avrà il tempo di fare nulla.' });
     if (!g.collapse.stages.some((s) => s.at >= 0.999)) out.push({ level: 'warn', text: 'Nessuna fase finale (a 100%): il gioco riceve comunque l’evento «collapse» alla fine.' });
   }
+  out.push(...searchZoneIssues(env));
   for (const a of env.assets) if (!a.id) out.push({ level: 'error', text: 'Immagine senza identificativo.' });
   return out;
 }

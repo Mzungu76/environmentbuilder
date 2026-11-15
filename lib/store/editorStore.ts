@@ -3,7 +3,7 @@ import { duplicateEnvironment, uniqueName } from '@/lib/serialization/clone';
 import { createEnvironment } from '@/lib/serialization/factory';
 import { saveProject } from '@/lib/persistence/db';
 
-export type ToolId = 'select' | 'pan' | 'node' | 'connect' | 'path' | 'character' | 'object' | 'zones' | 'occluders';
+export type ToolId = 'select' | 'pan' | 'node' | 'connect' | 'path' | 'character' | 'object' | 'zones' | 'occluders' | 'search';
 
 /** Brush of the scale-zones tool. */
 export interface ZoneBrush { zoneId: string | null; /** fraction of the image height */ radius: number; mode: 'paint' | 'erase'; /** 0 = very soft edge … 1 = hard */ hardness: number; /** show the resulting size map instead of the zone colours */ showResult: boolean }
@@ -16,6 +16,9 @@ export interface OccluderBrush {
   /** edit tool: index of the selected shape op of the occluder */ selectedOp: number | null;
   /** polygon / spline being drawn (points placed, not closed yet) */ drafting: boolean;
 }
+/** Tool of the search zones ("Zone di ricerca"): draw a polygon, an ellipse or a rectangle, or edit the existing ones. */
+export type SearchTool = 'polygon' | 'ellipse' | 'rect' | 'edit';
+export interface SearchToolState { tool: SearchTool; selectedId: string | null; /** polygon being drawn (points placed, not closed yet) */ drafting: boolean }
 export type EditorMode = 'editor' | 'playtest';
 export type Selection = { kind: 'node' | 'edge' | 'character' | 'object'; id: string } | null;
 export type SaveStatus = 'saved' | 'dirty' | 'saving' | 'error';
@@ -25,6 +28,7 @@ export interface EditorState {
   tool: ToolId;
   zoneBrush: ZoneBrush;
   occluderBrush: OccluderBrush;
+  searchTool: SearchToolState;
   selection: Selection;
   preview: boolean;
   mode: EditorMode;
@@ -59,7 +63,7 @@ export class EditorStore {
 
   constructor(project: Project) {
     this.state = {
-      project, tool: 'select', zoneBrush: { zoneId: null, radius: 0.05, mode: 'paint', hardness: 0.2, showResult: false }, occluderBrush: { occluderId: null, radius: 0.03, mode: 'paint', tool: 'brush', selectedOp: null, drafting: false }, selection: null, preview: false, mode: 'editor', objectType: 'generic', showPaths: false,
+      project, tool: 'select', zoneBrush: { zoneId: null, radius: 0.05, mode: 'paint', hardness: 0.2, showResult: false }, occluderBrush: { occluderId: null, radius: 0.03, mode: 'paint', tool: 'brush', selectedOp: null, drafting: false }, searchTool: { tool: 'polygon', selectedId: null, drafting: false }, selection: null, preview: false, mode: 'editor', objectType: 'generic', showPaths: false,
       saveStatus: 'saved', saveError: null, canUndo: false, canRedo: false, revision: 0,
     };
   }
@@ -80,6 +84,7 @@ export class EditorStore {
   setTool(tool: ToolId) { this.set({ tool }); }
   setZoneBrush(patch: Partial<ZoneBrush>) { this.set({ zoneBrush: { ...this.state.zoneBrush, ...patch } }); }
   setOccluderBrush(patch: Partial<OccluderBrush>) { this.set({ occluderBrush: { ...this.state.occluderBrush, ...patch } }); }
+  setSearchTool(patch: Partial<SearchToolState>) { this.set({ searchTool: { ...this.state.searchTool, ...patch } }); }
   setSelection(selection: Selection) { this.set({ selection }); }
   setPreview(preview: boolean) { this.set({ preview }); }
   setObjectType(objectType: ObjectType) { this.set({ objectType }); }
